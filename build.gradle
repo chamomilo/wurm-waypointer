@@ -14,7 +14,7 @@ if (configuredLibraryDirectory == null || configuredLibraryDirectory.toString().
     configuredLibraryDirectory = System.getenv('WURM_CLIENT_LIBS')
 }
 
-ext.waypointerVersion = findProperty('waypointerVersion') ?: '0.8.0-map-r11'
+ext.waypointerVersion = findProperty('waypointerVersion') ?: '0.8.0-map-r12'
 ext.wurmClientLibDir = configuredLibraryDirectory == null
         ? null : file(configuredLibraryDirectory.toString())
 

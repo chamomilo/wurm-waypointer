@@ -82,7 +82,8 @@ public final class SklotopolisMapService {
         if (!enabled || profile == null || fingerprint.isEmpty()) return;
 
         final String expectedKey = key;
-        final Path directory = cacheRoot.resolve(fingerprintDirectory(fingerprint));
+        final Path directory = cacheRoot.resolve(cacheDirectoryName(
+                fingerprint, profile));
         final Path surface = directory.resolve("surface.png");
         final Path deeds = directory.resolve("deeds.snapshot");
         synchronization = worker.scheduleWithFixedDelay(new Runnable() {
@@ -324,6 +325,13 @@ public final class SklotopolisMapService {
         } catch (NoSuchAlgorithmException impossible) {
             throw new IllegalStateException("SHA-256 is unavailable", impossible);
         }
+    }
+
+    static String cacheDirectoryName(String fingerprint,
+                                     ServerMapProfile profile) {
+        if (profile == null) throw new IllegalArgumentException(
+                "map profile is required");
+        return fingerprintDirectory(fingerprint + "|" + profile.getId());
     }
 
     private synchronized void cancel() {

@@ -21,7 +21,7 @@ public final class SklotopolisHighwayServiceTest {
                 SklotopolisHighwayService.sourceUrl(server(
                         "176.9.149.249", 3724, "Caza")));
         assertEquals(
-                "https://web.game.sklotopolis.com/unlimited/6/highways.json",
+                "https://web.game.sklotopolis.com/unlimited/5/highways.json",
                 SklotopolisHighwayService.sourceUrl(server(
                         "176.9.149.249", 3724, "Infinity")));
         assertEquals("", SklotopolisHighwayService.sourceUrl(server(

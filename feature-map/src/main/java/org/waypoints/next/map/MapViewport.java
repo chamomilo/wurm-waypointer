@@ -18,12 +18,29 @@ public final class MapViewport {
     public MapViewport(int mapWidth, int mapHeight, int viewportWidth,
                        int viewportHeight, double initialCenterX,
                        double initialCenterY) {
+        this(mapWidth, mapHeight, viewportWidth, viewportHeight,
+                initialCenterX, initialCenterY, 0.0d);
+    }
+
+    /**
+     * Creates a viewport focused on the supplied point. A positive initial
+     * scale keeps that point useful as the opening view instead of forcing a
+     * whole-map fit that can hide edge markers under the window chrome.
+     */
+    public MapViewport(int mapWidth, int mapHeight, int viewportWidth,
+                       int viewportHeight, double initialCenterX,
+                       double initialCenterY, double initialPixelsPerTile) {
         if (mapWidth < 1 || mapHeight < 1) throw new IllegalArgumentException(
                 "map bounds must be positive");
+        if (!finite(initialPixelsPerTile) || initialPixelsPerTile < 0.0d) {
+            throw new IllegalArgumentException(
+                    "initial pixels per tile must be finite and non-negative");
+        }
         this.mapWidth = mapWidth;
         this.mapHeight = mapHeight;
         resize(viewportWidth, viewportHeight);
-        this.pixelsPerTile = fitScale();
+        this.pixelsPerTile = clamp(Math.max(fitScale(), initialPixelsPerTile),
+                fitScale(), Math.max(fitScale(), MAXIMUM_PIXELS_PER_TILE));
         centerOn(initialCenterX, initialCenterY);
     }
 
@@ -130,7 +147,10 @@ public final class MapViewport {
     private static double clampAxis(double center, double mapSize,
                                     double visibleHalf) {
         if (visibleHalf * 2.0d >= mapSize) return mapSize / 2.0d;
-        return clamp(center, visibleHalf, mapSize - visibleHalf);
+        // Keep at least half the map attached to the viewport, but allow its
+        // water-colored surround to show. This lets an edge target remain at
+        // the center instead of pinning it underneath the window border.
+        return clamp(center, 0.0d, mapSize);
     }
 
     private static double clamp(double value, double minimum, double maximum) {

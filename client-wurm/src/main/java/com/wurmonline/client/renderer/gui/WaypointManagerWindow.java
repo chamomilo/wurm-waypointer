@@ -161,7 +161,7 @@ final class WaypointManagerWindow extends WWindow
         hoverTexts.clear();
         activeContent = null;
         lastResponsiveWidth = -1;
-        setTitle("Wurm Waypointer - Static Waypoints");
+        setTitle("Wurm Waypointer - Waypoints");
         WaypointManagerContext context = controller.context();
         WaypointManagerSnapshot options = controller.snapshot(
                 WaypointManagerQuery.builder().allServers()
@@ -299,6 +299,10 @@ final class WaypointManagerWindow extends WWindow
     }
 
     private void refreshRows() {
+        // Stale native input callbacks can arrive while an editor view owns the
+        // window and deliberately has no table. Ignore them instead of letting
+        // one delayed search/Enter event break the Manager refresh path.
+        if (table == null) return;
         try {
             WaypointManagerContext context = controller.context();
             WaypointManagerQuery query = query(context);
@@ -382,6 +386,8 @@ final class WaypointManagerWindow extends WWindow
         WButton on = button(data.isEnabled() ? "On" : "Off", ON_WIDTH);
         on.setHoverString(data.isSystemManaged()
                 ? "Enable or disable this server's managed vanilla landmark. This On/Off choice is remembered per server."
+                : data.getSourceType() == WaypointSourceType.LOOT_MAP
+                ? "Show or hide the active Loot Map waypoint without deleting hunt progress. New readings keep this choice."
                 : "Enable or disable this waypoint's compass marker, label, and world effect.");
         rowActions.put(on, new RowAction(ActionKind.TOGGLE, data.getId(),
                 data.isEnabled(), data.getName() + " [" + data.getShortId() + "]"));
@@ -417,8 +423,10 @@ final class WaypointManagerWindow extends WWindow
         }
         row.addComponent(cell(new WurmLabel(title(data.getWorldStyle().name())), STYLE_WIDTH));
 
-        if (data.isSystemManaged()) {
-            String explanation = "Managed vanilla landmark. Its server coordinates and exact vanilla renderer are fixed; only On/Off is available.";
+        if (data.isToggleOnlyManaged()) {
+            String explanation = data.isSystemManaged()
+                    ? "Managed vanilla landmark. Its server coordinates and exact vanilla renderer are fixed; only On/Off is available."
+                    : "Active Loot Map hunt waypoint. On/Off hides or restores its compass, map, label, and world marker without deleting hunt progress.";
             WurmLabel fixed = new WurmLabel("Fixed");
             registerHover(fixed, explanation);
             row.addComponent(cell(fixed, EDIT_WIDTH));

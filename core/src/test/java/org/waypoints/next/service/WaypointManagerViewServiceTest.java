@@ -13,7 +13,9 @@ import java.util.List;
 import java.time.Instant;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 public class WaypointManagerViewServiceTest {
     private final WaypointManagerViewService service = new WaypointManagerViewService();
@@ -89,6 +91,18 @@ public class WaypointManagerViewServiceTest {
                 .getRows().get(0);
         assertEquals(true, row.isTemporary());
         assertEquals(expiry, row.getExpiresAt());
+    }
+
+    @Test public void lootMapRowsAreToggleOnlyManaged() {
+        WaypointRecord loot = WaypointRecord.copyOf(records.get(0))
+                .sourceType(org.waypoints.next.model.WaypointSourceType.LOOT_MAP)
+                .sourceKey("active-hunt").build();
+        WaypointManagerRow row = service.snapshot(Arrays.asList(loot),
+                WaypointManagerQuery.builder().allServers().build())
+                .getRows().get(0);
+
+        assertFalse(row.isSystemManaged());
+        assertTrue(row.isToggleOnlyManaged());
     }
 
     @Test public void vanillaRowsStayFirstFixedOrderAndIgnoreUserFilter() {

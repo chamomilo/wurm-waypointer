@@ -11,6 +11,7 @@ import org.waypoints.next.surroundings.SurroundingsRow;
 import org.waypoints.next.surroundings.SurroundingsSnapshot;
 import org.waypoints.next.surroundings.UniqueStatus;
 import org.waypoints.next.ui.SurroundingsController;
+import org.waypoints.next.ui.SurroundingsScrollState;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -28,6 +29,7 @@ final class SurroundingsWindow extends WWindow
     private static final int ROW_HEIGHT = 25;
     private static final int TABLE_WIDTH = 950;
     private static final long AUTO_REFRESH_MILLIS = 1000L;
+    private static final long SCROLL_SETTLE_MILLIS = 1200L;
 
     private static final int MARK_WIDTH = 62;
     private static final int NAME_WIDTH = 190;
@@ -69,6 +71,8 @@ final class SurroundingsWindow extends WWindow
             new EnumMap<SurroundingKind, FilterState>(SurroundingKind.class);
     private final Map<SurroundingKind, Integer> scrollOffsets =
             new EnumMap<SurroundingKind, Integer>(SurroundingKind.class);
+    private final SurroundingsScrollState scrollState =
+            new SurroundingsScrollState(SCROLL_SETTLE_MILLIS);
 
     private SurroundingKind activeKind = SurroundingKind.ANIMAL;
     private WButton animalsTab;
@@ -134,8 +138,7 @@ final class SurroundingsWindow extends WWindow
         root.setComponent(actionRow(), WurmBorderPanel.SOUTH);
         setComponent(root);
         filteredKeys.clear();
-        refreshRows(new ScrollAnchor(scrollOffsets.get(activeKind).intValue(),
-                null, 0));
+        refreshRows(scrollOffsets.get(activeKind).intValue());
     }
 
     private FlexComponent tabAndSearchRow(String search) {
@@ -247,10 +250,10 @@ final class SurroundingsWindow extends WWindow
     }
 
     private void refreshRows() {
-        refreshRows(captureScrollAnchor());
+        refreshRows(captureScrollOffset());
     }
 
-    private void refreshRows(ScrollAnchor anchor) {
+    private void refreshRows(int scrollOffset) {
         try {
             SurroundingsSnapshot snapshot = controller.snapshot(query());
             displayedRevision = snapshot.getRevision();
@@ -266,7 +269,7 @@ final class SurroundingsWindow extends WWindow
             table.removeAllComponents();
             table.addComponents(components.toArray(
                     new FlexComponent[components.size()]));
-            restoreScroll(anchor);
+            restoreScroll(scrollOffset);
             countLabel.setLabel(snapshot.getFilteredCount() + " of "
                     + snapshot.getTotalCount() + " "
                     + activeKind.name().toLowerCase(Locale.ENGLISH)
@@ -424,27 +427,18 @@ final class SurroundingsWindow extends WWindow
         rebuildView(search);
     }
 
-    private ScrollAnchor captureScrollAnchor() {
-        int offset = scrollPanel == null
+    private int captureScrollOffset() {
+        return scrollPanel == null
                 ? scrollOffsets.get(activeKind).intValue()
                 : Math.max(0, scrollPanel.yo);
-        int slot = offset / ROW_HEIGHT;
-        SurroundingKey key = slot > 0 && slot - 1 < filteredKeys.size()
-                ? filteredKeys.get(slot - 1) : null;
-        return new ScrollAnchor(offset, key, offset % ROW_HEIGHT);
     }
 
-    private void restoreScroll(ScrollAnchor anchor) {
+    private void restoreScroll(int requestedOffset) {
         if (scrollPanel == null) return;
-        int offset = anchor == null ? 0 : anchor.pixelOffset;
-        if (anchor != null && anchor.key != null) {
-            int index = filteredKeys.indexOf(anchor.key);
-            if (index >= 0) {
-                offset = (index + 1) * ROW_HEIGHT + anchor.rowOffset;
-            }
-        }
-        scrollPanel.scrollDownTo(offset);
-        scrollOffsets.put(activeKind, Integer.valueOf(scrollPanel.yo));
+        scrollPanel.scrollDownTo(Math.max(0, requestedOffset));
+        int restored = Math.max(0, scrollPanel.yo);
+        scrollOffsets.put(activeKind, Integer.valueOf(restored));
+        scrollState.synchronize(restored);
     }
 
     private void rememberScrollOffset() {
@@ -496,7 +490,13 @@ final class SurroundingsWindow extends WWindow
     @Override public void gameTick() {
         super.gameTick();
         long now = System.currentTimeMillis();
-        if (now < nextAutoRefreshAt) return;
+        if (scrollPanel != null) {
+            int offset = Math.max(0, scrollPanel.yo);
+            if (scrollState.observe(offset, now)) {
+                scrollOffsets.put(activeKind, Integer.valueOf(offset));
+            }
+        }
+        if (now < nextAutoRefreshAt || !scrollState.permitsAutoRefresh(now)) return;
         nextAutoRefreshAt = now + AUTO_REFRESH_MILLIS;
         if (controller.revision() != displayedRevision) refreshRows();
     }
@@ -750,16 +750,4 @@ final class SurroundingsWindow extends WWindow
         }
     }
 
-    private static final class ScrollAnchor {
-        private final int pixelOffset;
-        private final SurroundingKey key;
-        private final int rowOffset;
-
-        private ScrollAnchor(int pixelOffset, SurroundingKey key,
-                             int rowOffset) {
-            this.pixelOffset = Math.max(0, pixelOffset);
-            this.key = key;
-            this.rowOffset = Math.max(0, rowOffset);
-        }
-    }
 }

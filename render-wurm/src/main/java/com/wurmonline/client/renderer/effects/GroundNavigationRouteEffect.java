@@ -80,7 +80,7 @@ public final class GroundNavigationRouteEffect extends Effect
     private final float green;
     private final float blue;
     private final float alpha;
-    private final NavigationRouteVisualStyle visualStyle;
+    private volatile NavigationRouteVisualStyle visualStyle;
     private final float pulseMaximumDistanceMetres;
     private final float maximumSlopeDirt;
     private final float maximumWaterDepthMetres;
@@ -202,17 +202,25 @@ public final class GroundNavigationRouteEffect extends Effect
     private void renderRoute(Queue queue, boolean tunnelMainPass) {
         RouteSnapshot visible = route;
         int pointCount = visible.count;
+        NavigationRouteVisualStyle currentStyle = visualStyle;
 
-        if (visualStyle == NavigationRouteVisualStyle.PULSE) {
+        if (currentStyle == NavigationRouteVisualStyle.PULSE) {
             if (pointCount < 2 && pulsePointCount < 2) return;
             renderPulse(queue, visible, tunnelMainPass);
         } else if (pointCount < 2) {
             return;
-        } else if (visualStyle == NavigationRouteVisualStyle.SOLID) {
+        } else if (currentStyle == NavigationRouteVisualStyle.SOLID) {
             renderSolid(queue, visible, tunnelMainPass);
         } else {
             renderMovingDashes(queue, visible, tunnelMainPass);
         }
+    }
+
+    /** Changes only presentation; the planned route and its statistics survive. */
+    public void setVisualStyle(NavigationRouteVisualStyle value) {
+        if (value == null) throw new IllegalArgumentException(
+                "navigation route visual style is required");
+        visualStyle = value;
     }
 
     private void renderMovingDashes(Queue queue, RouteSnapshot visible,

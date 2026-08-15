@@ -14,4 +14,15 @@ public final class NavigationRouteStatisticsWindowBridgeTest {
         assertTrue(NavigationRouteStatisticsWindowBridge.shouldCreateWindow(
                 true, false));
     }
+
+    @Test public void userCloseSuppressesOnlyCurrentTargetOnCurrentHud() {
+        assertTrue(NavigationRouteStatisticsWindowBridge.shouldRemainDismissed(
+                true, true, true));
+        assertFalse(NavigationRouteStatisticsWindowBridge.shouldRemainDismissed(
+                true, true, false));
+        assertFalse(NavigationRouteStatisticsWindowBridge.shouldRemainDismissed(
+                true, false, true));
+        assertFalse(NavigationRouteStatisticsWindowBridge.shouldRemainDismissed(
+                false, true, true));
+    }
 }

@@ -45,9 +45,28 @@ public final class MapViewportTest {
         viewport.panByPixels(1_000_000.0d, 1_000_000.0d);
         assertTrue(viewport.getCenterX() >= 0.0d);
         assertTrue(viewport.getCenterY() >= 0.0d);
-        MapPoint corner = viewport.screenToMap(0.0d, 0.0d);
-        assertTrue(corner.getX() >= -EPSILON);
-        assertTrue(corner.getY() >= -EPSILON);
+        assertTrue(viewport.getCenterX() <= viewport.getMapWidth());
+        assertTrue(viewport.getCenterY() <= viewport.getMapHeight());
+        MapPoint mapOrigin = viewport.mapToScreen(0.0d, 0.0d);
+        assertEquals(viewport.getViewportWidth() / 2.0d,
+                mapOrigin.getX(), EPSILON);
+        assertEquals(viewport.getViewportHeight() / 2.0d,
+                mapOrigin.getY(), EPSILON);
+    }
+
+    @Test public void focusedOpeningViewKeepsPlayersAtVerticalEdgesVisible() {
+        MapViewport north = new MapViewport(4096, 4096,
+                920, 620, 2048.5d, 0.5d, 0.42d);
+        MapPoint northPlayer = north.mapToScreen(2048.5d, 0.5d);
+        assertEquals(0.42d, north.getPixelsPerTile(), EPSILON);
+        assertEquals(460.0d, northPlayer.getX(), EPSILON);
+        assertEquals(310.0d, northPlayer.getY(), EPSILON);
+
+        MapViewport south = new MapViewport(4096, 4096,
+                920, 620, 2048.5d, 4095.5d, 0.42d);
+        MapPoint southPlayer = south.mapToScreen(2048.5d, 4095.5d);
+        assertEquals(460.0d, southPlayer.getX(), EPSILON);
+        assertEquals(310.0d, southPlayer.getY(), EPSILON);
     }
 
     @Test public void deedFocusCentersAndZoomsWithoutZoomingOut() {

@@ -100,6 +100,7 @@ public final class StaticNavigationController {
     private int appliedPlayerLayer = Integer.MIN_VALUE;
     private long refreshAtNanos;
     private boolean forceReconcile = true;
+    private boolean navigationPulseEnabled = true;
     private PreviewDraft managerDraft;
     private long managerDraftRevision;
 
@@ -217,6 +218,7 @@ public final class StaticNavigationController {
     public synchronized void configure(WaypointRenderConfiguration value) {
         if (navigatorEffect != null) clearNavigatorEffect();
         configuration = value == null ? WaypointRenderConfiguration.defaults() : value;
+        navigationPulseEnabled = true;
         highwaySource.configure(configuration);
         forceReconcile = true;
         labelReconcileState.reset();
@@ -352,6 +354,22 @@ public final class StaticNavigationController {
         return waypointId != null && active != null
                 && waypointId.equals(active.getWaypointId())
                 && serverKey.equalsIgnoreCase(active.getServerFingerprint());
+    }
+
+    /** Session-only switch used by /wp nav pulse; navigation ownership remains. */
+    public synchronized void setNavigationPulseEnabled(boolean enabled) {
+        if (navigationPulseEnabled == enabled) return;
+        navigationPulseEnabled = enabled;
+        if (navigatorEffect != null && navigatorEffect.isAlive()) {
+            navigatorEffect.setVisualStyle(effectiveNavigationRouteVisualStyle(
+                    configuration.getNavigationRouteVisualStyle(), enabled));
+        } else {
+            forceReconcile = true;
+        }
+    }
+
+    public synchronized boolean isNavigationPulseEnabled() {
+        return navigationPulseEnabled;
     }
 
     public synchronized void managerEnabledChanged(UUID waypointId,
@@ -610,7 +628,9 @@ public final class StaticNavigationController {
                     coordinate.getLayer() == WaypointLayer.CAVE ? -1 : 0,
                     style.getRed(), style.getGreen(), style.getBlue(),
                     style.getAlpha(),
-                    configuration.getNavigationRouteVisualStyle(),
+                    effectiveNavigationRouteVisualStyle(
+                            configuration.getNavigationRouteVisualStyle(),
+                            navigationPulseEnabled),
                     configuration.getNavigationPulseMaximumDistanceMetres(),
                     configuration.getNavigationCartMaximumSlopeDirt(),
                     configuration.getNavigationCartMaximumWaterDepthMetres(),
@@ -636,6 +656,18 @@ public final class StaticNavigationController {
             if (failure instanceof Error) throw (Error) failure;
             throw new IllegalStateException("navigator start failed", failure);
         }
+    }
+
+    static org.waypoints.next.navigation.NavigationRouteVisualStyle
+    effectiveNavigationRouteVisualStyle(
+            org.waypoints.next.navigation.NavigationRouteVisualStyle configured,
+            boolean pulseEnabled) {
+        if (configured == null) {
+            configured = org.waypoints.next.navigation.NavigationRouteVisualStyle
+                    .MOVING_DASHES;
+        }
+        return pulseEnabled ? configured
+                : org.waypoints.next.navigation.NavigationRouteVisualStyle.SOLID;
     }
 
     private void clearNavigatorEffect() {

@@ -20,7 +20,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public final class WurmWaypointerMod implements WurmClientMod, Configurable, PreInitable, Initable {
-    public static final String VERSION = "0.8.0-map-r11";
+    public static final String VERSION = "0.8.0-map-r12";
     private static final Logger LOGGER = Logger.getLogger("WurmWaypointer");
     private static volatile BeamProbeConfiguration configuration =
             BeamProbeConfiguration.disabled();

@@ -111,7 +111,7 @@ public final class WurmWaypointerRuntime {
                 }
                 @Override public WaypointManagerSnapshot snapshot(WaypointManagerQuery query) {
                     return STATIC_WAYPOINTS.managerSnapshot(
-                            query, VANILLA_LANDMARKS.records());
+                            query, managerSupplementalRecords());
                 }
                 @Override public WaypointEditData editData(UUID id) {
                     return STATIC_WAYPOINTS.editData(id);
@@ -179,7 +179,11 @@ public final class WurmWaypointerRuntime {
                     return active;
                 }
                 @Override public void setEnabled(UUID id, boolean enabled) {
-                    if (VANILLA_LANDMARKS.setEnabled(id, enabled)) {
+                    if (LOOT_MAPS.setEnabled(id, enabled)) {
+                        STATIC_NAVIGATION.managerEnabledChanged(id, enabled);
+                        event((enabled ? "Enabled: " : "Disabled: ")
+                                + "active Loot Map waypoint. Hunt progress was kept.");
+                    } else if (VANILLA_LANDMARKS.setEnabled(id, enabled)) {
                         event((enabled ? "Enabled: " : "Disabled: ")
                                 + VANILLA_LANDMARKS.displayName(id)
                                 + ". Vanilla landmark state saved for this server.");
@@ -191,8 +195,12 @@ public final class WurmWaypointerRuntime {
                 @Override public void setEnabled(List<UUID> ids, boolean enabled) {
                     List<UUID> ordinary = new ArrayList<UUID>();
                     int vanilla = 0;
+                    int lootMaps = 0;
                     for (UUID id : ids) {
-                        if (VANILLA_LANDMARKS.setEnabled(id, enabled)) vanilla++;
+                        if (LOOT_MAPS.setEnabled(id, enabled)) {
+                            lootMaps++;
+                            STATIC_NAVIGATION.managerEnabledChanged(id, enabled);
+                        } else if (VANILLA_LANDMARKS.setEnabled(id, enabled)) vanilla++;
                         else ordinary.add(id);
                     }
                     if (!ordinary.isEmpty()) {
@@ -205,6 +213,10 @@ public final class WurmWaypointerRuntime {
                     if (vanilla > 0) {
                         event((enabled ? "Enabled " : "Disabled ") + vanilla
                                 + " vanilla landmark(s) for this server.");
+                    }
+                    if (lootMaps > 0) {
+                        event((enabled ? "Enabled " : "Disabled ") + lootMaps
+                                + " Loot Map waypoint(s). Hunt progress was kept.");
                     }
                 }
                 @Override public void delete(UUID id) {
@@ -220,13 +232,23 @@ public final class WurmWaypointerRuntime {
                     WurmWaypointerRuntime.openSurroundings();
                 }
                 @Override public long revision() {
-                    return STATIC_WAYPOINTS.revision() * 31L
-                            + VANILLA_LANDMARKS.revision();
+                    return (STATIC_WAYPOINTS.revision() * 31L
+                            + VANILLA_LANDMARKS.revision()) * 31L
+                            + LOOT_MAPS.revision();
                 }
                 @Override public void reportFailure(String operation, Throwable failure) {
                     STATIC_WAYPOINTS.reportManagerFailure(operation, failure, hud);
                 }
             };
+
+    private static List<org.waypoints.next.model.WaypointRecord>
+    managerSupplementalRecords() {
+        List<org.waypoints.next.model.WaypointRecord> records =
+                new ArrayList<org.waypoints.next.model.WaypointRecord>();
+        records.addAll(VANILLA_LANDMARKS.records());
+        records.addAll(LOOT_MAPS.records());
+        return records;
+    }
     private static final SurroundingsController SURROUNDINGS_CONTROLLER =
             new SurroundingsController() {
                 @Override public SurroundingsSnapshot snapshot(SurroundingsQuery query) {
@@ -450,6 +472,24 @@ public final class WurmWaypointerRuntime {
         String[] values = WaypointCommandArguments.withoutRepeatedCommand(
                 command, arguments);
         if (values.length == 0 || !"nav".equalsIgnoreCase(values[0])) return false;
+        if (values.length >= 2 && "pulse".equalsIgnoreCase(values[1])) {
+            String operation = values.length < 3 ? "status" : values[2];
+            if ("off".equalsIgnoreCase(operation)) {
+                STATIC_NAVIGATION.setNavigationPulseEnabled(false);
+                event("Navigation pulse is off for this client session. "
+                        + "The active Navigator keeps a solid route.");
+            } else if ("on".equalsIgnoreCase(operation)) {
+                STATIC_NAVIGATION.setNavigationPulseEnabled(true);
+                event("Navigation pulse is on for this client session.");
+            } else if ("status".equalsIgnoreCase(operation)) {
+                event("Navigation pulse is "
+                        + (STATIC_NAVIGATION.isNavigationPulseEnabled()
+                        ? "on" : "off") + ".");
+            } else {
+                event("Usage: /wp nav pulse on | off | status");
+            }
+            return true;
+        }
         NavigationRenderFrame current = currentNavigationFrame();
         if (current == null || current.getSnapshot() == null) {
             event("Navigator is not ready yet.");

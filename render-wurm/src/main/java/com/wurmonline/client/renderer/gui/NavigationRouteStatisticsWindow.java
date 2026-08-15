@@ -2,7 +2,7 @@ package com.wurmonline.client.renderer.gui;
 
 import org.waypoints.next.navigation.NavigationRouteStatistics;
 
-/** Always-on compact debug window for the active navigator route. */
+/** Compact statistics window for the active navigator route. */
 final class NavigationRouteStatisticsWindow extends WWindow {
     static final int PREFERRED_WIDTH = 410;
     static final int PREFERRED_HEIGHT = 232;
@@ -21,7 +21,7 @@ final class NavigationRouteStatisticsWindow extends WWindow {
         super("wurm-waypointer.navigation-route-statistics", false);
         setTitle("Wurm Waypointer - Route Statistics");
         resizable = false;
-        closeable = false;
+        closeable = true;
 
         WurmArrayPanel<FlexComponent> rows =
                 new WurmArrayPanel<FlexComponent>(
@@ -69,7 +69,7 @@ final class NavigationRouteStatisticsWindow extends WWindow {
     }
 
     @Override void closePressed() {
-        // This debug window follows the active navigator and closes with it.
+        NavigationRouteStatisticsWindowBridge.closed(this);
     }
 
     private static WurmLabel label(String text) {

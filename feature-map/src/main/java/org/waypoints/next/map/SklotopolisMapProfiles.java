@@ -20,9 +20,9 @@ public final class SklotopolisMapProfiles {
     public static final ServerMapProfile CAZA = profile(
             "sklotopolis-caza", "Sklotopolis Caza", 4, 2048);
     public static final ServerMapProfile OLD_INFINITY = profile(
-            "sklotopolis-old-infinity", "Sklotopolis Old Infinity", 5, 2048);
+            "sklotopolis-old-infinity", "Sklotopolis Old Infinity", 6, 2048);
     public static final ServerMapProfile INFINITY = profile(
-            "sklotopolis-infinity", "Sklotopolis Infinity", 6, 2048);
+            "sklotopolis-infinity-r5", "Sklotopolis Infinity Round 5", 5, 2048);
 
     private static final List<ServerMapProfile> ALL =
             Collections.unmodifiableList(Arrays.asList(

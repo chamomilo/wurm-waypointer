@@ -25,6 +25,7 @@ public final class NavigationRouteStatisticsWindowBridge {
     private static NavigationRouteStatistics lastStatistics;
     private static String lastWaypointName = "";
     private static String lastLootMapSummary = "";
+    private static NavigationTargetKey userDismissedTargetKey;
     private static final LootMapStatisticsMemory LOOT_MAP_STATISTICS =
             new LootMapStatisticsMemory(32);
 
@@ -39,6 +40,12 @@ public final class NavigationRouteStatisticsWindowBridge {
             return;
         }
         try {
+            boolean sameHud = owner == hud;
+            boolean sameDismissedTarget = userDismissedTargetKey != null
+                    && userDismissedTargetKey.equals(target.getKey());
+            if (shouldRemainDismissed(userDismissedTargetKey != null,
+                    sameHud, sameDismissedTarget)) return;
+            userDismissedTargetKey = null;
             if (shouldCreateWindow(window != null, owner == hud)) {
                 discardWindow("HUD replacement");
                 owner = hud;
@@ -99,6 +106,7 @@ public final class NavigationRouteStatisticsWindowBridge {
         lastStatistics = null;
         lastWaypointName = "";
         lastLootMapSummary = "";
+        userDismissedTargetKey = null;
     }
 
     /**
@@ -108,6 +116,26 @@ public final class NavigationRouteStatisticsWindowBridge {
      */
     static boolean shouldCreateWindow(boolean hasWindow, boolean sameHud) {
         return !hasWindow || !sameHud;
+    }
+
+    static boolean shouldRemainDismissed(boolean dismissed, boolean sameHud,
+                                         boolean sameTarget) {
+        return dismissed && sameHud && sameTarget;
+    }
+
+    static synchronized void closed(NavigationRouteStatisticsWindow value) {
+        if (value == null || value != window) return;
+        userDismissedTargetKey = targetKey;
+        try {
+            if (owner != null && owner.getComponents().contains(window)) {
+                remove(owner, window);
+            }
+            LOGGER.info("Route statistics window closed by user: target="
+                    + String.valueOf(targetKey));
+        } catch (Throwable failure) {
+            LOGGER.log(Level.FINE,
+                    "Route statistics window close failed open", failure);
+        }
     }
 
     private static void discardWindow(String reason) {
@@ -133,6 +161,7 @@ public final class NavigationRouteStatisticsWindowBridge {
         lastStatistics = null;
         lastWaypointName = "";
         lastLootMapSummary = "";
+        userDismissedTargetKey = null;
     }
 
     private static void add(HeadsUpDisplay hud, WurmComponent component)

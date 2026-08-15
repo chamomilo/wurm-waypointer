@@ -144,11 +144,6 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
             throw new GradleException(
                     'Installable Wurm Waypointer artifact is missing ' + mapWordmark)
         }
-        def mapParchment = 'org/waypoints/next/map/sklotopolis-map-parchment.png'
-        if (contents.matching { include mapParchment }.files.empty) {
-            throw new GradleException(
-                    'Installable Wurm Waypointer artifact is missing ' + mapParchment)
-        }
         def forbidden = contents.matching {
             include 'com/hypercore/**'
             include 'com/wurmonline/client/renderer/gui/WaypointComponent.class'
@@ -175,7 +170,6 @@ task dist(type: Zip, dependsOn: [test, verifyArtifact]) {
             from(rootProject.file(
                     'client-wurm/src/main/resources/org/waypoints/next/map')) {
                 include 'sklotopolis-wordmark.png'
-                include 'sklotopolis-map-parchment.png'
             }
         }
     }
@@ -205,7 +199,6 @@ task dist(type: Zip, dependsOn: [test, verifyArtifact]) {
                 'mods/wurm-waypointer/LICENSE',
                 'mods/wurm-waypointer/COPYING.LESSER',
                 'mods/wurm-waypointer/assets/sklotopolis-wordmark.png',
-                'mods/wurm-waypointer/assets/sklotopolis-map-parchment.png',
                 'mods/wurm-waypointer/wurm-waypointer.jar'
         ].sort()
         if (actual != expected) {

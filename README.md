@@ -9,10 +9,10 @@ Its main purpose is to let you create waypoints and navigate to them using a glo
 ## Main features
 
 1. **Waypoints**
-   Create permanent or temporary waypoints and customize their size, pictogram, color, or white-light beam style. Waypoints can notify you when you arrive. You can also share them through chat, import waypoints shared by other players, or create one from a `/gps` message.
+   Create permanent or temporary waypoints and customize their size, pictogram, color, or white-light beam style. Waypoints can notify you when you arrive. You can also share them through chat, import waypoints shared by other players, or create one from a `/gps` message. An active Loot Map waypoint also appears in the Manager: switch it `Off` to hide it without losing hunt progress, then switch it `On` to restore it.
 
 2. **Sklotopolis maps in-game**
-   The server maps for all four Sklotopolis worlds are now available directly inside Wurm. Press `M` to see your position, waypoints, deeds, and published highways. Click a deed marker to view its details, or click anywhere else on the map to create a waypoint and start navigating to it.
+   The server maps for all four Sklotopolis worlds are now available directly inside Wurm. Press `M` to see your position, waypoints, deeds, and published highways. Use the `DEEDS`, `ROADS`, and `MARKS` buttons beside deed search to hide crowded overlay layers. Click a deed marker to view its details, or click anywhere else on the map to create a waypoint and start navigating to it.
 
 3. **Casual Loot Map hunting**
    Read your Loot Map and follow the white rabbit! Waypointer uses the readings to estimate the treasure location and tries to minimize the number of readings required. Its route planner can guide you across roads and bridges, through tunnels, and deep inside mountains.
@@ -22,6 +22,8 @@ Its main purpose is to let you create waypoints and navigate to them using a glo
 
 5. **Surroundings browser**
    If you have used Bdew's Scanner, the idea will feel familiar. The Surroundings window displays nearby animals, vehicles, containers, and other objects. You can search and filter the list, mark any result with a temporary waypoint, and immediately navigate to it.
+
+The Navigator route-statistics window can be closed normally. To keep a route active but replace its animated navigation pulse with a steady line for the current client session, use `/wp nav pulse off`; restore it with `/wp nav pulse on`, or check it with `/wp nav pulse status`. `/wp nav off` still stops Navigator completely.
 
 ## Installation
 
@@ -46,6 +48,6 @@ Please try the mod and share your feedback! Bug reports and suggestions will hel
 
 Download and source code: https://github.com/chamomilo/wurm-waypointer
 
-Special thanks to **Wolfbane** and **FlpSilva** for beta testing.
+Special thanks to **Wolfbane** and **FlpSilva** for beta testing, and to **Killerspike** for thoughtful suggestions and detailed bug reports.
 
 Licensed under `LGPL-3.0-only`.

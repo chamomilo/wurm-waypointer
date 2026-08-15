@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -57,6 +58,7 @@ final class LootMapRuntime implements DynamicWaypointProvider {
     private MapBounds bounds;
     private LootMapHuntSession hunt;
     private WaypointRecord record;
+    private boolean waypointEnabled = true;
     private long revision;
     private long combinedRevision;
     private long combinedBaseRevision = Long.MIN_VALUE;
@@ -124,6 +126,7 @@ final class LootMapRuntime implements DynamicWaypointProvider {
             synchronized (this) {
                 if (hunt == null || hunt.isClosed()) {
                     hunt = new LootMapHuntSession(logDirectory, bounds, observation);
+                    waypointEnabled = true;
                     exactReadingChimed = false;
                     messages.add("Loot Map hunt started; log: "
                             + hunt.getLogFile().getFileName());
@@ -137,6 +140,11 @@ final class LootMapRuntime implements DynamicWaypointProvider {
             WaypointRecord next = record(context, current, decision, digForLoot);
             boolean playDigChime = false;
             synchronized (this) {
+                // Manager On/Off is session state, not hunt progress. Preserve it
+                // when a fresh reading moves or renames the dynamic waypoint.
+                if (!waypointEnabled) {
+                    next = WaypointRecord.copyOf(next).enabled(false).build();
+                }
                 record = next;
                 revision++;
                 if (digForLoot && !exactReadingChimed) {
@@ -145,8 +153,10 @@ final class LootMapRuntime implements DynamicWaypointProvider {
                 }
             }
             if (playDigChime) digChimes.add(Boolean.TRUE);
-            navigationRequests.add(new NavigationTargetKey(
-                    next.getServerIdentity().getEndpointFingerprint(), next.getId()));
+            if (next.isEnabled()) {
+                navigationRequests.add(new NavigationTargetKey(
+                        next.getServerIdentity().getEndpointFingerprint(), next.getId()));
+            }
             String mode = decision.getMode().name().toLowerCase(
                     java.util.Locale.ENGLISH).replace('_', '-');
             String landAdjustment = decision.isLandAdjusted()
@@ -184,6 +194,21 @@ final class LootMapRuntime implements DynamicWaypointProvider {
         return record == null ? Collections.<WaypointRecord>emptyList()
                 : Collections.singletonList(record);
     }
+
+    /** Identifies and toggles only the current dynamic Loot Map waypoint. */
+    synchronized boolean setEnabled(UUID id, boolean value) {
+        if (id == null || record == null || !id.equals(record.getId())) return false;
+        waypointEnabled = value;
+        if (record.isEnabled() != value) {
+            record = WaypointRecord.copyOf(record).enabled(value)
+                    .updatedAt(Instant.now()).build();
+            revision++;
+        }
+        if (!value) navigationRequests.clear();
+        return true;
+    }
+
+    synchronized long revision() { return revision; }
 
     @Override public String pollMessage() { return messages.poll(); }
 
@@ -262,9 +287,11 @@ final class LootMapRuntime implements DynamicWaypointProvider {
             revision++;
         }
         current.event("chest_dug_up", at);
-        navigationRequests.add(new NavigationTargetKey(
-                currentRecord.getServerIdentity().getEndpointFingerprint(),
-                currentRecord.getId()));
+        if (currentRecord.isEnabled()) {
+            navigationRequests.add(new NavigationTargetKey(
+                    currentRecord.getServerIdentity().getEndpointFingerprint(),
+                    currentRecord.getId()));
+        }
         messages.add("Loot Map chest found; clear the ambush and open the chest.");
     }
 
@@ -324,6 +351,7 @@ final class LootMapRuntime implements DynamicWaypointProvider {
             awaitingChestOpen = false;
             pendingChestOpenItemId = null;
             exactReadingChimed = false;
+            waypointEnabled = true;
             navigationRequests.clear();
             if (record != null) { record = null; revision++; }
         }

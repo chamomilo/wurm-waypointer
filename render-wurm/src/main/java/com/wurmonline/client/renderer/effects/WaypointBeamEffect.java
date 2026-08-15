@@ -43,6 +43,7 @@ public final class WaypointBeamEffect extends Effect
     private final float throughWallWidth;
     private final VisualMode visualMode;
     private final float markerSize;
+    private final int statePrimerOffset;
     private final int extraGeometryOffset;
     private final long animationStartedNanos = System.nanoTime();
     private float width;
@@ -102,11 +103,13 @@ public final class WaypointBeamEffect extends Effect
         this.markerSize = positiveFinite(markerSize, "marker size");
         setColor(red, green, blue, alpha);
         int crossVertexCount = VERTICES_PER_CROSS * (throughWalls ? 2 : 1);
-        this.extraGeometryOffset = crossVertexCount;
+        this.statePrimerOffset = crossVertexCount;
+        int primerVertexCount = throughWalls ? VERTICES_PER_CROSS : 0;
+        this.extraGeometryOffset = crossVertexCount + primerVertexCount;
         int extraVertexCount = visualMode == VisualMode.CIRCLE
                 ? CIRCLE_VERTEX_COUNT : 0;
         this.vbo = VertexBuffer.create(VertexBuffer.Usage.EFFECT,
-                crossVertexCount + extraVertexCount,
+                crossVertexCount + primerVertexCount + extraVertexCount,
                 true, false, false, true, false, 0, 0, true, false);
         this.material = GLHelper.useDeferredShading()
                 ? Material.load("material.simple").instance() : null;
@@ -199,6 +202,8 @@ public final class WaypointBeamEffect extends Effect
                     geometryH - lineBelow, top,
                     adaptiveThroughWallWidth * 0.5f, 0.0f,
                     renderRed, renderGreen, renderBlue, alpha);
+            putStatePrimer(vertices, renderX, renderY,
+                    geometryH - lineBelow, top);
         }
         if (visualMode == VisualMode.CIRCLE) {
             putCircleWall(vertices, renderX, renderY, geometryH,
@@ -210,7 +215,10 @@ public final class WaypointBeamEffect extends Effect
         vbo.unlock();
 
         if (fieldScale > 0.0f) queuePrimitive(queue, 0, false);
-        if (throughWalls) queuePrimitive(queue, VERTICES_PER_CROSS, true);
+        if (throughWalls) {
+            queueStatePrimer(queue);
+            queuePrimitive(queue, VERTICES_PER_CROSS, true);
+        }
         if (fieldScale > 0.0f && visualMode == VisualMode.CIRCLE) {
             queueExtraGeometry(queue, CIRCLE_VERTEX_COUNT, false);
         }
@@ -225,6 +233,7 @@ public final class WaypointBeamEffect extends Effect
                     + ", geometryDistance=" + geometryDistance
                     + ", markerSize=" + markerSize
                     + ", lineOnlyFallback=" + lineOnly
+                    + ", statePrimer=" + throughWalls
                     + ", fieldScale=" + fieldScale
                     + ", renderedHalfHeight=" + renderedHalfHeight
                     + ", throughWallBottom=" + (geometryH - lineBelow)
@@ -290,6 +299,41 @@ public final class WaypointBeamEffect extends Effect
             primitive.depthwrite = false;
             primitive.nofog = true;
         }
+        queue.queue(primitive, null);
+    }
+
+    private void putStatePrimer(FloatBuffer vertices, float renderX,
+                                float renderY, float bottom, float top) {
+        // Degenerate, fully transparent geometry: it reaches the renderer's
+        // state machine but cannot contribute a pixel.
+        putCross(vertices, renderX, renderY, bottom, top,
+                0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+    }
+
+    private void queueStatePrimer(Queue queue) {
+        Primitive primitive = queue.reservePrimitive();
+        primitive.copyStateFrom(RenderState.RENDERSTATE_ALPHABLEND);
+        // Wurm caches these states globally across queues. Using a state that
+        // differs from the real through-wall line guarantees that the line's
+        // ALPHAADD/ALPHABLEND + ALWAYS state is reapplied even when that cache
+        // was left out of sync by a server or render-pipeline transition.
+        primitive.blendmode = Primitive.BlendMode.ADD;
+        primitive.depthtest = Primitive.TestFunc.LESSEQUAL;
+        primitive.depthwrite = false;
+        primitive.nofog = false;
+        primitive.clearTextures();
+        if (material != null) {
+            primitive.materialInstance = material;
+            primitive.program = material.getProgram();
+            primitive.bindings = material.getProgramBindings();
+        }
+        primitive.type = Primitive.Type.TRIANGLESTRIP;
+        primitive.twosided = true;
+        primitive.nolight = true;
+        primitive.vertex = vbo;
+        primitive.index = null;
+        primitive.offset = statePrimerOffset;
+        primitive.num = VERTICES_PER_CROSS - 2;
         queue.queue(primitive, null);
     }
 

@@ -10,9 +10,7 @@ JAR and contains no copied Keybinder implementation source.
 
 Wurm Unlimited client classes and the client modloader are compile-time/runtime
 dependencies supplied by the user's Wurm installation. They are not bundled in
-the Wurm Waypointer artifact. The decorative M-map parchment is an adapted
-local UI backing based on the Wurm `map.freedom` artwork; the island depictions
-and labels were removed for use behind the active server map.
+the Wurm Waypointer artifact.
 
 On recognized Sklotopolis Liberty, Novus, Caza, and Infinity servers, the map
 and navigation modules may retrieve the server operator's published flat map,

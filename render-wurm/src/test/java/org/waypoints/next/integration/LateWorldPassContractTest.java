@@ -11,6 +11,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 /** Locks every custom world primitive to one cave-independent late queue. */
 public final class LateWorldPassContractTest {
@@ -53,6 +54,20 @@ public final class LateWorldPassContractTest {
                 boundary.getSignature());
     }
 
+    @Test public void throughWallBeamPrimesCachedStateWithoutVanillaEffects()
+            throws Exception {
+        CtClass beam = ClassPool.getDefault().get(
+                "com.wurmonline.client.renderer.effects.WaypointBeamEffect");
+        CtMethod render = beam.getDeclaredMethod("renderWorld");
+        CtMethod primer = beam.getDeclaredMethod("queueStatePrimer");
+
+        assertEquals(1, callCount(render, "putStatePrimer"));
+        assertEquals(1, callCount(render, "queueStatePrimer"));
+        assertEquals(1, callCount(primer, "queue"));
+        assertTrue(readsStaticField(primer, "ADD"));
+        assertTrue(readsStaticField(primer, "LESSEQUAL"));
+    }
+
     private static int callCount(CtMethod method, String methodName)
             throws Exception {
         CodeAttribute code = method.getMethodInfo2().getCodeAttribute();
@@ -68,5 +83,19 @@ public final class LateWorldPassContractTest {
             if (methodName.equals(constants.getMethodrefName(reference))) count++;
         }
         return count;
+    }
+
+    private static boolean readsStaticField(CtMethod method, String fieldName)
+            throws Exception {
+        CodeAttribute code = method.getMethodInfo2().getCodeAttribute();
+        CodeIterator iterator = code.iterator();
+        ConstPool constants = code.getConstPool();
+        while (iterator.hasNext()) {
+            int position = iterator.next();
+            if (iterator.byteAt(position) != Opcode.GETSTATIC) continue;
+            int reference = iterator.u16bitAt(position + 1);
+            if (fieldName.equals(constants.getFieldrefName(reference))) return true;
+        }
+        return false;
     }
 }

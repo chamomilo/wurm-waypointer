@@ -130,6 +130,49 @@ public class LootMapRuntimeTest {
         runtime.dismiss();
     }
 
+    @Test public void managerToggleHidesWaypointWithoutLosingHuntProgress()
+            throws Exception {
+        Properties properties = new Properties();
+        properties.setProperty("lootMapLogDirectory",
+                temporary.getRoot().getAbsolutePath());
+        LootMapRuntime runtime = new LootMapRuntime(Logger.getAnonymousLogger());
+        WaypointClientConfiguration configuration =
+                WaypointClientConfiguration.from(properties);
+        runtime.configure(configuration);
+        LootMapRuntime.EventContext context = new LootMapRuntime.EventContext(
+                1000, 1000, 0.0d, 100.0d, WaypointLayer.SURFACE,
+                server(), "Tester", Instant.parse("2026-08-08T12:00:00Z"),
+                configuration.getMapBounds());
+
+        assertTrue(runtime.observe(":Event",
+                "The marked spot is quite some distance away in front of you.",
+                context));
+        awaitReadingCount(runtime, "1");
+        NavigationTargetKey initialRequest = awaitNavigationRequest(runtime);
+        UUID id = runtime.records().get(0).getId();
+        long beforeDisable = runtime.revision();
+
+        assertTrue(runtime.setEnabled(id, false));
+        assertFalse(runtime.records().get(0).isEnabled());
+        assertTrue(runtime.revision() > beforeDisable);
+        assertNull(runtime.pollNavigationRequest());
+
+        assertTrue(runtime.observe(":Event",
+                "The marked spot is quite some distance away in front of you.",
+                context));
+        awaitReadingCount(runtime, "2");
+        assertEquals(id, runtime.records().get(0).getId());
+        assertFalse(runtime.records().get(0).isEnabled());
+        assertNull("a hidden hunt must not restart navigation",
+                runtime.pollNavigationRequest());
+
+        assertTrue(runtime.setEnabled(id, true));
+        assertTrue(runtime.records().get(0).isEnabled());
+        assertEquals(id, initialRequest.getWaypointId());
+        assertFalse(runtime.setEnabled(UUID.randomUUID(), false));
+        runtime.dismiss();
+    }
+
     @Test public void firstAndRepeatedReadingsMoveWaterTargetsToDryLand()
             throws Exception {
         Properties properties = new Properties();

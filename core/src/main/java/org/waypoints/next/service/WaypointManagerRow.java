@@ -62,6 +62,12 @@ public final class WaypointManagerRow {
         return sourceType == WaypointSourceType.VANILLA_SYSTEM;
     }
 
+    /** Dynamic/system records shown in Manager but not owned by static storage. */
+    public boolean isToggleOnlyManaged() {
+        return sourceType == WaypointSourceType.VANILLA_SYSTEM
+                || sourceType == WaypointSourceType.LOOT_MAP;
+    }
+
     public String getShortId() {
         String value = id.toString();
         return value.substring(0, Math.min(8, value.length()));

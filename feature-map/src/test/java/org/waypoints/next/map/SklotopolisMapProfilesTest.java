@@ -28,7 +28,11 @@ public final class SklotopolisMapProfilesTest {
         assertEquals("https://web.game.sklotopolis.com/unlimited/4/mapdump-flat.png",
                 SklotopolisMapProfiles.CAZA.getSurfaceUrl());
         assertEquals(4096, SklotopolisMapProfiles.NOVUS.getMapWidth());
+        assertEquals(5, SklotopolisMapProfiles.INFINITY.getBackendId());
         assertEquals(2048, SklotopolisMapProfiles.INFINITY.getMapWidth());
+        assertEquals("https://web.game.sklotopolis.com/unlimited/5/mapdump-flat.png",
+                SklotopolisMapProfiles.INFINITY.getSurfaceUrl());
+        assertEquals(6, SklotopolisMapProfiles.OLD_INFINITY.getBackendId());
     }
 
     @Test public void neverGuessesCazaFromSharedLoginPort() {

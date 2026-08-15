@@ -1,0 +1,24 @@
+# Gradle and IDE state
+.gradle/
+.gradle-user/
+**/build/
+.idea/
+.vscode/
+*.iml
+
+# Machine-local Wurm client dependency path
+local.properties
+
+# Local client/runtime files and diagnostics
+mods/wurm-waypointer/
+*.log
+hs_err_pid*
+
+# Generated packages and proprietary dependency jars
+*.zip
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# Retained local drafting and superseded artwork
+README.DRAFT.md
+docs/wurm-waypointer-forum-banner*.png

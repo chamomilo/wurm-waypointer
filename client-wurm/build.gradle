@@ -1,0 +1,44 @@
+apply plugin: 'java-library'
+
+def clientLibraryDirectory = rootProject.ext.wurmClientLibDir
+if (clientLibraryDirectory == null) {
+    throw new GradleException(
+            'Wurm client libraries are not configured. Copy local.properties.example ' +
+            'to local.properties, pass -PwurmClientLibDir=..., or set WURM_CLIENT_LIBS.')
+}
+
+def requiredClientLibraries = [
+        'client-patched.jar',
+        'common.jar',
+        'javassist.jar',
+        'modlauncher.jar'
+].collect { new File(clientLibraryDirectory, it) }
+
+requiredClientLibraries.each { library ->
+    if (!library.isFile()) {
+        throw new GradleException('Required pinned client library is missing: ' + library)
+    }
+}
+
+dependencies {
+    api project(':core')
+    api project(':feature-archaeology')
+    api project(':feature-lootmaps')
+    api project(':feature-map')
+    api project(':feature-surroundings')
+    api project(':render-wurm')
+    compileOnly files(requiredClientLibraries)
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation files(requiredClientLibraries)
+}
+
+test {
+    systemProperty 'wurmClientLibDir', clientLibraryDirectory.absolutePath
+}
+
+// This module jar intentionally excludes :core and is only an input to the
+// distribution module. Give it an unmistakable name so it is never installed
+// as the client mod by hand.
+jar {
+    archiveFileName = "wurm-waypointer-client-wurm-internal-${project.version}.jar"
+}

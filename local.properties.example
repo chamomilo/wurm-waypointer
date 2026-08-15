@@ -1,0 +1,4 @@
+# Copy this file to local.properties or pass -PwurmClientLibDir=...
+# The directory must contain client-patched.jar, common.jar, javassist.jar,
+# and modlauncher.jar. WURM_CLIENT_LIBS is also supported.
+wurmClientLibDir=C:/path/to/wurm/client/libs

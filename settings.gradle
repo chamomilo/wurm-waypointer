@@ -1,0 +1,10 @@
+rootProject.name = 'wurm-waypointer'
+
+include 'core'
+include 'feature-archaeology'
+include 'feature-lootmaps'
+include 'feature-map'
+include 'feature-surroundings'
+include 'render-wurm'
+include 'client-wurm'
+include 'distribution'

@@ -1,0 +1,218 @@
+apply plugin: 'java'
+
+configurations {
+    bundled
+}
+
+dependencies {
+    bundled project(':core')
+    bundled project(':feature-archaeology')
+    bundled project(':feature-lootmaps')
+    bundled project(':feature-map')
+    bundled project(':feature-surroundings')
+    bundled project(':render-wurm')
+    bundled project(':client-wurm')
+}
+
+jar {
+    dependsOn ':core:jar', ':feature-archaeology:jar', ':feature-lootmaps:jar',
+            ':feature-map:jar', ':feature-surroundings:jar',
+            ':render-wurm:jar', ':client-wurm:jar'
+    archiveFileName = 'wurm-waypointer.jar'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from {
+        configurations.bundled.collect { dependency ->
+            dependency.isDirectory() ? dependency : zipTree(dependency)
+        }
+    }
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+}
+
+task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
+    doLast {
+        def contents = zipTree(jar.archiveFile.get().asFile)
+        def requiredClasses = [
+                'org/waypoints/next/WurmWaypointerMod.class',
+                'org/waypoints/next/integration/WurmWaypointerRuntime.class',
+                'org/waypoints/next/integration/VanillaLandmarkRuntime.class',
+                'org/waypoints/next/integration/LootMapRuntime.class',
+                'org/waypoints/next/integration/ArchaeologyRuntime.class',
+                'org/waypoints/next/integration/ArchaeologyChimePlayer.class',
+                'org/waypoints/next/integration/SurroundingsRuntime.class',
+                'org/waypoints/next/integration/SurroundingsRenderableAdapter.class',
+                'org/waypoints/next/integration/ConfigurationProperties.class',
+                'org/waypoints/next/integration/DynamicWaypointProvider.class',
+                'org/waypoints/next/archaeology/ArchaeologyMessageParser.class',
+                'org/waypoints/next/archaeology/ArchaeologyPlanner.class',
+                'org/waypoints/next/archaeology/ArchaeologySessionStore.class',
+                'org/waypoints/next/archaeology/KnownArchaeologyLocationStore.class',
+                'org/waypoints/next/lootmap/LootMapPlanner.class',
+                'org/waypoints/next/lootmap/LootMapHuntSession.class',
+                'org/waypoints/next/lootmap/LootMapHuntLog.class',
+                'org/waypoints/next/lootmap/LootMapMessageParser.class',
+                'org/waypoints/next/lootmap/LootMapTerrain.class',
+                'org/waypoints/next/lootmap/LootMapWaypointPlacement.class',
+                'org/waypoints/next/integration/WurmLootMapTerrain.class',
+                'org/waypoints/next/integration/WurmSurfaceTileDescription.class',
+                'org/waypoints/next/surroundings/SurroundingsCatalog.class',
+                'org/waypoints/next/surroundings/SurroundingsClassifier.class',
+                'org/waypoints/next/surroundings/SurroundingsQuery.class',
+                'org/waypoints/next/surroundings/DeedStatus.class',
+                'org/waypoints/next/surroundings/DeedArea.class',
+                'org/waypoints/next/surroundings/UniqueStatus.class',
+                'org/waypoints/next/map/ServerMapProfile.class',
+                'org/waypoints/next/map/SklotopolisMapProfiles.class',
+                'org/waypoints/next/map/MapViewport.class',
+                'org/waypoints/next/map/SurfaceTileIndex.class',
+                'org/waypoints/next/map/DeedParser.class',
+                'org/waypoints/next/map/ServerMapSnapshot.class',
+                'org/waypoints/next/map/SklotopolisMapService.class',
+                'org/waypoints/next/model/ServerEndpoint.class',
+                'org/waypoints/next/service/ServerIdentitySession.class',
+                'org/waypoints/next/model/WaypointRecord.class',
+                'org/waypoints/next/model/VanillaLandmarkKind.class',
+                'org/waypoints/next/model/VanillaLandmarkVisibility.class',
+                'org/waypoints/next/persistence/WaypointStore.class',
+                'org/waypoints/next/persistence/VanillaLandmarkVisibilityStore.class',
+                'org/waypoints/next/service/WaypointManager.class',
+                'org/waypoints/next/service/WaypointManagerViewService.class',
+                'org/waypoints/next/service/WaypointRevisionSnapshot.class',
+                'org/waypoints/next/service/ServerIdentityRepair.class',
+                'org/waypoints/next/navigation/StaticNavigationRegistry.class',
+                'org/waypoints/next/navigation/NavigationMath.class',
+                'org/waypoints/next/navigation/CompassMarkerClusterer.class',
+                'org/waypoints/next/navigation/WaypointLabelCollisionLayout.class',
+                'org/waypoints/next/navigation/NavigationEffectSelector.class',
+                'org/waypoints/next/navigation/CartTerrainRoutePlanner.class',
+                'org/waypoints/next/navigation/GroundRouteTrace.class',
+                'org/waypoints/next/navigation/HighwayTileIndex.class',
+                'org/waypoints/next/navigation/HighwayRoutePlanner.class',
+                'org/waypoints/next/navigation/SklotopolisHighwayService.class',
+                'org/waypoints/next/source/CoordinateInputParser.class',
+                'org/waypoints/next/ui/WaypointManagerController.class',
+                'org/waypoints/next/ui/WaypointManagerHelpText.class',
+                'org/waypoints/next/ui/WaypointManagerTableLayout.class',
+                'org/waypoints/next/ui/MarkerStyleEditorState.class',
+                'org/waypoints/next/ui/HsvColor.class',
+                'org/waypoints/next/ui/WaypointManagerVisibilityPolicy.class',
+                'org/waypoints/next/ui/SurroundingsController.class',
+                'com/wurmonline/client/renderer/gui/WaypointLabelComponent.class',
+                'com/wurmonline/client/renderer/gui/WaypointLabelLayoutCoordinator.class',
+                'com/wurmonline/client/renderer/gui/WaypointManagerWindow.class',
+                'com/wurmonline/client/renderer/gui/WaypointManagerWindowBridge.class',
+                'com/wurmonline/client/renderer/gui/ServerMapWindowBridge.class',
+                'com/wurmonline/client/resources/WaypointerFileResourceUrl.class',
+                'com/wurmonline/client/resources/textures/WaypointerTextureFilters.class',
+                'com/wurmonline/client/renderer/gui/DeedSearchWindow.class',
+                'com/wurmonline/client/renderer/gui/DeedSearchWindowBridge.class',
+                'com/wurmonline/client/renderer/gui/DeedInformationWindow.class',
+                'com/wurmonline/client/renderer/gui/DeedInformationWindowBridge.class',
+                'com/wurmonline/client/renderer/gui/SurroundingsWindow.class',
+                'com/wurmonline/client/renderer/gui/SurroundingsWindowBridge.class',
+                'com/wurmonline/client/renderer/gui/CompassSurroundingsPopupBridge.class',
+                'com/wurmonline/client/renderer/gui/WaypointColorPicker.class',
+                'com/wurmonline/client/renderer/gui/WaypointStyleSlider.class',
+                'com/wurmonline/client/renderer/WaypointScreenProjector.class',
+                'com/wurmonline/client/renderer/gui/WaypointCompassMarkerBridge.class',
+                'com/wurmonline/client/renderer/gui/CompassMarkerClusterHit.class',
+                'com/wurmonline/client/renderer/gui/WaypointClusterPickerWindow.class',
+                'com/wurmonline/client/renderer/gui/WaypointClusterPickerWindowBridge.class',
+                'org/waypoints/next/render/CompassMarkerGeometry.class',
+                'org/waypoints/next/render/StaticNavigationController.class',
+                'org/waypoints/next/render/WaypointLatePassBridge.class',
+                'org/waypoints/next/render/WaypointLatePassParticipant.class',
+                'org/waypoints/next/render/NavigationRouteDiagnosticLog.class',
+                'com/wurmonline/client/renderer/effects/GroundNavigationRouteEffect.class',
+                'org/waypoints/next/navigation/NavigationDraftOverlay.class',
+                'org/waypoints/next/render/WaypointWorldBlend.class',
+                'org/waypoints/next/render/ManagedResourceRegistry.class'
+        ]
+        requiredClasses.each { requiredClass ->
+            if (contents.matching { include requiredClass }.files.empty) {
+                throw new GradleException(
+                        'Installable Wurm Waypointer artifact is incomplete; missing ' +
+                                requiredClass)
+            }
+        }
+        def markerAsset = 'org/waypoints/next/markers/archaeology-report-scroll.png'
+        if (contents.matching { include markerAsset }.files.empty) {
+            throw new GradleException(
+                    'Installable Wurm Waypointer artifact is missing ' + markerAsset)
+        }
+        def mapWordmark = 'org/waypoints/next/map/sklotopolis-wordmark.png'
+        if (contents.matching { include mapWordmark }.files.empty) {
+            throw new GradleException(
+                    'Installable Wurm Waypointer artifact is missing ' + mapWordmark)
+        }
+        def mapParchment = 'org/waypoints/next/map/sklotopolis-map-parchment.png'
+        if (contents.matching { include mapParchment }.files.empty) {
+            throw new GradleException(
+                    'Installable Wurm Waypointer artifact is missing ' + mapParchment)
+        }
+        def forbidden = contents.matching {
+            include 'com/hypercore/**'
+            include 'com/wurmonline/client/renderer/gui/WaypointComponent.class'
+            include 'com/wurmonline/client/renderer/gui/WindowWaypointManager.class'
+            include 'com/wurmonline/client/renderer/gui/WindowNewWaypoint.class'
+        }.files
+        if (!forbidden.empty) {
+            throw new GradleException('Legacy Waypoints runtime classes entered the artifact: ' + forbidden)
+        }
+    }
+}
+
+task dist(type: Zip, dependsOn: [test, verifyArtifact]) {
+    archiveFileName = "wurm-waypointer-${project.version}.zip"
+    destinationDirectory = file("${buildDir}/distributions")
+
+    into('mods/wurm-waypointer') {
+        from jar
+        from rootProject.file('README.md')
+        from rootProject.file('THIRD_PARTY_NOTICES.md')
+        from rootProject.file('LICENSE')
+        from rootProject.file('COPYING.LESSER')
+        into('assets') {
+            from(rootProject.file(
+                    'client-wurm/src/main/resources/org/waypoints/next/map')) {
+                include 'sklotopolis-wordmark.png'
+                include 'sklotopolis-map-parchment.png'
+            }
+        }
+    }
+    into('mods') {
+        from rootProject.file('mods/wurm-waypointer.properties')
+        from rootProject.file('mods/wurm-waypointer.config')
+    }
+
+    doLast {
+        def actual = []
+        def archive = new java.util.zip.ZipFile(archiveFile.get().asFile)
+        try {
+            def entries = archive.entries()
+            while (entries.hasMoreElements()) {
+                def entry = entries.nextElement()
+                if (!entry.isDirectory()) actual << entry.name
+            }
+        } finally {
+            archive.close()
+        }
+        actual.sort()
+        def expected = [
+                'mods/wurm-waypointer.properties',
+                'mods/wurm-waypointer.config',
+                'mods/wurm-waypointer/README.md',
+                'mods/wurm-waypointer/THIRD_PARTY_NOTICES.md',
+                'mods/wurm-waypointer/LICENSE',
+                'mods/wurm-waypointer/COPYING.LESSER',
+                'mods/wurm-waypointer/assets/sklotopolis-wordmark.png',
+                'mods/wurm-waypointer/assets/sklotopolis-map-parchment.png',
+                'mods/wurm-waypointer/wurm-waypointer.jar'
+        ].sort()
+        if (actual != expected) {
+            throw new GradleException('Installable ZIP contains unexpected files:\n'
+                    + 'expected=' + expected + '\nactual=' + actual)
+        }
+    }
+}
+
+build.dependsOn verifyArtifact

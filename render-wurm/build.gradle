@@ -1,0 +1,66 @@
+apply plugin: 'java-library'
+
+def clientLibraryDirectory = rootProject.ext.wurmClientLibDir
+if (clientLibraryDirectory == null) {
+    throw new GradleException(
+            'Wurm client libraries are not configured. Copy local.properties.example ' +
+            'to local.properties, pass -PwurmClientLibDir=..., or set WURM_CLIENT_LIBS.')
+}
+
+def requiredClientLibraries = [
+        'client-patched.jar',
+        'common.jar',
+        'javassist.jar',
+        'modlauncher.jar'
+].collect { new File(clientLibraryDirectory, it) }
+
+requiredClientLibraries.each { library ->
+    if (!library.isFile()) {
+        throw new GradleException('Required pinned client library is missing: ' + library)
+    }
+}
+
+dependencies {
+    api project(':core')
+    compileOnly files(requiredClientLibraries)
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation files(requiredClientLibraries)
+}
+
+test {
+    systemProperty 'wurmClientLibDir', clientLibraryDirectory.absolutePath
+}
+
+task verifyRendererBoundary {
+    group = 'verification'
+    description = 'Prevents feature and client-runtime dependencies from entering the renderer.'
+
+    doLast {
+        def forbiddenImports = [
+                'org.waypoints.next.integration',
+                'org.waypoints.next.archaeology',
+                'org.waypoints.next.lootmap'
+        ]
+        def violations = []
+        fileTree('src/main/java') { include '**/*.java' }.each { source ->
+            def text = source.getText('UTF-8')
+            forbiddenImports.each { forbidden ->
+                if (text.contains('import ' + forbidden)) {
+                    violations << source.path + ' imports ' + forbidden
+                }
+            }
+        }
+        if (!violations.empty) {
+            throw new GradleException('Renderer boundary violation:\n' +
+                    violations.join('\n'))
+        }
+    }
+}
+
+check.dependsOn verifyRendererBoundary
+
+// This module is bundled into the one installable mod. Its standalone jar is
+// an internal build input and must never be installed by hand.
+jar {
+    archiveFileName = "wurm-waypointer-render-wurm-internal-${project.version}.jar"
+}

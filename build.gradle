@@ -1,0 +1,109 @@
+import java.util.Properties
+
+def localProperties = new Properties()
+def localPropertiesFile = file('local.properties')
+if (localPropertiesFile.isFile()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+
+def configuredLibraryDirectory = findProperty('wurmClientLibDir')
+if (configuredLibraryDirectory == null || configuredLibraryDirectory.toString().trim().isEmpty()) {
+    configuredLibraryDirectory = localProperties.getProperty('wurmClientLibDir')
+}
+if (configuredLibraryDirectory == null || configuredLibraryDirectory.toString().trim().isEmpty()) {
+    configuredLibraryDirectory = System.getenv('WURM_CLIENT_LIBS')
+}
+
+ext.waypointerVersion = findProperty('waypointerVersion') ?: '0.8.0-map-r11'
+ext.wurmClientLibDir = configuredLibraryDirectory == null
+        ? null : file(configuredLibraryDirectory.toString())
+
+allprojects {
+    group = 'org.waypoints.next'
+    version = rootProject.ext.waypointerVersion
+
+    repositories {
+        mavenCentral()
+    }
+}
+
+subprojects {
+    plugins.withType(JavaPlugin) {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+
+        tasks.withType(JavaCompile) {
+            options.encoding = 'UTF-8'
+        }
+
+        test {
+            testLogging {
+                events 'failed'
+                exceptionFormat 'full'
+            }
+        }
+    }
+
+    tasks.withType(org.gradle.api.tasks.bundling.AbstractArchiveTask) {
+        preserveFileTimestamps = false
+        reproducibleFileOrder = true
+    }
+}
+
+task verifyArchitectureBoundaries {
+    group = 'verification'
+    description = 'Locks feature providers away from Wurm and renderer implementation APIs.'
+    dependsOn ':render-wurm:verifyRendererBoundary'
+
+    doLast {
+        def violations = []
+    [project(':feature-archaeology'), project(':feature-lootmaps'),
+     project(':feature-map'), project(':feature-surroundings')].each { feature ->
+            fileTree(new File(feature.projectDir, 'src')) {
+                include '**/*.java'
+            }.each { source ->
+                def text = source.getText('UTF-8')
+                [
+                        'com.wurmonline.',
+                        'org.waypoints.next.render.',
+                        'org.waypoints.next.integration.'
+                ].each { forbidden ->
+                    if (text.contains('import ' + forbidden)) {
+                        violations << source.path + ' imports ' + forbidden
+                    }
+                }
+            }
+        }
+
+        def clientSource = new File(project(':client-wurm').projectDir,
+                'src/main/java')
+        [
+                'org/waypoints/next/render',
+                'com/wurmonline/client/renderer/effects',
+                'com/wurmonline/client/renderer/gui/WaypointCompassMarkerBridge.java',
+                'com/wurmonline/client/renderer/gui/WaypointClusterPickerWindowBridge.java',
+                'com/wurmonline/client/renderer/gui/WaypointClusterPickerWindow.java',
+                'com/wurmonline/client/renderer/gui/CompassMarkerClusterHit.java'
+        ].each { forbiddenPath ->
+            def path = new File(clientSource, forbiddenPath)
+            def exists = path.isFile() || (path.isDirectory() && !fileTree(path) {
+                include '**/*.java'
+            }.empty)
+            if (exists) {
+                violations << 'renderer implementation returned to client-wurm: '
+                        + path.path
+            }
+        }
+
+        if (!violations.empty) {
+            throw new GradleException('Architecture boundary violation:\n' +
+                    violations.join('\n'))
+        }
+    }
+}
+
+task dist {
+    group = 'distribution'
+    description = 'Builds the installable Wurm Waypointer archive.'
+    dependsOn verifyArchitectureBoundaries, ':distribution:dist'
+}

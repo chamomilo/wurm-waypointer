@@ -64,46 +64,55 @@ final class SurroundingsRuntime implements DynamicWaypointProvider {
         catalog.updateDeedAreas(deedAreas, deedDataAvailable);
     }
 
-    synchronized void upsertRenderable(Object renderable) {
+    synchronized SurroundingEntry upsertRenderable(Object renderable) {
         try {
             SurroundingEntry entry = classified(SurroundingsRenderableAdapter.project(
                     renderable, Instant.now()));
-            if (entry == null) return;
+            if (entry == null) return null;
             upsert(entry);
+            return entry;
         } catch (Throwable failure) {
             logger.log(Level.FINE, "Surroundings renderable projection failed open", failure);
+            return null;
         }
     }
 
-    synchronized void creatureMoved(Object renderable, double worldX,
-                                    double worldY, double height) {
+    synchronized SurroundingEntry creatureMoved(Object renderable, double worldX,
+                                                double worldY, double height) {
         try {
             SurroundingEntry entry = classified(
                     SurroundingsRenderableAdapter.projectCreature(
                             renderable, worldX, worldY, height, Instant.now()));
             if (entry != null) upsert(entry);
+            return entry;
         } catch (Throwable failure) {
             logger.log(Level.FINE,
                     "Surroundings creature movement projection failed open", failure);
+            return null;
         }
     }
 
-    synchronized void removeRenderable(Object renderable) {
+    synchronized SurroundingKey removeRenderable(Object renderable) {
         try {
             Long renderableId = SurroundingsRenderableAdapter.renderableId(renderable);
             if (renderableId != null) {
                 SurroundingKind previous = renderableKinds.remove(renderableId);
                 if (previous != null) {
-                    catalog.remove(new SurroundingKey(previous, renderableId));
-                    return;
+                    SurroundingKey key = new SurroundingKey(previous, renderableId);
+                    catalog.remove(key);
+                    return key;
                 }
             }
             SurroundingEntry entry = SurroundingsRenderableAdapter.project(
                     renderable, Instant.now());
-            if (entry != null) catalog.remove(entry.getKey());
+            if (entry != null) {
+                catalog.remove(entry.getKey());
+                return entry.getKey();
+            }
         } catch (Throwable failure) {
             logger.log(Level.FINE, "Surroundings renderable removal failed open", failure);
         }
+        return null;
     }
 
     synchronized void clearRenderables() {

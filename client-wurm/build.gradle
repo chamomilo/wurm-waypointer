@@ -21,6 +21,7 @@ requiredClientLibraries.each { library ->
 }
 
 dependencies {
+    api project(':api')
     api project(':core')
     api project(':feature-archaeology')
     api project(':feature-lootmaps')

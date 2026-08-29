@@ -9,6 +9,15 @@ import com.wurmonline.client.renderer.gui.ServerMapWindowBridge;
 import com.wurmonline.client.renderer.gui.WaypointClusterPickerWindowBridge;
 import com.wurmonline.client.renderer.gui.WaypointManagerWindowBridge;
 import com.wurmonline.client.renderer.gui.SurroundingsWindowBridge;
+import org.waypoints.api.MarkResult;
+import org.waypoints.api.NavigationRequest;
+import org.waypoints.api.ObjectMarkRequest;
+import org.waypoints.api.ObjectMarkerType;
+import org.waypoints.api.WaypointerApi;
+import org.waypoints.api.WaypointerCapability;
+import org.waypoints.api.WaypointerService;
+import org.waypoints.api.WurmObjectKind;
+import org.waypoints.api.WurmObjectRef;
 import org.waypoints.next.model.CapturedServerSelection;
 import org.waypoints.next.model.MarkerStyle;
 import org.waypoints.next.model.ServerIdentity;
@@ -39,6 +48,8 @@ import org.waypoints.next.ui.WaypointManagerContext;
 import org.waypoints.next.ui.WaypointManagerController;
 import org.waypoints.next.ui.SurroundingsController;
 import org.waypoints.next.surroundings.SurroundingKey;
+import org.waypoints.next.surroundings.SurroundingEntry;
+import org.waypoints.next.surroundings.SurroundingKind;
 import org.waypoints.next.surroundings.SurroundingsQuery;
 import org.waypoints.next.surroundings.SurroundingsSnapshot;
 
@@ -47,6 +58,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.UUID;
+import java.util.EnumSet;
+import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -73,6 +87,8 @@ public final class WurmWaypointerRuntime {
             new ArchaeologyRuntime(LOGGER);
     private static final SurroundingsRuntime SURROUNDINGS =
             new SurroundingsRuntime(LOGGER);
+    private static final ConcurrentLinkedQueue<UUID> EXTERNAL_NAVIGATION_REQUESTS =
+            new ConcurrentLinkedQueue<UUID>();
     private static final List<DynamicWaypointProvider> DYNAMIC_WAYPOINTS =
             Collections.unmodifiableList(Arrays.<DynamicWaypointProvider>asList(
                     LOOT_MAPS, ARCHAEOLOGY, SURROUNDINGS));
@@ -302,11 +318,69 @@ public final class WurmWaypointerRuntime {
                 }
             };
 
+    private static final WaypointerService EXTERNAL_API = new WaypointerService() {
+        @Override public int apiVersion() { return WaypointerApi.API_VERSION; }
+
+        @Override public Set<WaypointerCapability> capabilities() {
+            return EnumSet.allOf(WaypointerCapability.class);
+        }
+
+        @Override public MarkResult markObject(ObjectMarkRequest request) {
+            HeadsUpDisplay currentHud = hud;
+            World world = currentHud == null ? null : currentHud.getWorld();
+            if (world == null || identity == null) return MarkResult.failure(
+                    MarkResult.Status.WAYPOINTER_NOT_READY,
+                    "Waypointer has no confirmed world yet");
+            SurroundingEntry entry = findExternalSubject(request.getSubject());
+            if (entry == null) return MarkResult.failure(
+                    MarkResult.Status.SUBJECT_NOT_FOUND,
+                    "object is not present in Waypointer's live catalog");
+            UUID id = STATIC_WAYPOINTS.upsertExternalObjectWaypoint(entry,
+                    request.getOwnerId(), request.getMarkerKey(),
+                    externalMarkerStyle(request.getMarkerType(), entry.getKind()),
+                    request.getMaximumLifetimeSeconds(), currentHud, identity,
+                    java.time.Instant.now());
+            SURROUNDINGS.reconcileWaypoints(
+                    STATIC_WAYPOINTS.surroundingsWaypointKeys());
+            if (request.getNavigation() == NavigationRequest.ACTIVATE) {
+                EXTERNAL_NAVIGATION_REQUESTS.add(id);
+            }
+            return MarkResult.success(id);
+        }
+
+        @Override public int subjectVanished(WurmObjectRef subject) {
+            return removeExternalSubjectMarks(subject);
+        }
+
+        @Override public boolean removeOwnedMarker(String ownerId, UUID markerId) {
+            boolean navigatorStopped = STATIC_NAVIGATION.isNavigatorActive(markerId);
+            boolean removed = STATIC_WAYPOINTS.deleteOwnedExternalMarker(
+                    ownerId, markerId);
+            if (!removed) return false;
+            STATIC_NAVIGATION.managerEnabledChanged(markerId, false);
+            SURROUNDINGS.reconcileWaypoints(
+                    STATIC_WAYPOINTS.surroundingsWaypointKeys());
+            if (navigatorStopped) event("Navigator stopped: external marker removed.");
+            return true;
+        }
+
+        @Override public boolean setNavigation(String ownerId, UUID markerId,
+                                               boolean active) {
+            if (!STATIC_WAYPOINTS.isOwnedExternalMarker(ownerId, markerId)) {
+                return false;
+            }
+            if (active) EXTERNAL_NAVIGATION_REQUESTS.add(markerId);
+            else STATIC_NAVIGATION.stopNavigator(markerId);
+            return true;
+        }
+    };
+
     private WurmWaypointerRuntime() {
     }
 
     public static void configure(BeamProbeConfiguration value) {
         WaypointRenderRuntimeBridge.bind(RENDER_ACCESS);
+        WaypointerApi.installRuntime(EXTERNAL_API);
         configuration = value == null ? BeamProbeConfiguration.disabled() : value;
         LOGGER.info("Runtime configuration: " + configuration.diagnosticSummary());
     }
@@ -580,7 +654,7 @@ public final class WurmWaypointerRuntime {
 
     public static void observeAction(long[] targets, PlayerAction action) {
         try {
-            String actionName = action == null ? null : action.getName();
+            String actionName = WurmPlayerActionName.resolve(action);
             for (DynamicWaypointProvider provider : DYNAMIC_WAYPOINTS) {
                 provider.observeAction(targets, actionName);
             }
@@ -928,7 +1002,11 @@ public final class WurmWaypointerRuntime {
 
     /** Called after a creature or ground item enters or changes in the client. */
     public static void surroundingsRenderableUpserted(Object renderable) {
-        try { SURROUNDINGS.upsertRenderable(renderable); }
+        try {
+            SurroundingEntry entry = SURROUNDINGS.upsertRenderable(renderable);
+            STATIC_WAYPOINTS.refreshExternalObjectWaypoints(
+                    entry, java.time.Instant.now());
+        }
         catch (Throwable failure) {
             LOGGER.log(Level.FINE, "Surroundings upsert hook failed open", failure);
         }
@@ -937,17 +1015,41 @@ public final class WurmWaypointerRuntime {
     /** Called with the latest server target for a moving creature or item. */
     public static void surroundingsCreatureMoved(Object renderable, float worldX,
                                                   float worldY, float height) {
-        try { SURROUNDINGS.creatureMoved(renderable, worldX, worldY, height); }
+        try {
+            SurroundingEntry entry = SURROUNDINGS.creatureMoved(
+                    renderable, worldX, worldY, height);
+            STATIC_WAYPOINTS.refreshExternalObjectWaypoints(
+                    entry, java.time.Instant.now());
+        }
         catch (Throwable failure) {
             LOGGER.log(Level.FINE, "Surroundings movement hook failed open", failure);
         }
     }
 
     /** Called after a creature or ground item leaves the client stream. */
-    public static void surroundingsRenderableRemoved(Object renderable) {
-        try { SURROUNDINGS.removeRenderable(renderable); }
-        catch (Throwable failure) {
+    public static void surroundingsRenderableRemoved(Object renderable,
+                                                      boolean removedFromWorld) {
+        try {
+            SurroundingKey removed = SURROUNDINGS.removeRenderable(renderable);
+            // In the pinned client true is used by authoritative server removals
+            // (picked up, buried, destroyed, dead-animation completion, etc.).
+            // false is also emitted by addRenderable's technical remove-before-add.
+            if (!removedFromWorld || removed == null) return;
+            removeVanishedMarks(removed);
+        } catch (Throwable failure) {
             LOGGER.log(Level.FINE, "Surroundings remove hook failed open", failure);
+        }
+    }
+
+    /** Exact lifecycle boundary: the creature is gone and the corpse is a new object. */
+    public static void surroundingsCreatureReplacedByCorpse(long creatureId,
+                                                             long corpseId) {
+        try {
+            removeVanishedMarks(new SurroundingKey(
+                    SurroundingKind.ANIMAL, creatureId));
+        } catch (Throwable failure) {
+            LOGGER.log(Level.FINE,
+                    "Creature-to-corpse waypoint lifecycle failed open", failure);
         }
     }
 
@@ -1019,6 +1121,117 @@ public final class WurmWaypointerRuntime {
                 }
             }
         }
+        UUID externalId;
+        while ((externalId = EXTERNAL_NAVIGATION_REQUESTS.poll()) != null) {
+            NavigationRenderFrame current = currentNavigationFrame();
+            NavigationTarget target = current == null ? null
+                    : findNavigationTarget(current.getSnapshot().getTargets(),
+                    externalId.toString());
+            NavigationTarget started = target == null ? null
+                    : STATIC_NAVIGATION.startNavigator(target.getKey());
+            if (started != null && started.isNavigatorActive()) {
+                event("Navigator started: " + oneLine(started.getName())
+                        + " (external API request).");
+            }
+        }
+    }
+
+    private static SurroundingEntry findExternalSubject(WurmObjectRef subject) {
+        if (subject == null) return null;
+        long id = subject.getWurmId();
+        switch (subject.getKind()) {
+            case CREATURE:
+                return SURROUNDINGS.find(new SurroundingKey(
+                        SurroundingKind.ANIMAL, id));
+            case ITEM:
+                return SURROUNDINGS.find(new SurroundingKey(
+                        SurroundingKind.ITEM, id));
+            case CONTAINER:
+                return SURROUNDINGS.find(new SurroundingKey(
+                        SurroundingKind.CONTAINER, id));
+            case AUTO:
+            default:
+                for (SurroundingKind kind : new SurroundingKind[]{
+                        SurroundingKind.ANIMAL, SurroundingKind.ITEM,
+                        SurroundingKind.CONTAINER}) {
+                    SurroundingEntry found = SURROUNDINGS.find(
+                            new SurroundingKey(kind, id));
+                    if (found != null) return found;
+                }
+                return null;
+        }
+    }
+
+    static MarkerStyle externalMarkerStyle(ObjectMarkerType requested,
+                                           SurroundingKind kind) {
+        MarkerStyle base = SurroundingsRuntime.style(kind);
+        MarkerStyle.WorldStyle worldStyle;
+        ObjectMarkerType markerType = requested == null
+                ? ObjectMarkerType.ALERT : requested;
+        switch (markerType) {
+            case TARGET:
+                worldStyle = MarkerStyle.WorldStyle.TARGET_CROSSHAIR;
+                break;
+            case BEAM:
+                worldStyle = MarkerStyle.WorldStyle.COLORED_BEAM;
+                break;
+            case COMPASS_ONLY:
+                worldStyle = MarkerStyle.WorldStyle.COMPASS_ONLY;
+                break;
+            case ALERT:
+            default:
+                worldStyle = MarkerStyle.WorldStyle.EXCLAMATION;
+                break;
+        }
+        if (markerType == ObjectMarkerType.ALERT) {
+            // ALERT is a semantic warning, not a category-coloured ordinary
+            // Surroundings mark. Red also remains visible on blue/green wagon
+            // cloth where the inherited CONTAINER cyan was easily lost.
+            return new MarkerStyle(worldStyle,
+                    1.0f, 0.12f, 0.055f, 1.0f,
+                    Math.max(15.0f, base.getMarkerSize()),
+                    Math.max(2.6f, base.getBeamWidth()),
+                    base.isShowLabel(), base.isShowDistance());
+        }
+        return new MarkerStyle(worldStyle, base.getRed(), base.getGreen(),
+                base.getBlue(), base.getAlpha(), base.getMarkerSize(),
+                base.getBeamWidth(), base.isShowLabel(), base.isShowDistance());
+    }
+
+    private static int removeExternalSubjectMarks(WurmObjectRef subject) {
+        if (subject == null) return 0;
+        int removed = 0;
+        if (subject.getKind() == WurmObjectKind.AUTO) {
+            for (SurroundingKind kind : new SurroundingKind[]{
+                    SurroundingKind.ANIMAL, SurroundingKind.ITEM,
+                    SurroundingKind.CONTAINER}) {
+                removed += removeVanishedMarks(new SurroundingKey(
+                        kind, subject.getWurmId()));
+            }
+            return removed;
+        }
+        SurroundingKind kind = subject.getKind() == WurmObjectKind.CREATURE
+                ? SurroundingKind.ANIMAL
+                : subject.getKind() == WurmObjectKind.CONTAINER
+                ? SurroundingKind.CONTAINER : SurroundingKind.ITEM;
+        return removeVanishedMarks(new SurroundingKey(kind, subject.getWurmId()));
+    }
+
+    private static int removeVanishedMarks(SurroundingKey removed) {
+        List<UUID> deleted = STATIC_WAYPOINTS
+                .removeVanishedSurroundingsWaypoint(removed);
+        if (deleted.isEmpty()) return 0;
+        boolean navigatorStopped = false;
+        for (UUID id : deleted) {
+            if (STATIC_NAVIGATION.isNavigatorActive(id)) navigatorStopped = true;
+            STATIC_NAVIGATION.managerEnabledChanged(id, false);
+        }
+        SURROUNDINGS.reconcileWaypoints(
+                STATIC_WAYPOINTS.surroundingsWaypointKeys());
+        event("Removed " + deleted.size()
+                + " object mark(s): target disappeared."
+                + (navigatorStopped ? " Navigator stopped." : ""));
+        return deleted.size();
     }
 
     private static void flushDynamicMessages() {

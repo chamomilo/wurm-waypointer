@@ -30,6 +30,7 @@ import org.waypoints.next.source.ParsedCoordinate;
 import org.waypoints.next.surroundings.SurroundingEntry;
 import org.waypoints.next.surroundings.SurroundingKey;
 import org.waypoints.next.surroundings.SurroundingKind;
+import org.waypoints.next.surroundings.SurroundingsClassifier;
 import org.waypoints.next.validation.WaypointLimits;
 import org.waypoints.next.validation.WaypointRecordValidator;
 import org.waypoints.next.ui.WaypointEditData;
@@ -56,8 +57,11 @@ import java.util.logging.Logger;
 
 /** First Phase 1 vertical slice: local static CRUD, parsing and durable transfer. */
 final class StaticWaypointRuntime {
+    private static final double VEHICLE_MARKER_HEIGHT_OFFSET_METRES = 2.4d;
     private static final String PREFIX = "[Wurm Waypointer] ";
     private static final long SURROUNDINGS_LIFETIME_SECONDS = 15L * 60L;
+    private static final String API_OWNER = "waypointer.api.owner";
+    private static final String API_MARKER_KEY = "waypointer.api.markerKey";
 
     private final Logger logger;
     private final WaypointRecordValidator validator = new WaypointRecordValidator();
@@ -493,7 +497,8 @@ final class StaticWaypointRuntime {
             for (WaypointRecord record : currentRecords) {
                 existingIds.add(record.getId());
                 SurroundingKey key = surroundingsKey(record);
-                if (key != null && !existingByKey.containsKey(key)) {
+                if (key != null && !isExternalObjectMarker(record)
+                        && !existingByKey.containsKey(key)) {
                     existingByKey.put(key, record);
                 }
             }
@@ -538,6 +543,123 @@ final class StaticWaypointRuntime {
         return changed;
     }
 
+    UUID upsertExternalObjectWaypoint(SurroundingEntry entry, String ownerId,
+                                      String markerKey, MarkerStyle markerStyle,
+                                      int maximumLifetimeSeconds,
+                                      HeadsUpDisplay hud,
+                                      ServerIdentity identity, Instant now) {
+        return upsertExternalObjectWaypoint(entry, ownerId, markerKey,
+                markerStyle, maximumLifetimeSeconds,
+                managerContext(hud, identity), now);
+    }
+
+    UUID upsertExternalObjectWaypoint(SurroundingEntry entry, String ownerId,
+                                      String markerKey, MarkerStyle markerStyle,
+                                      int maximumLifetimeSeconds,
+                                      WaypointManagerContext context,
+                                      Instant now) {
+        requireReady();
+        if (entry == null) throw new IllegalArgumentException(
+                "live object entry is required");
+        if (markerStyle == null) throw new IllegalArgumentException(
+                "marker style is required");
+        if (maximumLifetimeSeconds < 0) throw new IllegalArgumentException(
+                "maximum lifetime cannot be negative");
+        if (context == null) throw new IllegalArgumentException(
+                "waypoint context is required");
+        String owner = requireExternalToken(ownerId, "owner id");
+        String externalKey = requireExternalToken(markerKey, "marker key");
+        UUID id = externalMarkerId(context, owner, externalKey, entry.getKey());
+        WaypointRecord existing = manager.find(id);
+        if (existing != null && (!isExternalObjectMarker(existing)
+                || !owner.equals(extension(existing, API_OWNER)))) {
+            id = UUID.randomUUID();
+            existing = null;
+        }
+        Instant created = existing == null ? now : existing.getCreatedAt();
+        Map<String, List<String>> extensions =
+                new LinkedHashMap<String, List<String>>();
+        extensions.put(API_OWNER, Collections.singletonList(owner));
+        extensions.put(API_MARKER_KEY, Collections.singletonList(externalKey));
+        WaypointRecord record = WaypointRecord.builder().id(id)
+                .name(limitName(entry.getName()))
+                .description("Object mark owned by " + owner)
+                .createdByUser(context.getUser())
+                .serverIdentity(context.getServer())
+                .sourceType(entry.getKind() == SurroundingKind.ANIMAL
+                        ? WaypointSourceType.MANAGED_ANIMAL
+                        : WaypointSourceType.MANAGED_ITEM)
+                .sourceKey(entry.getKey().toString())
+                .coordinate(externalObjectCoordinate(entry))
+                .resolution(WaypointResolution.STATIC_EXACT).enabled(true)
+                .markerStyle(markerStyle)
+                .arrivalRadiusMetres(WaypointArrival.DISABLED)
+                .expiresAt(maximumLifetimeSeconds == 0 ? null
+                        : now.plusSeconds(maximumLifetimeSeconds))
+                .group("External / " + owner)
+                .createdAt(created).updatedAt(now).lastResolvedAt(now)
+                .extensions(extensions).build();
+        if (existing == null) manager.add(record);
+        else manager.update(record);
+        refreshNextExpiry();
+        scheduleSave("external object mark owner=" + owner + " id=" + id);
+        return id;
+    }
+
+    /**
+     * Keeps API-owned object markers attached to their live renderables.
+     * Ordinary Surroundings marks intentionally remain 15-minute snapshots.
+     */
+    int refreshExternalObjectWaypoints(SurroundingEntry entry, Instant now) {
+        if (entry == null || now == null || manager == null) return 0;
+        WaypointCoordinate coordinate = externalObjectCoordinate(entry);
+        String name = limitName(entry.getName());
+        int changed = 0;
+        for (WaypointRecord record : manager.snapshot()) {
+            if (!isExternalObjectMarker(record)
+                    || !entry.getKey().equals(surroundingsKey(record))) {
+                continue;
+            }
+            if (coordinate.equals(record.getCoordinate())
+                    && name.equals(record.getName())) continue;
+            manager.update(WaypointRecord.copyOf(record)
+                    .name(name).coordinate(coordinate)
+                    .lastResolvedAt(now).build());
+            changed++;
+        }
+        // Do not schedule a disk write for every movement packet. The marker
+        // remains persisted by its creation/removal operations, while the
+        // manager revision immediately refreshes the live world effect.
+        return changed;
+    }
+
+    /** Vehicles publish their ground/base H position, not their roof height. */
+    static WaypointCoordinate externalObjectCoordinate(SurroundingEntry entry) {
+        double height = entry.getHeight();
+        if (SurroundingsClassifier.VEHICLES.equals(entry.getCategory())) {
+            height += VEHICLE_MARKER_HEIGHT_OFFSET_METRES;
+        }
+        return new WaypointCoordinate(entry.getWorldX() / 4.0d,
+                entry.getWorldY() / 4.0d, height,
+                entry.getLayer() < 0 ? WaypointLayer.CAVE
+                        : WaypointLayer.SURFACE);
+    }
+
+    boolean deleteOwnedExternalMarker(String ownerId, UUID markerId) {
+        requireReady();
+        WaypointRecord record = manager.find(markerId);
+        if (!isOwnedExternalMarker(record, ownerId)
+                || !manager.delete(markerId)) return false;
+        refreshNextExpiry();
+        scheduleSave("external object mark removed owner=" + ownerId
+                + " id=" + markerId);
+        return true;
+    }
+
+    boolean isOwnedExternalMarker(String ownerId, UUID markerId) {
+        return isOwnedExternalMarker(manager.find(markerId), ownerId);
+    }
+
     int clearSurroundingsWaypoints() {
         requireReady();
         int changed = 0;
@@ -551,6 +673,25 @@ final class StaticWaypointRuntime {
             scheduleSave("surroundings clear all count=" + changed);
         }
         return changed;
+    }
+
+    /** Deletes every persisted mark tied to one object that the server removed. */
+    List<UUID> removeVanishedSurroundingsWaypoint(SurroundingKey key) {
+        requireReady();
+        if (key == null) return Collections.emptyList();
+        List<UUID> removed = new ArrayList<UUID>();
+        for (WaypointRecord record : manager.snapshot()) {
+            if (key.equals(surroundingsKey(record))
+                    && manager.delete(record.getId())) {
+                removed.add(record.getId());
+            }
+        }
+        if (!removed.isEmpty()) {
+            refreshNextExpiry();
+            scheduleSave("surroundings vanished " + key
+                    + " count=" + removed.size());
+        }
+        return Collections.unmodifiableList(removed);
     }
 
     Set<SurroundingKey> surroundingsWaypointKeys() {
@@ -675,8 +816,46 @@ final class StaticWaypointRuntime {
         return SurroundingKey.parse(record.getSourceKey());
     }
 
+    private static boolean isExternalObjectMarker(WaypointRecord record) {
+        return !extension(record, API_OWNER).isEmpty();
+    }
+
+    private static boolean isOwnedExternalMarker(WaypointRecord record,
+                                                  String ownerId) {
+        String owner = ownerId == null ? "" : ownerId.trim();
+        return record != null && !owner.isEmpty()
+                && owner.equals(extension(record, API_OWNER));
+    }
+
+    private static String extension(WaypointRecord record, String key) {
+        if (record == null) return "";
+        List<String> values = record.getExtensions().get(key);
+        return values == null || values.isEmpty() || values.get(0) == null
+                ? "" : values.get(0);
+    }
+
+    private static UUID externalMarkerId(WaypointManagerContext context,
+                                         String owner, String markerKey,
+                                         SurroundingKey subject) {
+        String server = context.getServer() == null ? ""
+                : context.getServer().getEndpointFingerprint();
+        String stable = "wurm-waypointer:api:v1:" + server + ":"
+                + context.getUser() + ":" + owner + ":" + markerKey
+                + ":" + subject;
+        return UUID.nameUUIDFromBytes(stable.getBytes(
+                java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    private static String requireExternalToken(String value, String label) {
+        String clean = oneLine(value);
+        if (clean.isEmpty()) throw new IllegalArgumentException(label + " is required");
+        if (clean.length() > 120) throw new IllegalArgumentException(label + " is too long");
+        return clean;
+    }
+
     private static MarkerStyle surroundingsMarkerStyle(WaypointRecord record,
                                                         MarkerStyle style) {
+        if (isExternalObjectMarker(record)) return style;
         if (record == null || (record.getSourceType()
                 != WaypointSourceType.MANAGED_ANIMAL
                 && record.getSourceType() != WaypointSourceType.MANAGED_ITEM)) {

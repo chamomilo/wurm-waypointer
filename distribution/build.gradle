@@ -5,6 +5,7 @@ configurations {
 }
 
 dependencies {
+    bundled project(':api')
     bundled project(':core')
     bundled project(':feature-archaeology')
     bundled project(':feature-lootmaps')
@@ -15,10 +16,10 @@ dependencies {
 }
 
 jar {
-    dependsOn ':core:jar', ':feature-archaeology:jar', ':feature-lootmaps:jar',
+    dependsOn ':api:jar', ':core:jar', ':feature-archaeology:jar', ':feature-lootmaps:jar',
             ':feature-map:jar', ':feature-surroundings:jar',
             ':render-wurm:jar', ':client-wurm:jar'
-    archiveFileName = 'wurm-waypointer.jar'
+    archiveFileName = "wurm-waypointer-${project.version}.jar"
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from {
         configurations.bundled.collect { dependency ->
@@ -32,6 +33,8 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
     doLast {
         def contents = zipTree(jar.archiveFile.get().asFile)
         def requiredClasses = [
+                'org/waypoints/api/WaypointerApi.class',
+                'org/waypoints/api/ObjectMarkRequest.class',
                 'org/waypoints/next/WurmWaypointerMod.class',
                 'org/waypoints/next/integration/WurmWaypointerRuntime.class',
                 'org/waypoints/next/integration/VanillaLandmarkRuntime.class',
@@ -57,6 +60,8 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
                 'org/waypoints/next/surroundings/SurroundingsCatalog.class',
                 'org/waypoints/next/surroundings/SurroundingsClassifier.class',
                 'org/waypoints/next/surroundings/SurroundingsQuery.class',
+                'org/waypoints/next/surroundings/SurroundingsMonitoringFilters.class',
+                'org/waypoints/next/surroundings/SurroundingsMonitoringView.class',
                 'org/waypoints/next/surroundings/DeedStatus.class',
                 'org/waypoints/next/surroundings/DeedArea.class',
                 'org/waypoints/next/surroundings/UniqueStatus.class',
@@ -96,6 +101,7 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
                 'org/waypoints/next/ui/HsvColor.class',
                 'org/waypoints/next/ui/WaypointManagerVisibilityPolicy.class',
                 'org/waypoints/next/ui/SurroundingsController.class',
+                'org/waypoints/next/ui/SurroundingsScrollGesture.class',
                 'com/wurmonline/client/renderer/gui/WaypointLabelComponent.class',
                 'com/wurmonline/client/renderer/gui/WaypointLabelLayoutCoordinator.class',
                 'com/wurmonline/client/renderer/gui/WaypointManagerWindow.class',
@@ -108,6 +114,8 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
                 'com/wurmonline/client/renderer/gui/DeedInformationWindow.class',
                 'com/wurmonline/client/renderer/gui/DeedInformationWindowBridge.class',
                 'com/wurmonline/client/renderer/gui/SurroundingsWindow.class',
+                'com/wurmonline/client/renderer/gui/SurroundingsMonitoringWindow.class',
+                'com/wurmonline/client/renderer/gui/SurroundingsScrollPanel.class',
                 'com/wurmonline/client/renderer/gui/SurroundingsWindowBridge.class',
                 'com/wurmonline/client/renderer/gui/CompassSurroundingsPopupBridge.class',
                 'com/wurmonline/client/renderer/gui/WaypointColorPicker.class',
@@ -199,7 +207,7 @@ task dist(type: Zip, dependsOn: [test, verifyArtifact]) {
                 'mods/wurm-waypointer/LICENSE',
                 'mods/wurm-waypointer/COPYING.LESSER',
                 'mods/wurm-waypointer/assets/sklotopolis-wordmark.png',
-                'mods/wurm-waypointer/wurm-waypointer.jar'
+                "mods/wurm-waypointer/wurm-waypointer-${project.version}.jar"
         ].sort()
         if (actual != expected) {
             throw new GradleException('Installable ZIP contains unexpected files:\n'

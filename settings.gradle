@@ -1,5 +1,6 @@
 rootProject.name = 'wurm-waypointer'
 
+include 'api'
 include 'core'
 include 'feature-archaeology'
 include 'feature-lootmaps'

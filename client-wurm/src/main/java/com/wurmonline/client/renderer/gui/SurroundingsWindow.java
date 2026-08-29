@@ -6,6 +6,7 @@ import org.waypoints.next.surroundings.SurroundingEntry;
 import org.waypoints.next.surroundings.SurroundingKey;
 import org.waypoints.next.surroundings.SurroundingKind;
 import org.waypoints.next.surroundings.SurroundingsClassifier;
+import org.waypoints.next.surroundings.SurroundingsMonitoringFilters;
 import org.waypoints.next.surroundings.SurroundingsQuery;
 import org.waypoints.next.surroundings.SurroundingsRow;
 import org.waypoints.next.surroundings.SurroundingsSnapshot;
@@ -73,6 +74,8 @@ final class SurroundingsWindow extends WWindow
             new EnumMap<SurroundingKind, Integer>(SurroundingKind.class);
     private final SurroundingsScrollState scrollState =
             new SurroundingsScrollState(SCROLL_SETTLE_MILLIS);
+    private final SurroundingsMonitoringFilters monitoringFilters =
+            new SurroundingsMonitoringFilters();
 
     private SurroundingKind activeKind = SurroundingKind.ANIMAL;
     private WButton animalsTab;
@@ -95,12 +98,15 @@ final class SurroundingsWindow extends WWindow
     private WButton applyFilters;
     private WurmLabel countLabel;
     private WurmArrayPanel<FlexComponent> table;
-    private WurmScrollPanel scrollPanel;
+    private SurroundingsScrollPanel scrollPanel;
     private WButton waypointFiltered;
     private WButton clearFiltered;
     private WButton clearAll;
     private WButton refreshButton;
     private WButton managerButton;
+    private WButton addMonitoringFilterButton;
+    private WButton clearMonitoringFiltersButton;
+    private WButton monitoringButton;
     private long displayedRevision = Long.MIN_VALUE;
     private long nextAutoRefreshAt;
 
@@ -117,6 +123,11 @@ final class SurroundingsWindow extends WWindow
 
     void refreshFromController() { refreshRows(); }
 
+    boolean mouseWheeledAt(int mouseX, int mouseY, int wheelDelta) {
+        return scrollPanel != null && scrollPanel.contains(mouseX, mouseY)
+                && scrollPanel.scrollWheel(wheelDelta);
+    }
+
     private void rebuildView(String search) {
         shortNameInput = null;
         shortNameModeFilter = null;
@@ -132,8 +143,15 @@ final class SurroundingsWindow extends WWindow
         root.setComponent(filterPanel, WurmBorderPanel.NORTH);
 
         table = vertical("waypointer.surroundings.table");
-        scrollPanel = new WurmScrollPanel("waypointer.surroundings.scroll",
-                table, false, true);
+        scrollPanel = new SurroundingsScrollPanel(
+                "waypointer.surroundings.scroll", table, ROW_HEIGHT,
+                new SurroundingsScrollPanel.ScrollListener() {
+                    @Override public void userScrolled(int offset,
+                                                       long nowMillis) {
+                        scrollState.observe(offset, nowMillis);
+                        scrollOffsets.put(activeKind, Integer.valueOf(offset));
+                    }
+                });
         root.setComponent(scrollPanel, WurmBorderPanel.CENTER);
         root.setComponent(actionRow(), WurmBorderPanel.SOUTH);
         setComponent(root);
@@ -235,16 +253,29 @@ final class SurroundingsWindow extends WWindow
         clearFiltered = button("Clear filtered", 112);
         clearAll = button("Clear all marks", 122);
         refreshButton = button("Refresh", 82);
+        addMonitoringFilterButton = button("Watch filter", 104);
+        clearMonitoringFiltersButton = button("Clear watches", 110);
+        monitoringButton = button(monitoringLabel(), 122);
         managerButton = button("All waypoints", 112);
         waypointFiltered.setHoverString(
                 "Create a standard 15-minute waypoint for every filtered row.");
         clearFiltered.setHoverString(
                 "Delete Surroundings waypoints for every filtered row.");
         clearAll.setHoverString("Delete every Surroundings temporary waypoint.");
+        addMonitoringFilterButton.setHoverString(
+                "Save the current tab and filter as another Monitoring preset.");
+        clearMonitoringFiltersButton.setHoverString(
+                "Remove all saved Monitoring filter presets.");
+        monitoringButton.setHoverString(
+                "Switch to compact Monitoring. If no filter is watched, "
+                        + "the current tab is enabled automatically.");
         row.addComponent(waypointFiltered);
         row.addComponent(clearFiltered);
         row.addComponent(clearAll);
         row.addComponent(refreshButton);
+        row.addComponent(addMonitoringFilterButton);
+        row.addComponent(clearMonitoringFiltersButton);
+        row.addComponent(monitoringButton);
         row.addComponent(managerButton);
         return row;
     }
@@ -282,15 +313,32 @@ final class SurroundingsWindow extends WWindow
     private SurroundingsQuery query() {
         captureSort();
         captureShortNameFilter();
-        FilterState state = state();
-        return SurroundingsQuery.builder().kind(activeKind)
-                .text(searchInput == null ? "" : searchInput.getText())
+        return query(activeKind, searchText());
+    }
+
+    private SurroundingsQuery query(SurroundingKind kind, String search) {
+        FilterState state = filters.get(kind);
+        return SurroundingsQuery.builder().kind(kind)
+                .text(search)
                 .shortName(state.shortName, state.shortNameMode)
                 .categories(state.categories).modifiers(state.modifiers)
                 .uniqueStatuses(state.uniques).materials(state.materials)
                 .rarities(state.rarities).deedStatuses(state.deeds)
                 .layers(state.layers).marks(state.marks)
                 .sort(state.sort, true).build();
+    }
+
+    List<SurroundingsQuery> monitoringQueries() {
+        captureSort();
+        captureShortNameFilter();
+        if (monitoringFilters.isEmpty()) monitoringFilters.add(query());
+        updateMonitoringControls();
+        return monitoringFilters.snapshot();
+    }
+
+    private String searchText() {
+        return searchInput == null || searchInput.getText() == null
+                ? "" : searchInput.getText();
     }
 
     private FlexComponent header() {
@@ -376,6 +424,16 @@ final class SurroundingsWindow extends WWindow
             else if (button == markedFilter) openFilter(button, "Mark status",
                     markChoices(), state().marks);
             else if (button == applyFilters || button == refreshButton) refreshRows();
+            else if (button == addMonitoringFilterButton) {
+                monitoringFilters.add(query());
+                updateMonitoringControls();
+            } else if (button == clearMonitoringFiltersButton) {
+                monitoringFilters.clear();
+                updateMonitoringControls();
+            } else if (button == monitoringButton) {
+                SurroundingsWindowBridge.showMonitoring(
+                        this, monitoringQueries());
+            }
             else if (button == waypointFiltered) {
                 controller.setWaypoints(new ArrayList<SurroundingKey>(filteredKeys), true);
                 refreshRows();
@@ -507,6 +565,16 @@ final class SurroundingsWindow extends WWindow
 
     private String tabLabel(String label, SurroundingKind kind) {
         return activeKind == kind ? "[" + label + "]" : label;
+    }
+
+    private String monitoringLabel() {
+        return "Monitoring (" + monitoringFilters.size() + ")";
+    }
+
+    private void updateMonitoringControls() {
+        if (monitoringButton != null) {
+            monitoringButton.setLabel(monitoringLabel(), false);
+        }
     }
 
     private WButton button(String label, int width) {

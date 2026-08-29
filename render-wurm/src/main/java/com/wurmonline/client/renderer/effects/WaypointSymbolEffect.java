@@ -26,6 +26,7 @@ public final class WaypointSymbolEffect extends Effect
         implements WaypointLatePassParticipant {
     private static final Logger LOGGER = Logger.getLogger(
             "WurmWaypointer.SymbolEffect");
+    private static final int STATE_PRIMER_VERTEX_COUNT = 4;
     private final float x;
     private final float y;
     private final float h;
@@ -39,7 +40,7 @@ public final class WaypointSymbolEffect extends Effect
     private final float green;
     private final float blue;
     private final float alpha;
-    private final int vertexCount;
+    private final int symbolVertexCount;
     private final VertexBuffer vbo;
     private final MaterialInstance material;
     private final long animationStartedNanos = System.nanoTime();
@@ -104,10 +105,11 @@ public final class WaypointSymbolEffect extends Effect
         this.green = unit(green, "green");
         this.blue = unit(blue, "blue");
         this.alpha = unit(alpha, "alpha");
-        this.vertexCount = WaypointSymbolGeometry.stripVertexCount(
+        this.symbolVertexCount = WaypointSymbolGeometry.stripVertexCount(
                 shape, lootMapGroundOutline);
-        this.vbo = VertexBuffer.create(VertexBuffer.Usage.EFFECT, vertexCount,
-                true, false, false, true, false, 0, 0, true, false);
+        this.vbo = VertexBuffer.create(VertexBuffer.Usage.EFFECT,
+                symbolVertexCount + STATE_PRIMER_VERTEX_COUNT, true, false,
+                false, true, false, 0, 0, true, false);
         this.material = GLHelper.useDeferredShading()
                 ? Material.load("material.simple").instance() : null;
         WaypointLatePassBridge.register(this);
@@ -197,9 +199,11 @@ public final class WaypointSymbolEffect extends Effect
             writeArchaeologyReportScroll(geometryH, playerH, projection, distance,
                     geometryDistance, screenWidth, horizontalFov);
         }
+        putStatePrimer();
         vbo.unlock();
         writing = null;
 
+        queueStatePrimer(queue);
         Primitive primitive = queue.reservePrimitive();
         primitive.copyStateFrom(RenderState.RENDERSTATE_ALPHABLEND);
         primitive.blendmode = WaypointWorldBlend.luminous();
@@ -218,7 +222,7 @@ public final class WaypointSymbolEffect extends Effect
         primitive.vertex = vbo;
         primitive.index = null;
         primitive.offset = 0;
-        primitive.num = vertexCount - 2;
+        primitive.num = symbolVertexCount - 2;
         queue.queue(primitive, null);
         if (!firstRenderDiagnosticWritten) {
             firstRenderDiagnosticWritten = true;
@@ -232,6 +236,41 @@ public final class WaypointSymbolEffect extends Effect
                     + ", vboReady=" + vbo.canRender());
         }
         WaypointRenderProfiler.recordSymbol(System.nanoTime() - profileStartedNanos);
+    }
+
+    private void putStatePrimer() {
+        // Degenerate, fully transparent geometry reaches Wurm's global state
+        // cache but cannot contribute a pixel.
+        for (int index = 0; index < STATE_PRIMER_VERTEX_COUNT; index++) {
+            writing.put(centerX).put(centerH).put(centerY);
+            writing.put(0.0f).put(0.0f).put(0.0f).put(0.0f);
+        }
+    }
+
+    private void queueStatePrimer(Queue queue) {
+        Primitive primitive = queue.reservePrimitive();
+        primitive.copyStateFrom(RenderState.RENDERSTATE_ALPHABLEND);
+        // Deliberately differs from the real ALPHAADD + ALWAYS symbol so the
+        // next primitive reapplies every state even when no vanilla Rift (or
+        // any other native effect) has primed the shared effect queue.
+        primitive.blendmode = Primitive.BlendMode.ADD;
+        primitive.depthtest = Primitive.TestFunc.LESSEQUAL;
+        primitive.depthwrite = false;
+        primitive.nofog = false;
+        primitive.clearTextures();
+        if (material != null) {
+            primitive.materialInstance = material;
+            primitive.program = material.getProgram();
+            primitive.bindings = material.getProgramBindings();
+        }
+        primitive.type = Primitive.Type.TRIANGLESTRIP;
+        primitive.twosided = true;
+        primitive.nolight = true;
+        primitive.vertex = vbo;
+        primitive.index = null;
+        primitive.offset = symbolVertexCount;
+        primitive.num = STATE_PRIMER_VERTEX_COUNT - 2;
+        queue.queue(primitive, null);
     }
 
     private void writeRing() {

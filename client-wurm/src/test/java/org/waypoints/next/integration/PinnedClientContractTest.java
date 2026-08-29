@@ -57,6 +57,12 @@ public class PinnedClientContractTest {
                 "(Lcom/wurmonline/client/renderer/gui/WurmComponent;)V");
         assertMethod(hud, "getWidth", "()I");
         assertMethod(hud, "getComponents", "()Ljava/util/List;");
+        assertMethod(hud, "getComponentAt",
+                "(II)Lcom/wurmonline/client/renderer/gui/WurmComponent;");
+
+        CtClass component = classes.get(
+                "com.wurmonline.client.renderer.gui.WurmComponent");
+        assertNotNull(component.getDeclaredField("parent"));
 
         CtClass world = classes.get("com.wurmonline.client.game.World");
         assertMethod(world, "getServerName", "()Ljava/lang/String;");
@@ -116,6 +122,10 @@ public class PinnedClientContractTest {
         CtClass creatureRenderable = classes.get(
                 "com.wurmonline.client.renderer.cell.CreatureCellRenderable");
         assertMethod(creatureRenderable, "isItem", "()Z");
+        CtClass cellRenderer = classes.get(
+                "com.wurmonline.client.renderer.cell.CellRenderer");
+        assertMethod(cellRenderer, "removeRenderable",
+                "(Lcom/wurmonline/client/renderer/cell/CellRenderable;Z)V");
     }
 
     @Test
@@ -212,6 +222,7 @@ public class PinnedClientContractTest {
         CtClass playerAction = classes.get(
                 "com.wurmonline.shared.constants.PlayerAction");
         assertMethod(playerAction, "getName", "()Ljava/lang/String;");
+        assertMethod(playerAction, "getBind", "()Ljava/lang/String;");
         CtClass chat = classes.get(
                 "com.wurmonline.client.renderer.gui.ChatPanelComponent");
         assertMethod(chat, "addText",

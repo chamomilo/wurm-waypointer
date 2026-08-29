@@ -1,5 +1,6 @@
 package org.waypoints.next.integration;
 
+import com.wurmonline.shared.constants.PlayerAction;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -308,9 +309,10 @@ public class LootMapRuntimeTest {
                 configuration.getMapBounds());
 
         assertTrue(runtime.observe(":Event",
-                "The marked spot is quite some distance away in front of you.",
-                context));
+                "You are practically standing on the marked spot!", context));
         awaitRecords(runtime, 1);
+        assertEquals(MarkerStyle.WorldStyle.SHOVEL, runtime.records().get(0)
+                .getMarkerStyle().getWorldStyle());
         assertEquals(0.5d, fractional(runtime.records().get(0)
                 .getCoordinate().getTileX()), 0.0d);
         assertEquals(0.5d, fractional(runtime.records().get(0)
@@ -322,13 +324,19 @@ public class LootMapRuntimeTest {
                 .getBeamWidth(), 0.0f);
         assertEquals(0, runtime.records().get(0).getArrivalRadiusMetres());
 
+        awaitNavigationRequest(runtime);
+
         assertTrue(runtime.observe(":Event", "You find a loot chest!", context));
         awaitRecordName(runtime, "Clear ambush and open chest");
         assertEquals("AWAITING_CHEST_OPEN", runtime.records().get(0)
                 .getExtensions().get("lootmap.phase").get(0));
         assertNotNull(awaitNavigationRequest(runtime));
 
-        runtime.observeAction(new long[]{987L}, "Open");
+        assertNull("the pinned OPEN action exposes no display name",
+                PlayerAction.OPEN.getName());
+        assertEquals("OPEN", WurmPlayerActionName.resolve(PlayerAction.OPEN));
+        runtime.observeAction(new long[]{987L},
+                WurmPlayerActionName.resolve(PlayerAction.OPEN));
         runtime.inventoryWindowOpened(654L, "loot chest");
         Thread.sleep(30L);
         assertEquals(1, runtime.records().size());
@@ -337,6 +345,7 @@ public class LootMapRuntimeTest {
         assertEquals(1, runtime.records().size());
         runtime.inventoryWindowOpened(987L, "loot chest");
         awaitRecords(runtime, 0);
+
         java.io.File log = temporary.getRoot().listFiles()[0];
         String content = new String(Files.readAllBytes(log.toPath()),
                 StandardCharsets.UTF_8);

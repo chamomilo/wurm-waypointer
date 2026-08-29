@@ -240,11 +240,12 @@ final class LootMapRuntime implements DynamicWaypointProvider {
             @Override public void run() {
                 boolean correlated;
                 synchronized (LootMapRuntime.this) {
+                    long elapsed = System.nanoTime()
+                            - pendingChestOpenActionAtNanos;
                     correlated = awaitingChestOpen
                             && pendingChestOpenItemId != null
                             && pendingChestOpenItemId.longValue() == itemId
-                            && System.nanoTime() - pendingChestOpenActionAtNanos
-                            <= 60_000_000_000L;
+                            && elapsed >= 0L && elapsed <= 60_000_000_000L;
                 }
                 if (!correlated) return;
                 finish("chest_opened", Instant.now());

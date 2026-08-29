@@ -20,7 +20,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public final class WurmWaypointerMod implements WurmClientMod, Configurable, PreInitable, Initable {
-    public static final String VERSION = "0.8.0-map-r12";
+    public static final String VERSION = "1.0.0";
     private static final Logger LOGGER = Logger.getLogger("WurmWaypointer");
     private static volatile BeamProbeConfiguration configuration =
             BeamProbeConfiguration.disabled();
@@ -256,7 +256,9 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
         CtClass hud = pool.getCtClass(
                 "com.wurmonline.client.renderer.gui.HeadsUpDisplay");
         hud.getMethod("mouseWheeled", "(III)V").insertBefore(
-                "if (com.wurmonline.client.renderer.gui.ServerMapWindowBridge."
+                "if (com.wurmonline.client.renderer.gui."
+                        + "SurroundingsWindowBridge.mouseWheeled($0, $1, $2, $3)) return;"
+                        + "if (com.wurmonline.client.renderer.gui.ServerMapWindowBridge."
                         + "mouseWheeled($0.getWorldMap(), $1, $2, $3)) return;");
     }
 
@@ -375,7 +377,7 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
         cells.getMethod("removeRenderable",
                 "(Lcom/wurmonline/client/renderer/cell/CellRenderable;Z)V")
                 .insertAfter("org.waypoints.next.integration.WurmWaypointerRuntime."
-                        + "surroundingsRenderableRemoved($1);");
+                        + "surroundingsRenderableRemoved($1, $2);");
         cells.getMethod("clear", "()V").insertAfter(
                 "org.waypoints.next.integration.WurmWaypointerRuntime."
                         + "surroundingsRenderablesCleared();");
@@ -391,5 +393,11 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
         creatures.getMethod("setPosImmediately", "(FFFZZ)V").insertAfter(
                 "org.waypoints.next.integration.WurmWaypointerRuntime."
                         + "surroundingsCreatureMoved($0, $1, $2, $3);");
+
+        CtClass listener = pool.getCtClass(
+                "com.wurmonline.client.comm.ServerConnectionListenerClass");
+        listener.getDeclaredMethod("playDeadThenReplaceWithCorpse").insertBefore(
+                "org.waypoints.next.integration.WurmWaypointerRuntime."
+                        + "surroundingsCreatureReplacedByCorpse($1, $2);");
     }
 }

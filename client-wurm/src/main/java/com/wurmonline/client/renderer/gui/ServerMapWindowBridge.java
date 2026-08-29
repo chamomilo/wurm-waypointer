@@ -308,7 +308,8 @@ public final class ServerMapWindowBridge {
     public static boolean mouseWheeled(WorldMap map, int mouseX, int mouseY,
                                        int wheelDelta) {
         State state = activeState(map);
-        if (state == null || !insideContent(map, mouseX, mouseY)) return false;
+        if (state == null || !insideContent(map, mouseX, mouseY)
+                || !isTopmostMapTarget(map, mouseX, mouseY)) return false;
         if (layerButtonAt(map, mouseX, mouseY) != null
                 || insideSearchButton(map, mouseX, mouseY)) return true;
         double steps = -wheelDelta / 3.0d;
@@ -318,6 +319,25 @@ public final class ServerMapWindowBridge {
                 mouseY - map.y - CONTENT_OFFSET_Y, steps);
         updateHover(map, state, mouseX, mouseY);
         return true;
+    }
+
+    /**
+     * The HUD wheel hook runs before normal component dispatch, so geometric
+     * map bounds alone are insufficient: another window can cover the map.
+     */
+    private static boolean isTopmostMapTarget(WorldMap map, int x, int y) {
+        HeadsUpDisplay current = WurmComponent.hud;
+        return current != null && belongsTo(current.getComponentAt(x, y), map);
+    }
+
+    private static boolean belongsTo(WurmComponent target,
+                                     WurmComponent ancestor) {
+        if (target == null || ancestor == null) return false;
+        for (WurmComponent component = target; component != null;
+             component = component.parent) {
+            if (component == ancestor) return true;
+        }
+        return false;
     }
 
     public static void mouseMoved(WorldMap map, int mouseX, int mouseY) {

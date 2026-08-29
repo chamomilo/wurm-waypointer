@@ -356,6 +356,14 @@ public final class StaticNavigationController {
                 && serverKey.equalsIgnoreCase(active.getServerFingerprint());
     }
 
+    /** Stops only NAV ownership; the marker remains enabled and visible. */
+    public synchronized void stopNavigator(UUID waypointId) {
+        NavigationSnapshot next = withManagerDraft(
+                navigation.deactivateNavigator(waypointId));
+        if (frame != null) frame.update(next);
+        forceReconcile = true;
+    }
+
     /** Session-only switch used by /wp nav pulse; navigation ownership remains. */
     public synchronized void setNavigationPulseEnabled(boolean enabled) {
         if (navigationPulseEnabled == enabled) return;

@@ -68,6 +68,20 @@ public final class LateWorldPassContractTest {
         assertTrue(readsStaticField(primer, "LESSEQUAL"));
     }
 
+    @Test public void symbolPrimesCachedStateWithoutVanillaRift()
+            throws Exception {
+        CtClass symbol = ClassPool.getDefault().get(
+                "com.wurmonline.client.renderer.effects.WaypointSymbolEffect");
+        CtMethod render = symbol.getDeclaredMethod("renderWorld");
+        CtMethod primer = symbol.getDeclaredMethod("queueStatePrimer");
+
+        assertEquals(1, callCount(render, "putStatePrimer"));
+        assertEquals(1, callCount(render, "queueStatePrimer"));
+        assertEquals(1, callCount(primer, "queue"));
+        assertTrue(readsStaticField(primer, "ADD"));
+        assertTrue(readsStaticField(primer, "LESSEQUAL"));
+    }
+
     private static int callCount(CtMethod method, String methodName)
             throws Exception {
         CodeAttribute code = method.getMethodInfo2().getCodeAttribute();

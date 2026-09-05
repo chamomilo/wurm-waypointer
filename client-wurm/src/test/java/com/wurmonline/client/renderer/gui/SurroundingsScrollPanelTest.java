@@ -4,6 +4,8 @@ import org.junit.Test;
 import org.waypoints.next.ui.SurroundingsScrollGesture;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public final class SurroundingsScrollPanelTest {
     @Test public void wheelMovesThreeWholeRowsInEitherDirection() {
@@ -33,6 +35,17 @@ public final class SurroundingsScrollPanelTest {
                 100, 200, 240));
         assertEquals(0, SurroundingsScrollGesture.dragTargetOffset(
                 20, 200, 240));
+    }
+
+    @Test public void contentDragNeverCapturesNativeScrollbars() {
+        assertTrue(SurroundingsScrollGesture.startsContentDrag(true,
+                false, false));
+        assertFalse(SurroundingsScrollGesture.startsContentDrag(true,
+                true, false));
+        assertFalse(SurroundingsScrollGesture.startsContentDrag(true,
+                false, true));
+        assertFalse(SurroundingsScrollGesture.startsContentDrag(false,
+                false, false));
     }
 
 }

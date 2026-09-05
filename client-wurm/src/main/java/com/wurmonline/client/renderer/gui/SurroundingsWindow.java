@@ -94,6 +94,8 @@ final class SurroundingsWindow extends WWindow
     private WurmInputField shortNameInput;
     private WurmDropDown shortNameModeFilter;
     private WButton clearShortName;
+    private WurmInputField excludedNamesInput;
+    private WButton clearExcludedNames;
     private WurmDropDown sortFilter;
     private WButton applyFilters;
     private WurmLabel countLabel;
@@ -132,11 +134,14 @@ final class SurroundingsWindow extends WWindow
         shortNameInput = null;
         shortNameModeFilter = null;
         clearShortName = null;
+        excludedNamesInput = null;
+        clearExcludedNames = null;
         WurmBorderPanel root = new WurmBorderPanel("waypointer.surroundings.root");
         WurmArrayPanel<FlexComponent> filterPanel = vertical(
                 "waypointer.surroundings.filters");
         filterPanel.addComponent(tabAndSearchRow(search));
         filterPanel.addComponent(fieldFilterRow());
+        filterPanel.addComponent(excludedNamesFilterRow());
         if (activeKind != SurroundingKind.ANIMAL) {
             filterPanel.addComponent(shortNameFilterRow());
         }
@@ -231,7 +236,7 @@ final class SurroundingsWindow extends WWindow
         shortNameInput = new WurmInputField(
                 "waypointer.surroundings.short-name.input", this);
         shortNameInput.setInitialSize(360, ROW_HEIGHT, false);
-        shortNameInput.prompt = "catseye";
+        shortNameInput.prompt = "client short-name fragment";
         shortNameInput.setTextMoveToEnd(state.shortName);
         row.addComponent(shortNameInput);
         shortNameModeFilter = new WurmDropDown(
@@ -242,8 +247,26 @@ final class SurroundingsWindow extends WWindow
         clearShortName = button("Clear", 62);
         row.addComponent(clearShortName);
         WurmLabel example = new WurmLabel(
-                "Example: catseye + Hide matching");
+                "Matches the client's undecorated short name");
         row.addComponent(cell(example, 278));
+        return row;
+    }
+
+    private FlexComponent excludedNamesFilterRow() {
+        FilterState state = state();
+        WurmArrayPanel<FlexComponent> row = horizontal(
+                "waypointer.surroundings.excluded-names");
+        row.addComponent(cell(new WurmLabel("Exclude names"), 110));
+        row.addComponent(cell(new WurmLabel("Example: catseyes, post"), 170));
+        row.addComponent(cell(new WurmLabel(""), 8));
+        excludedNamesInput = new WurmInputField(
+                "waypointer.surroundings.excluded-names.input", this);
+        excludedNamesInput.setInitialSize(600, ROW_HEIGHT, false);
+        excludedNamesInput.prompt = "";
+        excludedNamesInput.setTextMoveToEnd(joinFragments(state.excludedNames));
+        row.addComponent(excludedNamesInput);
+        clearExcludedNames = button("Clear", 62);
+        row.addComponent(clearExcludedNames);
         return row;
     }
 
@@ -313,6 +336,7 @@ final class SurroundingsWindow extends WWindow
     private SurroundingsQuery query() {
         captureSort();
         captureShortNameFilter();
+        captureExcludedNames();
         return query(activeKind, searchText());
     }
 
@@ -321,6 +345,7 @@ final class SurroundingsWindow extends WWindow
         return SurroundingsQuery.builder().kind(kind)
                 .text(search)
                 .shortName(state.shortName, state.shortNameMode)
+                .excludedNames(state.excludedNames)
                 .categories(state.categories).modifiers(state.modifiers)
                 .uniqueStatuses(state.uniques).materials(state.materials)
                 .rarities(state.rarities).deedStatuses(state.deeds)
@@ -331,6 +356,7 @@ final class SurroundingsWindow extends WWindow
     List<SurroundingsQuery> monitoringQueries() {
         captureSort();
         captureShortNameFilter();
+        captureExcludedNames();
         if (monitoringFilters.isEmpty()) monitoringFilters.add(query());
         updateMonitoringControls();
         return monitoringFilters.snapshot();
@@ -407,6 +433,10 @@ final class SurroundingsWindow extends WWindow
                 shortNameInput.setTextMoveToEnd("");
                 captureShortNameFilter();
                 refreshRows();
+            } else if (button == clearExcludedNames) {
+                excludedNamesInput.setTextMoveToEnd("");
+                captureExcludedNames();
+                refreshRows();
             } else if (button == categoryFilter) openFilter(button, "Categories",
                     categoryChoices(activeKind), state().categories);
             else if (button == modifierFilter) openFilter(button, "Traits",
@@ -479,6 +509,7 @@ final class SurroundingsWindow extends WWindow
         if (kind == activeKind) return;
         captureSort();
         captureShortNameFilter();
+        captureExcludedNames();
         String search = searchInput == null ? "" : searchInput.getText();
         rememberScrollOffset();
         activeKind = kind;
@@ -493,7 +524,8 @@ final class SurroundingsWindow extends WWindow
 
     private void restoreScroll(int requestedOffset) {
         if (scrollPanel == null) return;
-        scrollPanel.scrollDownTo(Math.max(0, requestedOffset));
+        scrollPanel.contentChanged();
+        scrollPanel.restoreOffset(requestedOffset);
         int restored = Math.max(0, scrollPanel.yo);
         scrollOffsets.put(activeKind, Integer.valueOf(restored));
         scrollState.synchronize(restored);
@@ -522,6 +554,28 @@ final class SurroundingsWindow extends WWindow
                 : SurroundingsQuery.ShortNameMode.INCLUDE;
     }
 
+    private void captureExcludedNames() {
+        if (excludedNamesInput == null) return;
+        FilterState state = state();
+        state.excludedNames.clear();
+        String input = excludedNamesInput.getText();
+        if (input == null) return;
+        for (String fragment : input.split("[,;]+")) {
+            String clean = fragment.trim();
+            if (!clean.isEmpty()) state.excludedNames.add(clean);
+        }
+    }
+
+    private static String joinFragments(Collection<String> values) {
+        StringBuilder result = new StringBuilder();
+        if (values != null) for (String value : values) {
+            if (value == null || value.trim().isEmpty()) continue;
+            if (result.length() > 0) result.append(", ");
+            result.append(value.trim());
+        }
+        return result.toString();
+    }
+
     private void updateFilterLabels() {
         FilterState state = state();
         updateFilterButton(categoryFilter, "Category", state.categories,
@@ -538,7 +592,8 @@ final class SurroundingsWindow extends WWindow
     @Override public void handleInput(String input) { refreshRows(); }
 
     @Override public void handleInputChanged(WurmInputField field, String input) {
-        if (field == searchInput || field == shortNameInput) refreshRows();
+        if (field == searchInput || field == shortNameInput
+                || field == excludedNamesInput) refreshRows();
     }
 
     @Override public void handleEscape(WurmInputField field) {
@@ -802,6 +857,7 @@ final class SurroundingsWindow extends WWindow
                 new LinkedHashSet<SurroundingsQuery.LayerFilter>();
         private final Set<SurroundingsQuery.MarkFilter> marks =
                 new LinkedHashSet<SurroundingsQuery.MarkFilter>();
+        private final Set<String> excludedNames = new LinkedHashSet<String>();
         private String shortName = "";
         private SurroundingsQuery.ShortNameMode shortNameMode =
                 SurroundingsQuery.ShortNameMode.EXCLUDE;

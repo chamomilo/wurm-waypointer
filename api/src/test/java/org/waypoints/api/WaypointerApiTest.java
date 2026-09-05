@@ -24,7 +24,7 @@ public final class WaypointerApiTest {
         installed = service();
         WaypointerApi.installRuntime(installed);
         assertTrue(WaypointerApi.isInstalled());
-        assertEquals(1, WaypointerApi.apiVersion());
+        assertEquals(2, WaypointerApi.apiVersion());
         assertTrue(WaypointerApi.capabilities().contains(
                 WaypointerCapability.OBJECT_MARKS));
     }
@@ -38,6 +38,19 @@ public final class WaypointerApiTest {
                 WaypointerApi.markObject(request).getStatus());
     }
 
+    @Test public void requestCarriesFallbackSnapshotForUncataloguedObjects() {
+        WurmObjectSnapshot snapshot = new WurmObjectSnapshot(
+                "Oleander hedge", 120.5d, 240.25d, 3.0d, 0);
+        ObjectMarkRequest request = ObjectMarkRequest.builder()
+                .ownerId("test.mod").markerKey("hedge")
+                .subject(new WurmObjectRef(WurmObjectKind.AUTO, 77L))
+                .snapshot(snapshot).build();
+
+        assertEquals(snapshot, request.getSnapshot());
+        assertEquals("Oleander hedge", request.getSnapshot().getName());
+        assertEquals(120.5d, request.getSnapshot().getWorldX(), 0.0d);
+    }
+
     @Test public void reflectionFriendlyMarkCommandUsesInstalledProvider() {
         installed = service();
         WaypointerApi.installRuntime(installed);
@@ -47,7 +60,7 @@ public final class WaypointerApiTest {
 
     private static WaypointerService service() {
         return new WaypointerService() {
-            @Override public int apiVersion() { return 1; }
+            @Override public int apiVersion() { return 2; }
             @Override public Set<WaypointerCapability> capabilities() {
                 return Collections.singleton(WaypointerCapability.OBJECT_MARKS);
             }

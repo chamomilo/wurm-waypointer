@@ -32,6 +32,7 @@ public class HookBytecodeCompatibilityTest {
         invokeInstaller("hookConsole", pool);
         invokeInstaller("hookInventoryWindows", pool);
         invokeInstaller("hookSurroundings", pool);
+        invokeInstaller("hookScannerOutlines", pool);
 
         assertTrue(pool.get("com.wurmonline.client.startup.ServerBrowserFX")
                 .toBytecode().length > 0);
@@ -58,6 +59,8 @@ public class HookBytecodeCompatibilityTest {
         assertTrue(pool.get("com.wurmonline.client.game.inventory."
                 + "InventoryMetaWindowManager").toBytecode().length > 0);
         assertTrue(pool.get("com.wurmonline.client.renderer.cell.CellRenderer")
+                .toBytecode().length > 0);
+        assertTrue(pool.get("com.wurmonline.client.renderer.WorldRender")
                 .toBytecode().length > 0);
     }
 

@@ -14,6 +14,7 @@ import org.waypoints.next.render.BeamDistanceScaling;
 import org.waypoints.next.render.WaypointSymbolGeometry;
 import org.waypoints.next.render.WaypointGroundHeight;
 import org.waypoints.next.render.WaypointWorldBlend;
+import org.waypoints.next.render.WaypointWorldTexture;
 import org.waypoints.next.render.WaypointRenderProfiler;
 import org.waypoints.next.render.WaypointLatePassBridge;
 import org.waypoints.next.render.WaypointLatePassParticipant;
@@ -27,9 +28,9 @@ public final class WaypointSymbolEffect extends Effect
     private static final Logger LOGGER = Logger.getLogger(
             "WurmWaypointer.SymbolEffect");
     private static final int STATE_PRIMER_VERTEX_COUNT = 4;
-    private final float x;
-    private final float y;
-    private final float h;
+    private volatile float x;
+    private volatile float y;
+    private volatile float h;
     private final int targetLayer;
     private final boolean groundAnchored;
     private final boolean lootMapGroundOutline;
@@ -44,6 +45,7 @@ public final class WaypointSymbolEffect extends Effect
     private final VertexBuffer vbo;
     private final MaterialInstance material;
     private final long animationStartedNanos = System.nanoTime();
+    private final float animationPhase;
     private volatile boolean alive = true;
     private boolean firstRenderDiagnosticWritten;
 
@@ -95,6 +97,7 @@ public final class WaypointSymbolEffect extends Effect
         this.x = x;
         this.y = y;
         this.h = h;
+        this.animationPhase = animationPhase(x, y);
         this.targetLayer = targetLayer;
         this.groundAnchored = groundAnchored;
         this.lootMapGroundOutline = lootMapGroundOutline;
@@ -113,6 +116,13 @@ public final class WaypointSymbolEffect extends Effect
         this.material = GLHelper.useDeferredShading()
                 ? Material.load("material.simple").instance() : null;
         WaypointLatePassBridge.register(this);
+    }
+
+    /** Retargets a live marker without restarting its animation clock. */
+    public void setTargetPosition(float x, float y, float h) {
+        this.x = finite(x, "x");
+        this.y = finite(y, "y");
+        this.h = finite(h, "height");
     }
 
     @Override public void render(Queue queue, float tickFraction) {
@@ -153,7 +163,6 @@ public final class WaypointSymbolEffect extends Effect
                 screenWidth, horizontalFov);
         float seconds = (float) ((profileStartedNanos - animationStartedNanos)
                 * 0.000000001d);
-        float animationPhase = animationPhase(x, y);
         float verticalDrift = (float) Math.sin(seconds * 0.55f + animationPhase)
                 * frameRadius * 0.42f;
         centerH = WaypointSymbolGeometry.centerHeight(geometryH, verticalDrift);
@@ -207,7 +216,7 @@ public final class WaypointSymbolEffect extends Effect
         Primitive primitive = queue.reservePrimitive();
         primitive.copyStateFrom(RenderState.RENDERSTATE_ALPHABLEND);
         primitive.blendmode = WaypointWorldBlend.luminous();
-        primitive.clearTextures();
+        WaypointWorldTexture.bindWhite(primitive);
         if (material != null) {
             primitive.materialInstance = material;
             primitive.program = material.getProgram();
@@ -257,7 +266,7 @@ public final class WaypointSymbolEffect extends Effect
         primitive.depthtest = Primitive.TestFunc.LESSEQUAL;
         primitive.depthwrite = false;
         primitive.nofog = false;
-        primitive.clearTextures();
+        WaypointWorldTexture.bindWhite(primitive);
         if (material != null) {
             primitive.materialInstance = material;
             primitive.program = material.getProgram();
@@ -742,6 +751,13 @@ public final class WaypointSymbolEffect extends Effect
     private static float animationPhase(float worldX, float worldY) {
         int hash = Float.floatToIntBits(worldX) * 31 + Float.floatToIntBits(worldY);
         return (hash & 1023) * ((float) Math.PI * 2.0f / 1024.0f);
+    }
+
+    private static float finite(float value, String label) {
+        if (Float.isNaN(value) || Float.isInfinite(value)) {
+            throw new IllegalArgumentException(label + " must be finite");
+        }
+        return value;
     }
 
     private static float unit(float value, String label) {

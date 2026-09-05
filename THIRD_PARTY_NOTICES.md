@@ -21,6 +21,5 @@ The compact Sklotopolis wordmark shown on the M-map was supplied by the server
 community for this integration. The Sklotopolis name and artwork remain the
 property of their respective owner; inclusion here grants no broader rights.
 
-Wurm Waypointer is licensed under the GNU Lesser General Public License version
-3 only (`LGPL-3.0-only`). The distribution includes both the GNU GPL v3 terms
-and the LGPL v3 additional permissions in `LICENSE` and `COPYING.LESSER`.
+Wurm Waypointer is licensed under the GNU General Public License version 3 only
+(`GPL-3.0-only`). The license terms are included in `LICENSE`.

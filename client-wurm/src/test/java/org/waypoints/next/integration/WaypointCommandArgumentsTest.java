@@ -4,9 +4,17 @@ import org.junit.Test;
 import org.waypoints.next.source.CoordinateInputParser;
 import org.waypoints.next.source.MapBounds;
 
+import java.util.Arrays;
+
 import static org.junit.Assert.assertEquals;
 
 public class WaypointCommandArgumentsTest {
+    @Test public void scannerMinusNamesSupportSeveralCommaSeparatedFragments() {
+        assertEquals(Arrays.asList("catseye", "corpse of", "pet"),
+                WurmWaypointerRuntime.scannerNameFragments(new String[]{
+                        "scan", "exclude", "catseye,", "corpse", "of;", "pet"
+                }, 2));
+    }
     private final CoordinateInputParser parser = new CoordinateInputParser();
     private final MapBounds bounds = new MapBounds(4096, 4096);
 

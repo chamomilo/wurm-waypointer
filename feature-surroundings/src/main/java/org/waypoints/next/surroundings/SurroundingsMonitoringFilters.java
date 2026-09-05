@@ -33,6 +33,7 @@ public final class SurroundingsMonitoringFilters {
                 && left.getText().equalsIgnoreCase(right.getText())
                 && left.getShortName().equalsIgnoreCase(right.getShortName())
                 && left.getShortNameMode() == right.getShortNameMode()
+                && left.getExcludedNames().equals(right.getExcludedNames())
                 && left.getCategories().equals(right.getCategories())
                 && left.getMaterials().equals(right.getMaterials())
                 && left.getModifiers().equals(right.getModifiers())

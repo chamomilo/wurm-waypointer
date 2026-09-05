@@ -14,6 +14,7 @@ import org.waypoints.next.render.BeamMarkerScale;
 import org.waypoints.next.render.CircleBeamAnimation;
 import org.waypoints.next.render.WaypointGroundHeight;
 import org.waypoints.next.render.WaypointWorldBlend;
+import org.waypoints.next.render.WaypointWorldTexture;
 import org.waypoints.next.render.WaypointRenderProfiler;
 import org.waypoints.next.render.WaypointLatePassBridge;
 import org.waypoints.next.render.WaypointLatePassParticipant;
@@ -31,9 +32,9 @@ public final class WaypointBeamEffect extends Effect
     private static final int CIRCLE_VERTEX_COUNT = CIRCLE_SEGMENTS * 6 - 2;
     private static final Logger LOGGER = Logger.getLogger("WurmWaypointer.BeamEffect");
 
-    private final float x;
-    private final float y;
-    private final float h;
+    private volatile float x;
+    private volatile float y;
+    private volatile float h;
     private final int targetLayer;
     private final boolean groundAnchored;
     private final float height;
@@ -46,6 +47,7 @@ public final class WaypointBeamEffect extends Effect
     private final int statePrimerOffset;
     private final int extraGeometryOffset;
     private final long animationStartedNanos = System.nanoTime();
+    private final float animationPhase;
     private float width;
     private float red;
     private float green;
@@ -91,6 +93,7 @@ public final class WaypointBeamEffect extends Effect
         this.x = x;
         this.y = y;
         this.h = h;
+        this.animationPhase = animationPhase(x, y);
         this.targetLayer = targetLayer;
         this.groundAnchored = groundAnchored;
         this.height = positiveFinite(height, "height");
@@ -114,6 +117,13 @@ public final class WaypointBeamEffect extends Effect
         this.material = GLHelper.useDeferredShading()
                 ? Material.load("material.simple").instance() : null;
         WaypointLatePassBridge.register(this);
+    }
+
+    /** Retargets a live marker without restarting its animation clock. */
+    public void setTargetPosition(float x, float y, float h) {
+        this.x = finite(x, "x");
+        this.y = finite(y, "y");
+        this.h = finite(h, "height");
     }
 
     public void setWidth(float value) {
@@ -184,7 +194,6 @@ public final class WaypointBeamEffect extends Effect
         float renderGreen = green;
         float renderBlue = blue;
         float seconds = elapsedSeconds(animationStartedNanos, frameNanos);
-        float animationPhase = animationPhase(x, y);
         float renderAlpha = alpha * slowPulse(seconds, animationPhase);
         if (visualMode == VisualMode.INVERT) {
             renderRed = WaypointWorldBlend.blackLightChannel(red);
@@ -281,7 +290,7 @@ public final class WaypointBeamEffect extends Effect
         primitive.copyStateFrom(RenderState.RENDERSTATE_ALPHABLEND);
         primitive.blendmode = visualMode == VisualMode.INVERT
                 ? WaypointWorldBlend.blackLight() : WaypointWorldBlend.luminous();
-        primitive.clearTextures();
+        WaypointWorldTexture.bindWhite(primitive);
         if (material != null) {
             primitive.materialInstance = material;
             primitive.program = material.getProgram();
@@ -321,7 +330,7 @@ public final class WaypointBeamEffect extends Effect
         primitive.depthtest = Primitive.TestFunc.LESSEQUAL;
         primitive.depthwrite = false;
         primitive.nofog = false;
-        primitive.clearTextures();
+        WaypointWorldTexture.bindWhite(primitive);
         if (material != null) {
             primitive.materialInstance = material;
             primitive.program = material.getProgram();
@@ -382,7 +391,7 @@ public final class WaypointBeamEffect extends Effect
         Primitive primitive = queue.reservePrimitive();
         primitive.copyStateFrom(RenderState.RENDERSTATE_ALPHABLEND);
         primitive.blendmode = WaypointWorldBlend.luminous();
-        primitive.clearTextures();
+        WaypointWorldTexture.bindWhite(primitive);
         if (material != null) {
             primitive.materialInstance = material;
             primitive.program = material.getProgram();
@@ -457,6 +466,13 @@ public final class WaypointBeamEffect extends Effect
     private static float positiveFinite(float value, String label) {
         if (Float.isNaN(value) || Float.isInfinite(value) || value <= 0.0f) {
             throw new IllegalArgumentException(label + " must be finite and positive");
+        }
+        return value;
+    }
+
+    private static float finite(float value, String label) {
+        if (Float.isNaN(value) || Float.isInfinite(value)) {
+            throw new IllegalArgumentException(label + " must be finite");
         }
         return value;
     }

@@ -25,6 +25,7 @@ import java.util.UUID;
  * and never performs persistence or client work.
  */
 public final class StaticNavigationRegistry {
+    private static final String API_OWNER_EXTENSION = "waypointer.api.owner";
     private final Map<NavigationTargetKey, Boolean> beamVisibility =
             new HashMap<NavigationTargetKey, Boolean>();
     private List<WaypointRecord> eligible = Collections.emptyList();
@@ -382,6 +383,12 @@ public final class StaticNavigationRegistry {
         MarkerStyle style = record.getMarkerStyle();
         if (record.getSourceType() == WaypointSourceType.MANAGED_ANIMAL
                 || record.getSourceType() == WaypointSourceType.MANAGED_ITEM) {
+            if (isExternalApiMarker(record)) {
+                // Public API marker types are an explicit caller choice. Do
+                // not replace TARGET, BEAM or COMPASS_ONLY with the ordinary
+                // Surroundings exclamation during render projection.
+                return style;
+            }
             // The source owns this shape. Keeping the stored colour/tuning also
             // upgrades marks written by the first Surroundings release.
             return new MarkerStyle(MarkerStyle.WorldStyle.EXCLAMATION,
@@ -407,5 +414,12 @@ public final class StaticNavigationRegistry {
                 1.0f, 0.0f, 0.0f, 1.0f, style.getMarkerSize(),
                 style.getBeamWidth(), style.isShowLabel(),
                 style.isShowDistance());
+    }
+
+    private static boolean isExternalApiMarker(WaypointRecord record) {
+        List<String> owners = record.getExtensions().get(API_OWNER_EXTENSION);
+        if (owners == null || owners.isEmpty()) return false;
+        String owner = owners.get(0);
+        return owner != null && !owner.trim().isEmpty();
     }
 }

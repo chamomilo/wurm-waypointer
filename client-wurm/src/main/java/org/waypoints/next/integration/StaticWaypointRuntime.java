@@ -143,6 +143,7 @@ final class StaticWaypointRuntime {
                 message(hud, "Commands: /wp here <name>; /wp add <name> <x> <y|map-link>; "
                         + "/wp paste <name>; /wp list; /wp duplicate|delete|enable|disable <UUID|exact name>; "
                         + "/wp rename <UUID|name> | <new name>; /wp manager; /wp export; /wp import; "
+                        + "/wp scan <uniques|treasure|animals|off|status>; "
                         + "/wp perf [reset].");
                 return true;
             }

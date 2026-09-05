@@ -8,6 +8,7 @@ public final class ObjectMarkRequest {
     private final String ownerId;
     private final String markerKey;
     private final WurmObjectRef subject;
+    private final WurmObjectSnapshot snapshot;
     private final ObjectMarkerType markerType;
     private final NavigationRequest navigation;
     private final int maximumLifetimeSeconds;
@@ -27,6 +28,7 @@ public final class ObjectMarkRequest {
                     + MAXIMUM_LIFETIME_SECONDS + " seconds");
         }
         subject = builder.subject;
+        snapshot = builder.snapshot;
         markerType = builder.markerType;
         navigation = builder.navigation;
         maximumLifetimeSeconds = builder.maximumLifetimeSeconds;
@@ -36,6 +38,8 @@ public final class ObjectMarkRequest {
     public String getOwnerId() { return ownerId; }
     public String getMarkerKey() { return markerKey; }
     public WurmObjectRef getSubject() { return subject; }
+    /** Optional caller-supplied fallback for objects outside the live catalog. */
+    public WurmObjectSnapshot getSnapshot() { return snapshot; }
     public ObjectMarkerType getMarkerType() { return markerType; }
     public NavigationRequest getNavigation() { return navigation; }
     /** Zero means object lifetime only; positive values add a safety expiry. */
@@ -55,6 +59,7 @@ public final class ObjectMarkRequest {
         private String ownerId;
         private String markerKey;
         private WurmObjectRef subject;
+        private WurmObjectSnapshot snapshot;
         private ObjectMarkerType markerType = ObjectMarkerType.ALERT;
         private NavigationRequest navigation = NavigationRequest.NONE;
         private int maximumLifetimeSeconds = DEFAULT_LIFETIME_SECONDS;
@@ -63,6 +68,10 @@ public final class ObjectMarkRequest {
         public Builder ownerId(String value) { ownerId = value; return this; }
         public Builder markerKey(String value) { markerKey = value; return this; }
         public Builder subject(WurmObjectRef value) { subject = value; return this; }
+        public Builder snapshot(WurmObjectSnapshot value) {
+            snapshot = value;
+            return this;
+        }
         public Builder markerType(ObjectMarkerType value) {
             markerType = value;
             return this;

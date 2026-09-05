@@ -164,6 +164,8 @@ public class ArchaeologyRuntimeTest {
                 "As you discover an Old Haven hidden cache the report is crumpled up and ruined.",
                 cache);
         awaitKnown(first);
+        assertEquals(ArchaeologyRuntime.SoundCue.CACHE_FOUND,
+                awaitSound(first));
 
         ArchaeologyRuntime restored = new ArchaeologyRuntime(Logger.getAnonymousLogger());
         restored.configure(configuration);

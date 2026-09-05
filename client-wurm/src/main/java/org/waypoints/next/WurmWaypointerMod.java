@@ -3,6 +3,7 @@ package org.waypoints.next;
 import com.wurmonline.client.renderer.gui.HeadsUpDisplay;
 import javassist.ClassPool;
 import javassist.CtClass;
+import javassist.CtNewMethod;
 import org.gotti.wurmunlimited.modloader.classhooks.HookManager;
 import org.gotti.wurmunlimited.modloader.interfaces.Configurable;
 import org.gotti.wurmunlimited.modloader.interfaces.Initable;
@@ -20,7 +21,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public final class WurmWaypointerMod implements WurmClientMod, Configurable, PreInitable, Initable {
-    public static final String VERSION = "1.0.0";
+    public static final String VERSION = "1.0.5";
     private static final Logger LOGGER = Logger.getLogger("WurmWaypointer");
     private static volatile BeamProbeConfiguration configuration =
             BeamProbeConfiguration.disabled();
@@ -117,6 +118,12 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
                 new FailOpenHookInstaller.HookOperation() {
                     @Override public void install() throws Exception {
                         hookSurroundings(pool);
+                    }
+                });
+        hooks.install("bounded Scanner coloured outlines",
+                new FailOpenHookInstaller.HookOperation() {
+                    @Override public void install() throws Exception {
+                        hookScannerOutlines(pool);
                     }
                 });
         hooks.install("effect renderer lifecycle and waypoint world pass",
@@ -399,5 +406,58 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
         listener.getDeclaredMethod("playDeadThenReplaceWithCorpse").insertBefore(
                 "org.waypoints.next.integration.WurmWaypointerRuntime."
                         + "surroundingsCreatureReplacedByCorpse($1, $2);");
+    }
+
+    private static void hookScannerOutlines(ClassPool pool) throws Exception {
+        CtClass worldRender = pool.getCtClass(
+                "com.wurmonline.client.renderer.WorldRender");
+        worldRender.addMethod(CtNewMethod.make(
+                "private void waypointerRenderScannerOutline("
+                        + "com.wurmonline.client.renderer.backend.Queue queue,"
+                        + "com.wurmonline.client.renderer.PickableUnit unit){"
+                        + "com.wurmonline.client.renderer.Color source=unit.getOutlineColor();"
+                        + "if(source==null)return;"
+                        + "float intensity=3.5f;"
+                        + "com.wurmonline.client.renderer.Color color="
+                        + "new com.wurmonline.client.renderer.Color(source);"
+                        + "color.a=intensity*source.a;"
+                        + "com.wurmonline.client.renderer.backend.RenderState fill="
+                        + "new com.wurmonline.client.renderer.backend.RenderState();"
+                        + "fill.alphaval=intensity;fill.twosided=false;"
+                        + "fill.depthtest=com.wurmonline.client.renderer.backend."
+                        + "Primitive.TestFunc.ALWAYS;fill.depthwrite=true;"
+                        + "fill.customstate=this.customPickFill;fill.nolight=true;"
+                        + "unit.renderPicked(queue,fill,color);"
+                        + "color.a=intensity*0.25f*source.a;"
+                        + "com.wurmonline.client.renderer.backend.RenderState outline="
+                        + "new com.wurmonline.client.renderer.backend.RenderState();"
+                        + "outline.alphaval=intensity*0.25f;outline.twosided=false;"
+                        + "outline.depthtest=com.wurmonline.client.renderer.backend."
+                        + "Primitive.TestFunc.LESS;outline.depthwrite=false;"
+                        + "outline.blendmode=com.wurmonline.client.renderer.backend."
+                        + "Primitive.BlendMode.ALPHABLEND;"
+                        + "outline.customstate=this.customPickOutline;outline.nolight=true;"
+                        + "unit.renderPicked(queue,outline,color);"
+                        + "com.wurmonline.client.renderer.backend.RenderState restore="
+                        + "new com.wurmonline.client.renderer.backend.RenderState();"
+                        + "restore.customstate=this.customPickFillDepth;"
+                        + "restore.depthtest=com.wurmonline.client.renderer.backend."
+                        + "Primitive.TestFunc.ALWAYS;restore.nolight=true;"
+                        + "unit.renderPicked(queue,restore,color);"
+                        + "}", worldRender));
+        worldRender.addMethod(CtNewMethod.make(
+                "private void waypointerRenderScannerOutlines("
+                        + "com.wurmonline.client.renderer.backend.Queue queue){"
+                        + "if(this.itemPlacer.isActive())return;"
+                        + "com.wurmonline.client.renderer.PickableUnit[] targets="
+                        + "org.waypoints.next.integration.ScannerOutlineRenderBridge."
+                        + "targets(queue);"
+                        + "for(int i=0;i<targets.length;i++){"
+                        + "try{if(targets[i]!=null)"
+                        + "waypointerRenderScannerOutline(queue,targets[i]);}"
+                        + "catch(java.lang.Throwable ignored){}}"
+                        + "}", worldRender));
+        worldRender.getDeclaredMethod("renderPickedItem").insertAfter(
+                "$0.waypointerRenderScannerOutlines($1);");
     }
 }

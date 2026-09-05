@@ -4,8 +4,11 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Properties;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /** Typed, bounded access to mod properties with optional per-setting recovery. */
@@ -62,6 +65,25 @@ final class ConfigurationProperties {
         }
     }
 
+    Set<String> commaSeparated(String key, String defaultValue,
+                               int maximumValues, int maximumLength) {
+        String value = text(key, defaultValue);
+        LinkedHashSet<String> result = new LinkedHashSet<String>();
+        if (value.isEmpty()) return Collections.unmodifiableSet(result);
+        for (String part : value.split("[,;]+")) {
+            String clean = part.trim();
+            if (clean.isEmpty()) continue;
+            if (clean.length() > maximumLength || result.size() >= maximumValues) {
+                return invalid(key, commaSeparatedDefault(defaultValue,
+                                maximumValues, maximumLength),
+                        "at most " + maximumValues + " comma-separated values of at most "
+                                + maximumLength + " characters", null);
+            }
+            result.add(clean);
+        }
+        return Collections.unmodifiableSet(result);
+    }
+
     <T extends Enum<T>> T enumeration(String key, T defaultValue, Class<T> type) {
         String value = text(key, defaultValue.name());
         try {
@@ -74,6 +96,18 @@ final class ConfigurationProperties {
     private String text(String key, String defaultValue) {
         String value = source.getProperty(key, defaultValue);
         return value == null ? "" : value.trim();
+    }
+
+    private static Set<String> commaSeparatedDefault(String value,
+                                                     int maximumValues,
+                                                     int maximumLength) {
+        LinkedHashSet<String> result = new LinkedHashSet<String>();
+        if (value != null) for (String part : value.split("[,;]+")) {
+            String clean = part.trim();
+            if (!clean.isEmpty() && clean.length() <= maximumLength
+                    && result.size() < maximumValues) result.add(clean);
+        }
+        return Collections.unmodifiableSet(result);
     }
 
     private <T> T invalid(String key, T defaultValue, String expected,

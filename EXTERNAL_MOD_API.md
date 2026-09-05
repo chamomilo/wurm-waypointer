@@ -1,28 +1,30 @@
-# Waypointer API для внешних client-модов
+# Waypointer API for external client mods
 
-Короткий контекст, который можно целиком скопировать в новую задачу Codex.
+This is a concise integration reference that can be copied in full into a new
+Codex task.
 
-## Правило интеграции
+## Integration rules
 
-Не обращаться к `org.waypoints.next.*`, private-полям или внутренним
-`SurroundingKind`/контроллерам. Единственная публичная точка входа:
+Do not access `org.waypoints.next.*`, private fields, or internal
+`SurroundingKind` values/controllers. The only public entry point is:
 
 ```text
 org.waypoints.api.WaypointerApi
 ```
 
-Интеграция всегда необязательная и fail-open:
+The integration must always be optional and fail open:
 
-1. Через `Class.forName` найти `WaypointerApi`.
-2. Вызвать статический `isInstalled()`; продолжать только при `true`.
-3. При необходимости проверить `apiVersion()` (текущая версия — `1`) и
+1. Locate `WaypointerApi` with `Class.forName`.
+2. Invoke the static `isInstalled()` method and continue only when it returns
+   `true`.
+3. If needed, check `apiVersion()` (the current version is `2`) and
    `capabilities()` (`OBJECT_MARKS`, `SUBJECT_LIFECYCLE`, `NAVIGATION`).
-4. Если API отсутствует, вернул `false` или вызов завершился ошибкой, внешний
-   мод продолжает работать без функций Waypointer.
+4. If the API is unavailable, returns `false`, or an invocation fails, the
+   external mod must continue working without Waypointer features.
 
-## Простые reflection-команды
+## Simple reflection calls
 
-Создать/обновить 15-минутный маркер на загруженном объекте:
+Create or update a 15-minute marker for a loaded object:
 
 ```java
 Class<?> api = Class.forName("org.waypoints.api.WaypointerApi");
@@ -32,32 +34,37 @@ if (installed) {
     boolean marked = Boolean.TRUE.equals(api.getMethod("markObject",
             String.class, String.class, String.class, long.class,
             String.class, boolean.class).invoke(null,
-            "my.mod.id",          // стабильный ID мода-владельца
-            "selected:" + wurmId, // idempotency key маркера
+            "my.mod.id",          // Stable ID of the owning mod
+            "selected:" + wurmId, // Idempotency key for the marker
             "AUTO",               // AUTO | CREATURE | ITEM | CONTAINER
             wurmId,
             "ALERT",              // ALERT | TARGET | BEAM | COMPASS_ONLY
-            true));                // true: также включить/перенести NAV
+            true));                // Also start or move NAV when true
 }
 ```
 
-Сообщить, что исходный объект исчез (смерть — это исчезновение creature;
-corpse является новым item и маркер на него не переносится):
+Report that the source object disappeared (a creature's death counts as its
+disappearance; the corpse is a new item and does not inherit the marker):
 
 ```java
 api.getMethod("subjectVanished", String.class, long.class)
         .invoke(null, "CREATURE", killedCreatureId);
 ```
 
-Typed API дополнительно предоставляет `ObjectMarkRequest`, `MarkResult`,
-`WurmObjectRef`, `removeOwnedMarker(...)` и `setNavigation(...)`. Маркер
-удаляется Waypointer при исчезновении объекта; при удалении активного маркера
-NAV останавливается автоматически.
+The typed API also provides `ObjectMarkRequest`, `MarkResult`,
+`WurmObjectRef`, `WurmObjectSnapshot`, `removeOwnedMarker(...)`, and
+`setNavigation(...)`. For a fence, hedge, or another object outside the live
+catalog, provide a `WurmObjectSnapshot` through
+`ObjectMarkRequest.Builder.snapshot(...)`. If the object is currently selected
+in the standard HUD, Waypointer will also try to obtain its coordinates
+automatically. Waypointer removes the marker when the object disappears; when
+the active marker is removed, NAV stops automatically.
 
-## Задание для другой задачи
+## Prompt for another task
 
-> Интегрируй этот client-мод с Waypointer только через публичный
-> `org.waypoints.api.WaypointerApi` по правилам из этого файла. Сначала выполни
-> optional handshake `isInstalled()`, не создавай жёсткую runtime-зависимость,
-> используй уникальные `ownerId` и `markerKey`, а события удаления/замены
-> объекта передавай через `subjectVanished`. Интеграция должна быть fail-open.
+> Integrate this client mod with Waypointer only through the public
+> `org.waypoints.api.WaypointerApi`, following the rules in this file. Perform
+> the optional `isInstalled()` handshake first, do not introduce a hard runtime
+> dependency, use unique `ownerId` and `markerKey` values, and report object
+> removal or replacement through `subjectVanished`. The integration must fail
+> open.

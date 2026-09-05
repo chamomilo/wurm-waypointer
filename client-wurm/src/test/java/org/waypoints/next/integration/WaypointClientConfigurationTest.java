@@ -20,6 +20,11 @@ public class WaypointClientConfigurationTest {
                 value.getNavigationRouteVisualStyle());
         assertEquals(240, value.getNavigationPulseMaximumDistanceMetres());
         assertFalse(value.isNavigationRouteDiagnosticsEnabled());
+        assertTrue(value.isScannerNotifications());
+        assertTrue(value.isScannerOutlines());
+        assertEquals(8, value.getScannerMaximumOutlines());
+        assertEquals(80, value.getScannerOutlineDistanceMetres());
+        assertTrue(value.getScannerExcludedNames().isEmpty());
     }
 
     @Test public void parsesLocalPathsAndMapBounds() {
@@ -58,6 +63,11 @@ public class WaypointClientConfigurationTest {
         properties.setProperty("phase2WorldEffectDistanceMetres", "6000");
         properties.setProperty("phase2MaxWorldLabels", "7");
         properties.setProperty("phase2WorldLabelDistanceMetres", "5000");
+        properties.setProperty("scannerNotifications", "false");
+        properties.setProperty("scannerOutlines", "false");
+        properties.setProperty("scannerMaximumOutlines", "5");
+        properties.setProperty("scannerOutlineDistanceMetres", "120");
+        properties.setProperty("scannerExcludedNames", "catseye, corpse; pet");
         WaypointClientConfiguration value = WaypointClientConfiguration.from(properties);
         assertEquals("mods\\test\\data.wpt", value.getDataFile().toString());
         assertEquals(8192, value.getMapBounds().getWidth());
@@ -95,6 +105,12 @@ public class WaypointClientConfigurationTest {
         assertEquals(6000, value.getWorldEffectDistanceMetres());
         assertEquals(7, value.getMaximumWorldLabels());
         assertEquals(5000, value.getWorldLabelDistanceMetres());
+        assertFalse(value.isScannerNotifications());
+        assertFalse(value.isScannerOutlines());
+        assertEquals(5, value.getScannerMaximumOutlines());
+        assertEquals(120, value.getScannerOutlineDistanceMetres());
+        assertEquals(3, value.getScannerExcludedNames().size());
+        assertTrue(value.getScannerExcludedNames().contains("catseye"));
     }
 
     @Test public void strictParsingRejectsInvalidBooleanInsteadOfSilentlyDisablingFeature() {

@@ -88,6 +88,11 @@ public final class SurroundingsCatalog {
         return key == null ? null : entries.get(key);
     }
 
+    public synchronized List<SurroundingEntry> entries() {
+        return Collections.unmodifiableList(
+                new ArrayList<SurroundingEntry>(entries.values()));
+    }
+
     public synchronized List<SurroundingEntry> findAll(
             Collection<SurroundingKey> keys) {
         List<SurroundingEntry> result = new ArrayList<SurroundingEntry>();

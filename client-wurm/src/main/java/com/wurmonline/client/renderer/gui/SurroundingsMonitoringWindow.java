@@ -191,7 +191,8 @@ final class SurroundingsMonitoringWindow extends WWindow
 
     private void restoreScroll(int requestedOffset) {
         if (scrollPanel == null) return;
-        scrollPanel.scrollDownTo(Math.max(0, requestedOffset));
+        scrollPanel.contentChanged();
+        scrollPanel.restoreOffset(requestedOffset);
         scrollState.synchronize(Math.max(0, scrollPanel.yo));
     }
 

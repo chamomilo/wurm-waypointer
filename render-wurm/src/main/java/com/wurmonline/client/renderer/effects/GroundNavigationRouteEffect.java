@@ -22,6 +22,7 @@ import org.waypoints.next.navigation.HighwayTileIndex;
 import org.waypoints.next.navigation.NavigationRouteStatistics;
 import org.waypoints.next.navigation.NavigationRouteVisualStyle;
 import org.waypoints.next.render.WaypointWorldBlend;
+import org.waypoints.next.render.WaypointWorldTexture;
 import org.waypoints.next.render.NavigationRouteDiagnosticLog;
 import org.waypoints.next.render.WaypointLatePassBridge;
 import org.waypoints.next.render.WaypointLatePassParticipant;
@@ -584,7 +585,7 @@ public final class GroundNavigationRouteEffect extends Effect
         Primitive primitive = queue.reservePrimitive();
         primitive.copyStateFrom(RenderState.RENDERSTATE_ALPHABLEND);
         primitive.blendmode = WaypointWorldBlend.luminous();
-        primitive.clearTextures();
+        WaypointWorldTexture.bindWhite(primitive);
         if (material != null) {
             primitive.materialInstance = material;
             primitive.program = material.getProgram();

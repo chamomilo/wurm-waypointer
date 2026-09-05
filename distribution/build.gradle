@@ -35,6 +35,7 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
         def requiredClasses = [
                 'org/waypoints/api/WaypointerApi.class',
                 'org/waypoints/api/ObjectMarkRequest.class',
+                'org/waypoints/api/WurmObjectSnapshot.class',
                 'org/waypoints/next/WurmWaypointerMod.class',
                 'org/waypoints/next/integration/WurmWaypointerRuntime.class',
                 'org/waypoints/next/integration/VanillaLandmarkRuntime.class',
@@ -43,6 +44,8 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
                 'org/waypoints/next/integration/ArchaeologyChimePlayer.class',
                 'org/waypoints/next/integration/SurroundingsRuntime.class',
                 'org/waypoints/next/integration/SurroundingsRenderableAdapter.class',
+                'org/waypoints/next/integration/ScannerOutlinePickable.class',
+                'org/waypoints/next/integration/ScannerOutlineRenderBridge.class',
                 'org/waypoints/next/integration/ConfigurationProperties.class',
                 'org/waypoints/next/integration/DynamicWaypointProvider.class',
                 'org/waypoints/next/archaeology/ArchaeologyMessageParser.class',
@@ -62,6 +65,12 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
                 'org/waypoints/next/surroundings/SurroundingsQuery.class',
                 'org/waypoints/next/surroundings/SurroundingsMonitoringFilters.class',
                 'org/waypoints/next/surroundings/SurroundingsMonitoringView.class',
+                'org/waypoints/next/surroundings/ScannerProfiles.class',
+                'org/waypoints/next/surroundings/ScannerProfile.class',
+                'org/waypoints/next/surroundings/ScannerRule.class',
+                'org/waypoints/next/surroundings/ScannerSession.class',
+                'org/waypoints/next/surroundings/ScannerEvent.class',
+                'org/waypoints/next/surroundings/ScannerColor.class',
                 'org/waypoints/next/surroundings/DeedStatus.class',
                 'org/waypoints/next/surroundings/DeedArea.class',
                 'org/waypoints/next/surroundings/UniqueStatus.class',
@@ -133,6 +142,7 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
                 'com/wurmonline/client/renderer/effects/GroundNavigationRouteEffect.class',
                 'org/waypoints/next/navigation/NavigationDraftOverlay.class',
                 'org/waypoints/next/render/WaypointWorldBlend.class',
+                'org/waypoints/next/render/WaypointWorldTexture.class',
                 'org/waypoints/next/render/ManagedResourceRegistry.class'
         ]
         requiredClasses.each { requiredClass ->
@@ -173,7 +183,6 @@ task dist(type: Zip, dependsOn: [test, verifyArtifact]) {
         from rootProject.file('README.md')
         from rootProject.file('THIRD_PARTY_NOTICES.md')
         from rootProject.file('LICENSE')
-        from rootProject.file('COPYING.LESSER')
         into('assets') {
             from(rootProject.file(
                     'client-wurm/src/main/resources/org/waypoints/next/map')) {
@@ -205,7 +214,6 @@ task dist(type: Zip, dependsOn: [test, verifyArtifact]) {
                 'mods/wurm-waypointer/README.md',
                 'mods/wurm-waypointer/THIRD_PARTY_NOTICES.md',
                 'mods/wurm-waypointer/LICENSE',
-                'mods/wurm-waypointer/COPYING.LESSER',
                 'mods/wurm-waypointer/assets/sklotopolis-wordmark.png',
                 "mods/wurm-waypointer/wurm-waypointer-${project.version}.jar"
         ].sort()

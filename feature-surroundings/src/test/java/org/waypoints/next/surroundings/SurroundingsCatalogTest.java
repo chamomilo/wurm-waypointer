@@ -156,6 +156,24 @@ public class SurroundingsCatalogTest {
         assertEquals(2, only.getFilteredCount());
     }
 
+    @Test public void severalMinusNameFiltersHideAnyMatchingName() {
+        SurroundingsCatalog catalog = new SurroundingsCatalog();
+        catalog.upsert(item(30L, "marble catseye",
+                SurroundingsClassifier.DECORATIONS, "marble", 4.0, 0.0));
+        catalog.upsert(item(31L, "corpse of a troll",
+                SurroundingsClassifier.CORPSES, "flesh", 8.0, 0.0));
+        catalog.upsert(item(32L, "strange bone",
+                SurroundingsClassifier.RESOURCES, "bone", 12.0, 0.0));
+
+        SurroundingsSnapshot result = catalog.snapshot(
+                SurroundingsQuery.builder().kind(SurroundingKind.ITEM)
+                        .excludedNames(Arrays.asList("catseye", "corpse"))
+                        .build(), 0.0, 0.0);
+
+        assertEquals(1, result.getFilteredCount());
+        assertEquals("strange bone", result.getRows().get(0).getEntry().getName());
+    }
+
     @Test public void groupWaypointSelectionUsesExactlyTheFilteredRows() {
         SurroundingsCatalog catalog = new SurroundingsCatalog();
         catalog.upsert(item(10L, "red mushroom", SurroundingsClassifier.MUSHROOMS,

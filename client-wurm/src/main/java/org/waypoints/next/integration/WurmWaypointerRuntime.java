@@ -1,6 +1,8 @@
 package org.waypoints.next.integration;
 
 import com.wurmonline.client.game.World;
+import com.wurmonline.client.renderer.PickableUnit;
+import com.wurmonline.client.renderer.cell.CellRenderable;
 import com.wurmonline.client.renderer.gui.CompassMarkerClusterHit;
 import com.wurmonline.client.renderer.gui.HeadsUpDisplay;
 import com.wurmonline.client.renderer.gui.DeedSearchWindowBridge;
@@ -18,6 +20,7 @@ import org.waypoints.api.WaypointerCapability;
 import org.waypoints.api.WaypointerService;
 import org.waypoints.api.WurmObjectKind;
 import org.waypoints.api.WurmObjectRef;
+import org.waypoints.api.WurmObjectSnapshot;
 import org.waypoints.next.model.CapturedServerSelection;
 import org.waypoints.next.model.MarkerStyle;
 import org.waypoints.next.model.ServerIdentity;
@@ -35,6 +38,7 @@ import org.waypoints.next.render.WaypointRenderRuntimeAccess;
 import org.waypoints.next.render.WaypointRenderRuntimeBridge;
 import org.waypoints.next.navigation.NavigationTarget;
 import org.waypoints.next.navigation.NavigationTargetKey;
+import org.waypoints.next.navigation.NavigationRouteVisualStyle;
 import org.waypoints.next.navigation.HighwayTileIndex;
 import org.waypoints.next.navigation.SklotopolisHighwayService;
 import org.waypoints.next.service.ServerIdentityResolver;
@@ -52,13 +56,16 @@ import org.waypoints.next.surroundings.SurroundingEntry;
 import org.waypoints.next.surroundings.SurroundingKind;
 import org.waypoints.next.surroundings.SurroundingsQuery;
 import org.waypoints.next.surroundings.SurroundingsSnapshot;
+import org.waypoints.next.surroundings.ScannerProfiles;
 
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Collection;
 import java.util.UUID;
 import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -80,6 +87,8 @@ public final class WurmWaypointerRuntime {
             new SklotopolisMapService(LOGGER);
     private static final StaticNavigationController STATIC_NAVIGATION =
             new StaticNavigationController(LOGGER, HIGHWAYS);
+    private static final NavigationRouteVisualStyleSettings NAVIGATION_SETTINGS =
+            NavigationRouteVisualStyleSettings.installed();
     private static final VanillaLandmarkRuntime VANILLA_LANDMARKS =
             new VanillaLandmarkRuntime(LOGGER);
     private static final LootMapRuntime LOOT_MAPS = new LootMapRuntime(LOGGER);
@@ -120,6 +129,13 @@ public final class WurmWaypointerRuntime {
     private static volatile boolean awaitingServerInformation = true;
     private static volatile WaypointClientConfiguration waypointConfiguration =
             WaypointClientConfiguration.defaults();
+    private static final PickableUnit[] NO_SCANNER_OUTLINES = new PickableUnit[0];
+    private static volatile PickableUnit[] scannerOutlineTargets =
+            NO_SCANNER_OUTLINES;
+    private static volatile long scannerOutlineRevision = Long.MIN_VALUE;
+    private static volatile int scannerOutlinePlayerTileX = Integer.MIN_VALUE;
+    private static volatile int scannerOutlinePlayerTileY = Integer.MIN_VALUE;
+    private static volatile int scannerOutlinePlayerLayer = Integer.MIN_VALUE;
     private static final WaypointManagerController MANAGER_CONTROLLER =
             new WaypointManagerController() {
                 @Override public WaypointManagerContext context() {
@@ -332,9 +348,17 @@ public final class WurmWaypointerRuntime {
                     MarkResult.Status.WAYPOINTER_NOT_READY,
                     "Waypointer has no confirmed world yet");
             SurroundingEntry entry = findExternalSubject(request.getSubject());
+            WurmObjectSnapshot snapshot = request.getSnapshot();
+            if (snapshot == null) snapshot = liveHudSnapshot(
+                    currentHud, request.getSubject());
+            if (entry == null && snapshot != null) {
+                entry = externalSnapshotEntry(request.getSubject(),
+                        snapshot, java.time.Instant.now());
+            }
             if (entry == null) return MarkResult.failure(
                     MarkResult.Status.SUBJECT_NOT_FOUND,
-                    "object is not present in Waypointer's live catalog");
+                    "object is not present in Waypointer's live catalog and "
+                            + "the caller supplied no position snapshot");
             UUID id = STATIC_WAYPOINTS.upsertExternalObjectWaypoint(entry,
                     request.getOwnerId(), request.getMarkerKey(),
                     externalMarkerStyle(request.getMarkerType(), entry.getKind()),
@@ -392,6 +416,20 @@ public final class WurmWaypointerRuntime {
                 ? WaypointClientConfiguration.defaults() : waypointValue;
         STATIC_WAYPOINTS.configureAndLoad(waypointConfiguration);
         STATIC_NAVIGATION.configure(waypointConfiguration);
+        STATIC_NAVIGATION.setNavigationRouteVisualStyleSink(
+                new java.util.function.Consumer<NavigationRouteVisualStyle>() {
+                    @Override public void accept(NavigationRouteVisualStyle style) {
+                        try {
+                            NAVIGATION_SETTINGS.save(style);
+                            LOGGER.info("Navigation route visual style saved: " + style);
+                        } catch (java.io.IOException | RuntimeException failure) {
+                            LOGGER.log(Level.WARNING,
+                                    "Unable to save navigation route visual style",
+                                    failure);
+                            event("Navigation signal changed, but the setting could not be saved; see client.log.");
+                        }
+                    }
+                });
         SERVER_MAPS.configure(waypointConfiguration.isServerMapEnabled(),
                 waypointConfiguration.getServerMapCacheDirectory(),
                 waypointConfiguration.getServerMapSyncMinutes());
@@ -470,6 +508,8 @@ public final class WurmWaypointerRuntime {
                     waypointConfiguration.getMapBounds());
             ARCHAEOLOGY.bind(archaeologyContext);
             SURROUNDINGS.bind(identity, world.getUsername());
+            SURROUNDINGS.tick(System.currentTimeMillis());
+            refreshScannerOutlineTargets(world);
             STATIC_NAVIGATION.tick(world, currentHud, identity,
                     world.getUsername(), combineDynamicWaypoints(
                             VANILLA_LANDMARKS.combine(
@@ -531,10 +571,135 @@ public final class WurmWaypointerRuntime {
                 && !"waypoint".equalsIgnoreCase(normalized)) return false;
         String[] values = WaypointCommandArguments.withoutRepeatedCommand(
                 command, arguments);
+        if (values.length > 0 && "scan".equalsIgnoreCase(values[0])) {
+            handleScannerCommand(values);
+            return true;
+        }
         if (values.length == 0 || (!"surroundings".equalsIgnoreCase(values[0])
                 && !"nearby".equalsIgnoreCase(values[0]))) return false;
         openSurroundings();
         return true;
+    }
+
+    private static void handleScannerCommand(String[] values) {
+        String operation = values.length < 2 ? "status"
+                : values[1].trim().toLowerCase(Locale.ENGLISH);
+        if (ScannerProfiles.find(operation) != null) {
+            int matches = SURROUNDINGS.activateScanner(operation);
+            invalidateScannerOutlineTargets();
+            event("Scanner profile " + operation + " enabled: " + matches
+                    + " loaded match(es). " + scannerPresentationSummary());
+            return;
+        }
+        if ("off".equals(operation) || "stop".equals(operation)) {
+            SURROUNDINGS.deactivateScanner();
+            invalidateScannerOutlineTargets();
+            event("Scanner is off.");
+            return;
+        }
+        if ("status".equals(operation)) {
+            event("Scanner profile: " + SURROUNDINGS.scannerProfileId() + "; "
+                    + SURROUNDINGS.scannerMatchCount() + " loaded match(es); "
+                    + scannerPresentationSummary());
+            return;
+        }
+        if ("profiles".equals(operation) || "list".equals(operation)) {
+            event("Scanner profiles: " + ScannerProfiles.ids() + ".");
+            return;
+        }
+        if ("window".equals(operation) || "show".equals(operation)) {
+            openSurroundings();
+            return;
+        }
+        if ("notify".equals(operation) || "notifications".equals(operation)) {
+            Boolean enabled = booleanCommand(values, 2);
+            if (enabled != null) {
+                SURROUNDINGS.setScannerNotificationsEnabled(enabled.booleanValue());
+            }
+            event("Scanner notifications are "
+                    + (SURROUNDINGS.isScannerNotificationsEnabled()
+                    ? "on." : "off."));
+            return;
+        }
+        if ("outline".equals(operation) || "outlines".equals(operation)) {
+            Boolean enabled = booleanCommand(values, 2);
+            if (enabled != null) {
+                SURROUNDINGS.setScannerOutlinesEnabled(enabled.booleanValue());
+                invalidateScannerOutlineTargets();
+            }
+            event("Scanner outlines are "
+                    + (SURROUNDINGS.isScannerOutlinesEnabled() ? "on" : "off")
+                    + "; at most " + SURROUNDINGS.maximumOutlines()
+                    + " nearest objects within "
+                    + SURROUNDINGS.outlineDistanceMetres() + "m.");
+            return;
+        }
+        if ("exclude".equals(operation) || "unexclude".equals(operation)) {
+            List<String> fragments = scannerNameFragments(values, 2);
+            if (fragments.isEmpty()) {
+                event("Usage: /wp scan " + operation
+                        + " <name fragment>[, <name fragment>...]");
+                return;
+            }
+            int changed = 0;
+            for (String fragment : fragments) {
+                boolean one = "exclude".equals(operation)
+                        ? SURROUNDINGS.addScannerExcludedName(fragment)
+                        : SURROUNDINGS.removeScannerExcludedName(fragment);
+                if (one) changed++;
+            }
+            invalidateScannerOutlineTargets();
+            event("Scanner minus-name rules changed: " + changed + "; active="
+                    + scannerExcludedNamesLabel() + ".");
+            return;
+        }
+        if ("excludes".equals(operation)) {
+            event("Scanner minus-name rules: " + scannerExcludedNamesLabel() + ".");
+            return;
+        }
+        if ("clear-excludes".equals(operation)) {
+            int changed = SURROUNDINGS.clearScannerExcludedNames();
+            invalidateScannerOutlineTargets();
+            event("Cleared " + changed + " Scanner minus-name rule(s).");
+            return;
+        }
+        event("Usage: /wp scan uniques|treasure|animals|off|status|profiles; "
+                + "/wp scan exclude|unexclude <name[, name...]>; "
+                + "/wp scan excludes|clear-excludes; "
+                + "/wp scan notify|outline on|off|status; /wp scan window");
+    }
+
+    private static Boolean booleanCommand(String[] values, int index) {
+        if (values.length <= index || "status".equalsIgnoreCase(values[index])) {
+            return null;
+        }
+        if ("on".equalsIgnoreCase(values[index])) return Boolean.TRUE;
+        if ("off".equalsIgnoreCase(values[index])) return Boolean.FALSE;
+        return null;
+    }
+
+    static List<String> scannerNameFragments(String[] values, int start) {
+        String joined = WaypointCommandArguments.join(values, start, values.length);
+        LinkedHashSet<String> result = new LinkedHashSet<String>();
+        for (String part : joined.split("[,;]+")) {
+            String clean = part.trim();
+            if (!clean.isEmpty()) result.add(clean);
+        }
+        return new ArrayList<String>(result);
+    }
+
+    private static String scannerExcludedNamesLabel() {
+        Collection<String> excluded = SURROUNDINGS.scannerExcludedNames();
+        return excluded.isEmpty() ? "none" : excluded.toString();
+    }
+
+    private static String scannerPresentationSummary() {
+        return "notifications " + (SURROUNDINGS.isScannerNotificationsEnabled()
+                ? "on" : "off") + "; outlines "
+                + (SURROUNDINGS.isScannerOutlinesEnabled() ? "on" : "off")
+                + " (" + SURROUNDINGS.maximumOutlines() + " nearest / "
+                + SURROUNDINGS.outlineDistanceMetres() + "m); minus names "
+                + scannerExcludedNamesLabel() + ".";
     }
 
     private static boolean handleNavigatorCommand(String command,
@@ -550,17 +715,31 @@ public final class WurmWaypointerRuntime {
             String operation = values.length < 3 ? "status" : values[2];
             if ("off".equalsIgnoreCase(operation)) {
                 STATIC_NAVIGATION.setNavigationPulseEnabled(false);
-                event("Navigation pulse is off for this client session. "
-                        + "The active Navigator keeps a solid route.");
+                event("Navigation signal selected: Solid.");
             } else if ("on".equalsIgnoreCase(operation)) {
                 STATIC_NAVIGATION.setNavigationPulseEnabled(true);
-                event("Navigation pulse is on for this client session.");
+                event("Navigation signal selected: Pulse.");
             } else if ("status".equalsIgnoreCase(operation)) {
                 event("Navigation pulse is "
                         + (STATIC_NAVIGATION.isNavigationPulseEnabled()
                         ? "on" : "off") + ".");
             } else {
                 event("Usage: /wp nav pulse on | off | status");
+            }
+            return true;
+        }
+        if (values.length >= 2 && "style".equalsIgnoreCase(values[1])) {
+            String requested = values.length < 3 ? "status" : values[2];
+            NavigationRouteVisualStyle style = navigationRouteVisualStyle(requested);
+            if ("status".equalsIgnoreCase(requested)) {
+                event("Navigation signal is " + navigationRouteVisualStyleLabel(
+                        STATIC_NAVIGATION.getNavigationRouteVisualStyle()) + ".");
+            } else if (style != null) {
+                STATIC_NAVIGATION.selectNavigationRouteVisualStyle(style);
+                event("Navigation signal selected: "
+                        + navigationRouteVisualStyleLabel(style) + ".");
+            } else {
+                event("Usage: /wp nav style pulse | solid | moving | status");
             }
             return true;
         }
@@ -598,6 +777,23 @@ public final class WurmWaypointerRuntime {
                 ? "Navigator started: " + target.getName() + "."
                 : "Navigator stopped: " + target.getName() + ".");
         return true;
+    }
+
+    private static NavigationRouteVisualStyle navigationRouteVisualStyle(
+            String value) {
+        if ("pulse".equalsIgnoreCase(value)) return NavigationRouteVisualStyle.PULSE;
+        if ("solid".equalsIgnoreCase(value)) return NavigationRouteVisualStyle.SOLID;
+        if ("moving".equalsIgnoreCase(value)
+                || "moving_dashes".equalsIgnoreCase(value)) {
+            return NavigationRouteVisualStyle.MOVING_DASHES;
+        }
+        return null;
+    }
+
+    private static String navigationRouteVisualStyleLabel(
+            NavigationRouteVisualStyle style) {
+        return style == NavigationRouteVisualStyle.PULSE ? "Pulse"
+                : style == NavigationRouteVisualStyle.SOLID ? "Solid" : "Moving";
     }
 
     private static NavigationTarget findNavigationTarget(
@@ -765,6 +961,51 @@ public final class WurmWaypointerRuntime {
         }
     }
 
+    /** Immutable cached array consumed by the injected world-render pass. */
+    public static PickableUnit[] currentScannerOutlineTargets() {
+        return scannerOutlineTargets;
+    }
+
+    private static void refreshScannerOutlineTargets(World world) {
+        if (world == null) {
+            invalidateScannerOutlineTargets();
+            return;
+        }
+        long revision = SURROUNDINGS.revision();
+        int tileX = (int) Math.floor(world.getPlayerPosX() / 4.0d);
+        int tileY = (int) Math.floor(world.getPlayerPosY() / 4.0d);
+        int layer = world.getPlayerLayer();
+        if (revision == scannerOutlineRevision
+                && tileX == scannerOutlinePlayerTileX
+                && tileY == scannerOutlinePlayerTileY
+                && layer == scannerOutlinePlayerLayer) return;
+        List<SurroundingsRuntime.ScannerOutlineSubject> subjects =
+                SURROUNDINGS.scannerOutlineSubjects(world.getPlayerPosX(),
+                        world.getPlayerPosY(), layer);
+        List<PickableUnit> targets = new ArrayList<PickableUnit>(subjects.size());
+        for (SurroundingsRuntime.ScannerOutlineSubject subject : subjects) {
+            Object renderable = subject.getRenderable();
+            if (renderable instanceof PickableUnit) {
+                targets.add(new ScannerOutlinePickable(
+                        (PickableUnit) renderable, subject.getColor()));
+            }
+        }
+        scannerOutlineTargets = targets.isEmpty() ? NO_SCANNER_OUTLINES
+                : targets.toArray(new PickableUnit[targets.size()]);
+        scannerOutlineRevision = revision;
+        scannerOutlinePlayerTileX = tileX;
+        scannerOutlinePlayerTileY = tileY;
+        scannerOutlinePlayerLayer = layer;
+    }
+
+    private static void invalidateScannerOutlineTargets() {
+        scannerOutlineTargets = NO_SCANNER_OUTLINES;
+        scannerOutlineRevision = Long.MIN_VALUE;
+        scannerOutlinePlayerTileX = Integer.MIN_VALUE;
+        scannerOutlinePlayerTileY = Integer.MIN_VALUE;
+        scannerOutlinePlayerLayer = Integer.MIN_VALUE;
+    }
+
     static String performanceSummary(boolean resetSamples) {
         return WaypointRenderProfiler.summary(resetSamples);
     }
@@ -785,6 +1026,7 @@ public final class WurmWaypointerRuntime {
     public static void connectionEnded() {
         try {
             endDynamicSessions();
+            invalidateScannerOutlineTargets();
             ARCHAEOLOGY_CHIMES.clear();
             detachBeam("disconnect");
             STATIC_NAVIGATION.detach("disconnect");
@@ -813,6 +1055,7 @@ public final class WurmWaypointerRuntime {
     public static void connectionTransferred(String host, int gamePort) {
         try {
             endDynamicSessions();
+            invalidateScannerOutlineTargets();
             ARCHAEOLOGY_CHIMES.clear();
             detachBeam("server transfer");
             STATIC_NAVIGATION.detach("server transfer");
@@ -1030,7 +1273,8 @@ public final class WurmWaypointerRuntime {
     public static void surroundingsRenderableRemoved(Object renderable,
                                                       boolean removedFromWorld) {
         try {
-            SurroundingKey removed = SURROUNDINGS.removeRenderable(renderable);
+            SurroundingKey removed = SURROUNDINGS.removeRenderable(
+                    renderable, removedFromWorld);
             // In the pinned client true is used by authoritative server removals
             // (picked up, buried, destroyed, dead-animation completion, etc.).
             // false is also emitted by addRenderable's technical remove-before-add.
@@ -1045,8 +1289,10 @@ public final class WurmWaypointerRuntime {
     public static void surroundingsCreatureReplacedByCorpse(long creatureId,
                                                              long corpseId) {
         try {
-            removeVanishedMarks(new SurroundingKey(
-                    SurroundingKind.ANIMAL, creatureId));
+            SurroundingKey removed = new SurroundingKey(
+                    SurroundingKind.ANIMAL, creatureId);
+            SURROUNDINGS.removeAuthoritatively(removed);
+            removeVanishedMarks(removed);
         } catch (Throwable failure) {
             LOGGER.log(Level.FINE,
                     "Creature-to-corpse waypoint lifecycle failed open", failure);
@@ -1160,6 +1406,70 @@ public final class WurmWaypointerRuntime {
                 }
                 return null;
         }
+    }
+
+    static SurroundingEntry externalSnapshotEntry(
+            WurmObjectRef subject, WurmObjectSnapshot snapshot,
+            java.time.Instant now) {
+        if (subject == null || snapshot == null) return null;
+        SurroundingKind kind = subject.getKind() == WurmObjectKind.CREATURE
+                ? SurroundingKind.ANIMAL
+                : subject.getKind() == WurmObjectKind.CONTAINER
+                ? SurroundingKind.CONTAINER : SurroundingKind.ITEM;
+        return SurroundingEntry.builder().kind(kind)
+                .wurmId(subject.getWurmId()).name(snapshot.getName())
+                .category("External objects").layer(snapshot.getLayer())
+                .position(snapshot.getWorldX(), snapshot.getWorldY(),
+                        snapshot.getHeight())
+                .firstSeenAt(now).updatedAt(now).build();
+    }
+
+    /** Resolves the object currently represented by the stock Select/Target HUD. */
+    private static WurmObjectSnapshot liveHudSnapshot(
+            HeadsUpDisplay currentHud, WurmObjectRef subject) {
+        if (currentHud == null || subject == null) return null;
+        PickableUnit[] candidates = new PickableUnit[]{
+                reflectedPickable(currentHud.getSelectBar(), "selectedUnit"),
+                reflectedPickable(currentHud, "targetRenderable"),
+                currentHud.getWorld() == null ? null
+                        : currentHud.getWorld().getCurrentHoveredObject()
+        };
+        for (PickableUnit candidate : candidates) {
+            if (candidate == null || candidate.getId() != subject.getWurmId()
+                    || !(candidate instanceof CellRenderable)) continue;
+            CellRenderable positioned = (CellRenderable) candidate;
+            try {
+                return new WurmObjectSnapshot(candidate.getHoverName(),
+                        positioned.getXPos(), positioned.getYPos(),
+                        positioned.getHPos(), positioned.getLayer());
+            } catch (RuntimeException invalidSnapshot) {
+                LOGGER.log(Level.FINE,
+                        "Unable to snapshot selected API object", invalidSnapshot);
+            }
+        }
+        return null;
+    }
+
+    private static PickableUnit reflectedPickable(Object owner,
+                                                   String fieldName) {
+        if (owner == null) return null;
+        Class<?> type = owner.getClass();
+        while (type != null) {
+            try {
+                java.lang.reflect.Field field = type.getDeclaredField(fieldName);
+                field.setAccessible(true);
+                Object value = field.get(owner);
+                return value instanceof PickableUnit ? (PickableUnit) value : null;
+            } catch (NoSuchFieldException absent) {
+                type = type.getSuperclass();
+            } catch (Throwable inaccessible) {
+                LOGGER.log(Level.FINE,
+                        "Unable to inspect HUD object field " + fieldName,
+                        inaccessible);
+                return null;
+            }
+        }
+        return null;
     }
 
     static MarkerStyle externalMarkerStyle(ObjectMarkerType requested,

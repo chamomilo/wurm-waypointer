@@ -16,6 +16,7 @@ public final class SurroundingsQuery {
     private final String text;
     private final String shortName;
     private final ShortNameMode shortNameMode;
+    private final Set<String> excludedNames;
     private final Set<String> categories;
     private final Set<String> materials;
     private final Set<CreatureModifier> modifiers;
@@ -33,6 +34,7 @@ public final class SurroundingsQuery {
         shortName = clean(builder.shortName);
         shortNameMode = builder.shortNameMode == null
                 ? ShortNameMode.INCLUDE : builder.shortNameMode;
+        excludedNames = immutableStrings(builder.excludedNames);
         categories = immutableStrings(builder.categories);
         materials = immutableStrings(builder.materials);
         modifiers = immutable(builder.modifiers);
@@ -50,6 +52,7 @@ public final class SurroundingsQuery {
     public String getText() { return text; }
     public String getShortName() { return shortName; }
     public ShortNameMode getShortNameMode() { return shortNameMode; }
+    public Set<String> getExcludedNames() { return excludedNames; }
     public Set<String> getCategories() { return categories; }
     public Set<String> getMaterials() { return materials; }
     public Set<CreatureModifier> getModifiers() { return modifiers; }
@@ -63,6 +66,7 @@ public final class SurroundingsQuery {
 
     boolean matches(SurroundingEntry entry, boolean marked) {
         if (entry.getKind() != kind) return false;
+        if (matchesExcludedName(entry, excludedNames)) return false;
         String normalizedText = SurroundingsClassifier.normalize(text);
         if (!normalizedText.isEmpty()) {
             String haystack = SurroundingsClassifier.normalize(entry.getName() + " "
@@ -108,6 +112,19 @@ public final class SurroundingsQuery {
         return true;
     }
 
+    /** Every fragment is a minus rule; matching any one hides the entry. */
+    static boolean matchesExcludedName(SurroundingEntry entry,
+                                       Collection<String> fragments) {
+        if (entry == null || fragments == null || fragments.isEmpty()) return false;
+        String name = SurroundingsClassifier.normalize(entry.getName() + " "
+                + entry.getShortName());
+        for (String fragment : fragments) {
+            String needle = SurroundingsClassifier.normalize(fragment);
+            if (!needle.isEmpty() && name.contains(needle)) return true;
+        }
+        return false;
+    }
+
     private static boolean containsIgnoreCase(Set<String> values, String actual) {
         for (String value : values) if (value.equalsIgnoreCase(actual)) return true;
         return false;
@@ -145,6 +162,7 @@ public final class SurroundingsQuery {
         private String text;
         private String shortName;
         private ShortNameMode shortNameMode;
+        private final Set<String> excludedNames = new LinkedHashSet<String>();
         private final Set<String> categories = new LinkedHashSet<String>();
         private final Set<String> materials = new LinkedHashSet<String>();
         private final Set<CreatureModifier> modifiers =
@@ -163,6 +181,16 @@ public final class SurroundingsQuery {
         public Builder text(String value) { text = value; return this; }
         public Builder shortName(String value, ShortNameMode mode) {
             shortName = value; shortNameMode = mode; return this;
+        }
+        public Builder excludedName(String value) {
+            excludedNames.clear();
+            if (value != null) excludedNames.add(value);
+            return this;
+        }
+        public Builder excludedNames(Collection<String> values) {
+            excludedNames.clear();
+            if (values != null) excludedNames.addAll(values);
+            return this;
         }
         public Builder category(String value) {
             categories.clear(); if (value != null) categories.add(value); return this;

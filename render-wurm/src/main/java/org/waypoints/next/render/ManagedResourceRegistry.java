@@ -12,6 +12,7 @@ public final class ManagedResourceRegistry<K, S, R> {
     public interface Adapter<K, S, R> {
         K key(S source);
         boolean sameResource(S previous, S next);
+        boolean updateResource(R resource, S previous, S next);
         R create(S source);
         void add(R resource);
         void remove(R resource);
@@ -46,6 +47,11 @@ public final class ManagedResourceRegistry<K, S, R> {
             K key = adapter.key(source);
             Owned<S, R> current = owned.get(key);
             if (current != null && adapter.sameResource(current.source, source)) continue;
+            if (current != null && adapter.updateResource(
+                    current.resource, current.source, source)) {
+                current.source = source;
+                continue;
+            }
             if (current != null) removeOwned(key);
             R resource = adapter.create(source);
             try {
@@ -107,7 +113,7 @@ public final class ManagedResourceRegistry<K, S, R> {
     }
 
     private static final class Owned<S, R> {
-        private final S source;
+        private S source;
         private final R resource;
 
         private Owned(S source, R resource) {

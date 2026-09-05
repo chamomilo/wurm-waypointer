@@ -75,6 +75,12 @@ public class PinnedClientContractTest {
         assertMethod(worldRender, "getScreenHeight", "()I");
         assertNotNull(worldRender.getDeclaredField("projectionMatrixWorld"));
         assertNotNull(worldRender.getDeclaredField("viewMatrixWorldRender"));
+        assertNotNull(worldRender.getDeclaredField("customPickFill"));
+        assertNotNull(worldRender.getDeclaredField("customPickOutline"));
+        assertNotNull(worldRender.getDeclaredField("customPickFillDepth"));
+        assertNotNull(worldRender.getDeclaredField("itemPlacer"));
+        assertDeclaredMethod(worldRender, "renderPickedItem",
+                "(Lcom/wurmonline/client/renderer/backend/Queue;)V");
 
         CtClass matrix = classes.get("com.wurmonline.client.renderer.Matrix");
         assertMethod(matrix, "getBuffer", "()Ljava/nio/FloatBuffer;");

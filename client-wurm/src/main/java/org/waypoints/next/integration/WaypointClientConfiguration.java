@@ -6,6 +6,7 @@ import org.waypoints.next.render.WaypointRenderConfiguration;
 
 import java.nio.file.Path;
 import java.util.Properties;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /** Local paths, map validation bounds, and bounded Phase 2 render budgets. */
@@ -41,6 +42,11 @@ public final class WaypointClientConfiguration
     private final int worldEffectDistanceMetres;
     private final int maximumWorldLabels;
     private final int worldLabelDistanceMetres;
+    private final boolean scannerNotifications;
+    private final boolean scannerOutlines;
+    private final int scannerMaximumOutlines;
+    private final int scannerOutlineDistanceMetres;
+    private final Set<String> scannerExcludedNames;
 
     private WaypointClientConfiguration(Path dataFile, Path transferFile,
                                         Path vanillaLandmarkStateFile,
@@ -70,7 +76,12 @@ public final class WaypointClientConfiguration
                                         int maximumWorldEffects,
                                         int worldEffectDistanceMetres,
                                         int maximumWorldLabels,
-                                        int worldLabelDistanceMetres) {
+                                        int worldLabelDistanceMetres,
+                                        boolean scannerNotifications,
+                                        boolean scannerOutlines,
+                                        int scannerMaximumOutlines,
+                                        int scannerOutlineDistanceMetres,
+                                        Set<String> scannerExcludedNames) {
         this.dataFile = dataFile;
         this.transferFile = transferFile;
         this.vanillaLandmarkStateFile = vanillaLandmarkStateFile;
@@ -104,6 +115,11 @@ public final class WaypointClientConfiguration
         this.worldEffectDistanceMetres = worldEffectDistanceMetres;
         this.maximumWorldLabels = maximumWorldLabels;
         this.worldLabelDistanceMetres = worldLabelDistanceMetres;
+        this.scannerNotifications = scannerNotifications;
+        this.scannerOutlines = scannerOutlines;
+        this.scannerMaximumOutlines = scannerMaximumOutlines;
+        this.scannerOutlineDistanceMetres = scannerOutlineDistanceMetres;
+        this.scannerExcludedNames = scannerExcludedNames;
     }
 
     public static WaypointClientConfiguration defaults() {
@@ -151,7 +167,12 @@ public final class WaypointClientConfiguration
                 source.integer("phase2MaxWorldEffects", 16, 0, 1024),
                 source.integer("phase2WorldEffectDistanceMetres", 12000, 1, 100000),
                 source.integer("phase2MaxWorldLabels", 16, 0, 1024),
-                source.integer("phase2WorldLabelDistanceMetres", 12000, 1, 100000));
+                source.integer("phase2WorldLabelDistanceMetres", 12000, 1, 100000),
+                source.bool("scannerNotifications", true),
+                source.bool("scannerOutlines", true),
+                source.integer("scannerMaximumOutlines", 8, 0, 32),
+                source.integer("scannerOutlineDistanceMetres", 80, 4, 512),
+                source.commaSeparated("scannerExcludedNames", "", 32, 80));
     }
 
     public Path getDataFile() { return dataFile; }
@@ -208,6 +229,13 @@ public final class WaypointClientConfiguration
     public int getWorldEffectDistanceMetres() { return worldEffectDistanceMetres; }
     public int getMaximumWorldLabels() { return maximumWorldLabels; }
     public int getWorldLabelDistanceMetres() { return worldLabelDistanceMetres; }
+    public boolean isScannerNotifications() { return scannerNotifications; }
+    public boolean isScannerOutlines() { return scannerOutlines; }
+    public int getScannerMaximumOutlines() { return scannerMaximumOutlines; }
+    public int getScannerOutlineDistanceMetres() {
+        return scannerOutlineDistanceMetres;
+    }
+    public Set<String> getScannerExcludedNames() { return scannerExcludedNames; }
 
     public String diagnosticSummary() {
         return "dataFile=\"" + dataFile + "\", transferFile=\"" + transferFile
@@ -248,7 +276,13 @@ public final class WaypointClientConfiguration
                 + ", phase2MaxWorldEffects=" + maximumWorldEffects
                 + ", phase2WorldEffectDistanceMetres=" + worldEffectDistanceMetres
                 + ", phase2MaxWorldLabels=" + maximumWorldLabels
-                + ", phase2WorldLabelDistanceMetres=" + worldLabelDistanceMetres;
+                + ", phase2WorldLabelDistanceMetres=" + worldLabelDistanceMetres
+                + ", scannerNotifications=" + scannerNotifications
+                + ", scannerOutlines=" + scannerOutlines
+                + ", scannerMaximumOutlines=" + scannerMaximumOutlines
+                + ", scannerOutlineDistanceMetres="
+                + scannerOutlineDistanceMetres
+                + ", scannerExcludedNames=" + scannerExcludedNames;
     }
 
 }

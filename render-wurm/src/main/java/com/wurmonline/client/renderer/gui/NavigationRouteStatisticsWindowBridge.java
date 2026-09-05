@@ -9,6 +9,7 @@ import org.waypoints.next.navigation.NavigationRouteStatistics;
 import org.waypoints.next.navigation.NavigationTarget;
 import org.waypoints.next.navigation.NavigationTargetKey;
 import org.waypoints.next.model.WaypointSourceType;
+import org.waypoints.next.render.StaticNavigationController;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -34,7 +35,8 @@ public final class NavigationRouteStatisticsWindowBridge {
 
     public static synchronized void reconcile(
             HeadsUpDisplay hud, NavigationTarget target,
-            NavigationRouteStatistics statistics) {
+            NavigationRouteStatistics statistics,
+            StaticNavigationController navigation) {
         if (hud == null || target == null) {
             detach(hud, "navigator inactive");
             return;
@@ -49,7 +51,7 @@ public final class NavigationRouteStatisticsWindowBridge {
             if (shouldCreateWindow(window != null, owner == hud)) {
                 discardWindow("HUD replacement");
                 owner = hud;
-                window = new NavigationRouteStatisticsWindow();
+                window = new NavigationRouteStatisticsWindow(navigation);
                 window.setInitialSize(
                         Math.min(NavigationRouteStatisticsWindow.PREFERRED_WIDTH,
                                 Math.max(260, hud.getWidth() - 20)),
@@ -62,6 +64,7 @@ public final class NavigationRouteStatisticsWindowBridge {
             } else if (!hud.getComponents().contains(window)) {
                 add(hud, window);
             }
+            window.updateVisualStyle(navigation.getNavigationRouteVisualStyle());
             if (!target.getKey().equals(targetKey)) {
                 targetKey = target.getKey();
                 lastStatistics = null;

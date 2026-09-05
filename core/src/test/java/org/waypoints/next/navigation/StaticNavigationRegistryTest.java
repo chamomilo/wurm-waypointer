@@ -118,6 +118,30 @@ public class StaticNavigationRegistryTest {
                         .getMarkerStyle().getWorldStyle());
     }
 
+    @Test public void externalApiMarkerKeepsItsRequestedWorldStyle() {
+        MarkerStyle requested = new MarkerStyle(
+                MarkerStyle.WorldStyle.TARGET_CROSSHAIR,
+                1.0f, 0.12f, 0.055f, 1.0f,
+                15.0f, 2.6f, true, true);
+        WaypointRecord external = WaypointRecord.copyOf(record(
+                "00000000-0000-0000-0000-000000000073", "API target",
+                "Chamomilo", novus, 12, 20))
+                .sourceType(WaypointSourceType.MANAGED_ITEM)
+                .sourceKey("ITEM:44")
+                .markerStyle(requested)
+                .extensions(Collections.singletonMap("waypointer.api.owner",
+                        Collections.singletonList("org.example.focusbar")))
+                .build();
+        manager.add(external);
+
+        NavigationTarget target = registry.reconcile(
+                manager.revisionSnapshot(),
+                new NavigationContext(novus, "Chamomilo", 64))
+                .getTargets().get(0);
+
+        assertEquals(requested, target.getMarkerStyle());
+    }
+
     @Test public void deterministicCapPromotesSelection() {
         WaypointRecord first = record("00000000-0000-0000-0000-000000000001",
                 "First", "Chamomilo", novus, 10, 20);

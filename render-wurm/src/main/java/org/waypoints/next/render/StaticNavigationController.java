@@ -19,6 +19,7 @@ import org.waypoints.next.navigation.NavigationContext;
 import org.waypoints.next.navigation.NavigationDraftOverlay;
 import org.waypoints.next.navigation.NavigationEffectSelector;
 import org.waypoints.next.navigation.NavigationLabelSelector;
+import org.waypoints.next.navigation.NavigationRouteVisualStyle;
 import org.waypoints.next.navigation.NavigationSnapshot;
 import org.waypoints.next.navigation.NavigationTarget;
 import org.waypoints.next.navigation.NavigationTargetKey;
@@ -35,6 +36,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -100,7 +102,9 @@ public final class StaticNavigationController {
     private int appliedPlayerLayer = Integer.MIN_VALUE;
     private long refreshAtNanos;
     private boolean forceReconcile = true;
-    private boolean navigationPulseEnabled = true;
+    private NavigationRouteVisualStyle navigationRouteVisualStyle =
+            NavigationRouteVisualStyle.MOVING_DASHES;
+    private Consumer<NavigationRouteVisualStyle> navigationRouteVisualStyleSink;
     private PreviewDraft managerDraft;
     private long managerDraftRevision;
 
@@ -121,6 +125,12 @@ public final class StaticNavigationController {
                                                           NavigationTarget next) {
                         return previous.getCoordinate().equals(next.getCoordinate())
                                 && previous.getMarkerStyle().equals(next.getMarkerStyle());
+                    }
+
+                    @Override public boolean updateResource(
+                            OwnedEffect resource, NavigationTarget previous,
+                            NavigationTarget next) {
+                        return retargetCustomEffect(resource, previous, next);
                     }
 
                     @Override public OwnedEffect create(NavigationTarget source) {
@@ -218,7 +228,8 @@ public final class StaticNavigationController {
     public synchronized void configure(WaypointRenderConfiguration value) {
         if (navigatorEffect != null) clearNavigatorEffect();
         configuration = value == null ? WaypointRenderConfiguration.defaults() : value;
-        navigationPulseEnabled = true;
+        navigationRouteVisualStyle = configuredNavigationRouteVisualStyle(
+                configuration.getNavigationRouteVisualStyle());
         highwaySource.configure(configuration);
         forceReconcile = true;
         labelReconcileState.reset();
@@ -295,7 +306,7 @@ public final class StaticNavigationController {
             reconcileNavigator(next.getActiveNavigator());
             NavigationRouteStatisticsWindowBridge.reconcile(nextHud,
                     next.getActiveNavigator(), navigatorEffect == null
-                            ? null : navigatorEffect.getRouteStatistics());
+                            ? null : navigatorEffect.getRouteStatistics(), this);
             // Labels remain independent from beam visibility. Rebuild their
             // ownership only when culling inputs change; components continue
             // projection every render frame without per-tick collection churn.
@@ -364,20 +375,41 @@ public final class StaticNavigationController {
         forceReconcile = true;
     }
 
-    /** Session-only switch used by /wp nav pulse; navigation ownership remains. */
+    /** Compatibility alias for the former two-state console command. */
     public synchronized void setNavigationPulseEnabled(boolean enabled) {
-        if (navigationPulseEnabled == enabled) return;
-        navigationPulseEnabled = enabled;
-        if (navigatorEffect != null && navigatorEffect.isAlive()) {
-            navigatorEffect.setVisualStyle(effectiveNavigationRouteVisualStyle(
-                    configuration.getNavigationRouteVisualStyle(), enabled));
-        } else {
-            forceReconcile = true;
-        }
+        selectNavigationRouteVisualStyle(enabled
+                ? NavigationRouteVisualStyle.PULSE
+                : NavigationRouteVisualStyle.SOLID);
     }
 
     public synchronized boolean isNavigationPulseEnabled() {
-        return navigationPulseEnabled;
+        return navigationRouteVisualStyle == NavigationRouteVisualStyle.PULSE;
+    }
+
+    /** Applies the selected signal immediately and persists a user selection. */
+    public synchronized void selectNavigationRouteVisualStyle(
+            NavigationRouteVisualStyle selected) {
+        NavigationRouteVisualStyle next = configuredNavigationRouteVisualStyle(
+                selected);
+        if (navigationRouteVisualStyle != next) {
+            navigationRouteVisualStyle = next;
+            if (navigatorEffect != null && navigatorEffect.isAlive()) {
+                navigatorEffect.setVisualStyle(next);
+            } else {
+                forceReconcile = true;
+            }
+        }
+        Consumer<NavigationRouteVisualStyle> sink = navigationRouteVisualStyleSink;
+        if (sink != null) sink.accept(next);
+    }
+
+    public synchronized NavigationRouteVisualStyle getNavigationRouteVisualStyle() {
+        return navigationRouteVisualStyle;
+    }
+
+    public synchronized void setNavigationRouteVisualStyleSink(
+            Consumer<NavigationRouteVisualStyle> sink) {
+        navigationRouteVisualStyleSink = sink;
     }
 
     public synchronized void managerEnabledChanged(UUID waypointId,
@@ -636,9 +668,7 @@ public final class StaticNavigationController {
                     coordinate.getLayer() == WaypointLayer.CAVE ? -1 : 0,
                     style.getRed(), style.getGreen(), style.getBlue(),
                     style.getAlpha(),
-                    effectiveNavigationRouteVisualStyle(
-                            configuration.getNavigationRouteVisualStyle(),
-                            navigationPulseEnabled),
+                    navigationRouteVisualStyle,
                     configuration.getNavigationPulseMaximumDistanceMetres(),
                     configuration.getNavigationCartMaximumSlopeDirt(),
                     configuration.getNavigationCartMaximumWaterDepthMetres(),
@@ -676,6 +706,12 @@ public final class StaticNavigationController {
         }
         return pulseEnabled ? configured
                 : org.waypoints.next.navigation.NavigationRouteVisualStyle.SOLID;
+    }
+
+    private static NavigationRouteVisualStyle configuredNavigationRouteVisualStyle(
+            NavigationRouteVisualStyle configured) {
+        return configured == null
+                ? NavigationRouteVisualStyle.MOVING_DASHES : configured;
     }
 
     private void clearNavigatorEffect() {
@@ -832,6 +868,41 @@ public final class StaticNavigationController {
             throw new IllegalStateException("unable to register exact vanilla light",
                     failure);
         }
+    }
+
+    /** Keeps moving custom markers alive so coordinate updates cannot restart animation. */
+    private static boolean retargetCustomEffect(
+            OwnedEffect resource, NavigationTarget previous,
+            NavigationTarget next) {
+        if (resource == null || previous == null || next == null
+                || resource.cleanup != CleanupKind.ORDINARY
+                || previous.getSourceType() != next.getSourceType()
+                || !previous.getMarkerStyle().equals(next.getMarkerStyle())) {
+            return false;
+        }
+        WaypointCoordinate previousCoordinate = previous.getCoordinate();
+        WaypointCoordinate nextCoordinate = next.getCoordinate();
+        if (previousCoordinate.getLayer() != nextCoordinate.getLayer()
+                || (previousCoordinate.getHeight() == null)
+                != (nextCoordinate.getHeight() == null)) {
+            return false;
+        }
+        float baseHeight = nextCoordinate.getHeight() == null
+                ? resource.world.getPlayerPosH()
+                : nextCoordinate.getHeight().floatValue();
+        float worldX = (float) nextCoordinate.worldX();
+        float worldY = (float) nextCoordinate.worldY();
+        if (resource.effect instanceof WaypointSymbolEffect) {
+            ((WaypointSymbolEffect) resource.effect).setTargetPosition(
+                    worldX, worldY, baseHeight);
+            return true;
+        }
+        if (resource.effect instanceof WaypointBeamEffect) {
+            ((WaypointBeamEffect) resource.effect).setTargetPosition(
+                    worldX, worldY, baseHeight);
+            return true;
+        }
+        return false;
     }
 
     private static WaypointBeamEffect.VisualMode beamMode(

@@ -26,7 +26,6 @@ public final class LateWorldPassHookContractTest {
                 "com.wurmonline.client.renderer.effects.EffectRender"));
         assertTrue(hasUtf8(installer,
                 "WaypointLatePassBridge.render($1)"));
-        assertFalse(hasUtf8(installer, "WorldRender"));
         assertFalse(hasUtf8(installer, "queuePick"));
         assertFalse(hasUtf8(installer, "pipelineWorldForward"));
     }

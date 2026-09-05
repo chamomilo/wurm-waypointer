@@ -7,7 +7,7 @@ import java.util.UUID;
 
 /** Stable, Wurm-independent entry point for optional client-mod integrations. */
 public final class WaypointerApi {
-    public static final int API_VERSION = 1;
+    public static final int API_VERSION = 2;
     private static volatile WaypointerService runtime;
 
     private WaypointerApi() { }

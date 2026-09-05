@@ -19,6 +19,13 @@ public final class SurroundingsScrollGesture {
         return clampOffset((long) startOffset + startMouseY - currentMouseY);
     }
 
+    /** The table drag gesture must never steal the native scrollbar thumb. */
+    public static boolean startsContentDrag(boolean insidePanel,
+                                            boolean overVerticalScrollBar,
+                                            boolean overHorizontalScrollBar) {
+        return insidePanel && !overVerticalScrollBar && !overHorizontalScrollBar;
+    }
+
     private static int clampOffset(long value) {
         if (value <= 0L) return 0;
         return value >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) value;

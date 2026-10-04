@@ -326,6 +326,12 @@ final class StaticWaypointRuntime {
     WaypointRecord addCustomMapMark(String text, int tileX, int tileY,
                                     HeadsUpDisplay hud,
                                     ServerIdentity identity) {
+        return addCustomMapMark(text, tileX, tileY, hud, identity, WaypointLayer.SURFACE);
+    }
+
+    WaypointRecord addCustomMapMark(String text, int tileX, int tileY,
+                                    HeadsUpDisplay hud, ServerIdentity identity,
+                                    WaypointLayer layer) {
         requireReady();
         WaypointManagerContext context = managerContext(hud, identity);
         String name = limitName(text);
@@ -343,7 +349,7 @@ final class StaticWaypointRuntime {
                 .sourceType(WaypointSourceType.CUSTOM_MAP_MARK)
                 .sourceKey("")
                 .coordinate(new WaypointCoordinate(tileX,
-                        tileY, null, WaypointLayer.SURFACE))
+                        tileY, null, layer))
                 .resolution(WaypointResolution.STATIC_EXACT)
                 .enabled(true).markerStyle(style)
                 .arrivalRadiusMetres(WaypointArrival.DISABLED)

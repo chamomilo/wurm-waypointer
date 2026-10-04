@@ -17,7 +17,7 @@ import java.util.PriorityQueue;
  * segments remain atomic, so they can only be entered at published portals.</p>
  */
 public final class HighwayRoutePlanner {
-    public static final String ALGORITHM_VERSION = "highway-graph-a-star-v9";
+    public static final String ALGORITHM_VERSION = "highway-graph-a-star-v10";
     private static final float HIGHWAY_TIME_PER_TILE = 1.0f / 3.0f;
     private static final float CONFIRMED_SPECIAL_MAXIMUM_PROJECTION_TILES =
             1.5f;
@@ -592,8 +592,35 @@ public final class HighwayRoutePlanner {
                                      boolean tunnelMustTouchSurfaceRoad) {
         List<Candidate> candidates = new ArrayList<Candidate>(
                 index.getSegments().size() * 2);
+        // Access the split graph edges, so a connector can join at a T-junction
+        // without travelling to the original segment end and doubling back.
+        if (layer.allows(HighwayTileIndex.Kind.ROAD)) {
+            for (int from = 0; from < compiledNodes.size(); from++) {
+                Node a = compiledNodes.get(from);
+                for (Edge edge : a.edges) {
+                    if (edge.kind != HighwayTileIndex.Kind.ROAD
+                            || edge.layerTransition || edge.to <= from) continue;
+                    Node b = compiledNodes.get(edge.to);
+                    // Inferred road gaps at bridge ramps are not independent
+                    // surface access points beneath the deck.
+                    if (!a.hasEndpointKind(HighwayTileIndex.Kind.ROAD)
+                            || !b.hasEndpointKind(HighwayTileIndex.Kind.ROAD)) continue;
+                    int[] access = projection(a.x, a.y, b.x, b.y, x, y);
+                    float offroad = distance(x, y, access[0], access[1]);
+                    candidates.add(new Candidate(from, offroad + distance(
+                            access[0], access[1], a.x, a.y)
+                            * HIGHWAY_TIME_PER_TILE, access[0], access[1],
+                            HighwayTileIndex.Kind.ROAD));
+                    candidates.add(new Candidate(edge.to, offroad + distance(
+                            access[0], access[1], b.x, b.y)
+                            * HIGHWAY_TIME_PER_TILE, access[0], access[1],
+                            HighwayTileIndex.Kind.ROAD));
+                }
+            }
+        }
         for (HighwayTileIndex.Segment segment : index.getSegments()) {
             if (!layer.allows(segment.getKind())) continue;
+            if (segment.getKind() == HighwayTileIndex.Kind.ROAD) continue;
             NodeLayer nodeLayer = nodeLayer(segment.getKind());
             int startNode = compiledNodeByCoordinate.get(Long.valueOf(
                     graphKey(segment.getStartX(), segment.getStartY(),
@@ -601,18 +628,7 @@ public final class HighwayRoutePlanner {
             int endNode = compiledNodeByCoordinate.get(Long.valueOf(
                     graphKey(segment.getEndX(), segment.getEndY(),
                             nodeLayer))).intValue();
-            if (segment.getKind() == HighwayTileIndex.Kind.ROAD) {
-                int[] access = projection(segment, x, y);
-                float offroad = distance(x, y, access[0], access[1]);
-                candidates.add(new Candidate(startNode, offroad + distance(
-                        access[0], access[1], segment.getStartX(),
-                        segment.getStartY()) * HIGHWAY_TIME_PER_TILE,
-                        access[0], access[1], segment.getKind()));
-                candidates.add(new Candidate(endNode, offroad + distance(
-                        access[0], access[1], segment.getEndX(),
-                        segment.getEndY()) * HIGHWAY_TIME_PER_TILE,
-                        access[0], access[1], segment.getKind()));
-            } else {
+            {
                 int[] access = projection(segment, x, y);
                 HighwayTileIndex.Tile occupied = index.get(x, y);
                 if (!tunnelMustTouchSurfaceRoad
@@ -717,16 +733,22 @@ public final class HighwayRoutePlanner {
 
     private static int[] projection(HighwayTileIndex.Segment segment,
                                     int x, int y) {
-        double dx = segment.getEndX() - segment.getStartX();
-        double dy = segment.getEndY() - segment.getStartY();
+        return projection(segment.getStartX(), segment.getStartY(),
+                segment.getEndX(), segment.getEndY(), x, y);
+    }
+
+    private static int[] projection(int startX, int startY, int endX,
+                                    int endY, int x, int y) {
+        double dx = endX - startX;
+        double dy = endY - startY;
         double lengthSquared = dx * dx + dy * dy;
         double t = lengthSquared <= 0.0d ? 0.0d
-                : ((x - segment.getStartX()) * dx
-                + (y - segment.getStartY()) * dy) / lengthSquared;
+                : ((x - startX) * dx
+                + (y - startY) * dy) / lengthSquared;
         t = Math.max(0.0d, Math.min(1.0d, t));
         return new int[] {
-                (int) Math.round(segment.getStartX() + t * dx),
-                (int) Math.round(segment.getStartY() + t * dy)
+                (int) Math.round(startX + t * dx),
+                (int) Math.round(startY + t * dy)
         };
     }
 
@@ -981,6 +1003,7 @@ public final class HighwayRoutePlanner {
             int y = (int) coordinate.longValue();
             int currentNode = node(nodes, nodeByCoordinate, x, y,
                     NodeLayer.SURFACE);
+            nodes.get(currentNode).addEndpointKind(HighwayTileIndex.Kind.ROAD);
             if (previousNode >= 0 && previousNode != currentNode) {
                 Node from = nodes.get(previousNode);
                 Node to = nodes.get(currentNode);

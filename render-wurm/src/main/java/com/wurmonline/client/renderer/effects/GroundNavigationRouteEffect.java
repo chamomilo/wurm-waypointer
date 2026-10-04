@@ -1738,7 +1738,9 @@ public final class GroundNavigationRouteEffect extends Effect
         float worldY = tileCentre(tileY);
         if (travelLayer == TravelLayer.TUNNEL) {
             CaveDataBuffer cave = world.getCaveBuffer();
-            if (cave == null || !cave.isValid(worldX, worldY)) return null;
+            if (cave == null || !insideLocalTerrainWindow(tileX, tileY,
+                    world.getPlayerPosX(), world.getPlayerPosY())
+                    || !cave.isValid(worldX, worldY)) return null;
             TileGeometry geometry = caveGeometry(cave, tileX, tileY);
             if (geometry == null) return null;
             float ground = cave.getInterpolatedFloor(worldX, worldY);
@@ -1755,7 +1757,9 @@ public final class GroundNavigationRouteEffect extends Effect
                     highways, travelLayer);
         }
         NearTerrainDataBuffer near = world.getNearTerrainBuffer();
-        if (near != null && near.isValid(worldX, worldY)) {
+        if (near != null && insideLocalTerrainWindow(tileX, tileY,
+                world.getPlayerPosX(), world.getPlayerPosY())
+                && near.isValid(worldX, worldY)) {
             TileGeometry geometry = nearGeometry(near, tileX, tileY);
             if (geometry == null) return null;
             float ground = near.getInterpolatedHeight(worldX, worldY);
@@ -1786,6 +1790,19 @@ public final class GroundNavigationRouteEffect extends Effect
                         : HighwayTileIndex.Kind.NONE,
                 false, geometry.maximumSlopeDirt), tileX, tileY,
                 highways, travelLayer);
+    }
+
+    // isValid checks circular slots (x/y & 511), not world-coordinate ownership.
+    // All four corners must lie in the unique player-centred buffer window.
+    static boolean insideLocalTerrainWindow(int tileX, int tileY,
+                                             float playerWorldX,
+                                             float playerWorldY) {
+        int playerX = (int) Math.floor(playerWorldX / TILE_SIZE);
+        int playerY = (int) Math.floor(playerWorldY / TILE_SIZE);
+        return (long) tileX - playerX >= -255L
+                && (long) tileX - playerX <= 254L
+                && (long) tileY - playerY >= -255L
+                && (long) tileY - playerY <= 254L;
     }
 
     private static TileGeometry nearGeometry(NearTerrainDataBuffer terrain,

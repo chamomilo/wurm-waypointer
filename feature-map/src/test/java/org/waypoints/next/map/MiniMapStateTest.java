@@ -50,4 +50,48 @@ public final class MiniMapStateTest {
     public void rejectsEmptyViewport() {
         new MiniMapState().pixelsPerTile(0);
     }
+
+    @Test public void automaticSwitchRunsOncePerTransitionAndHonoursManualOverride() {
+        MiniMapState state = new MiniMapState();
+        assertTrue(state.observePlayerLayer(false));
+        assertTrue(state.observePlayerLayer(true));
+        assertTrue(state.isCaveView());
+        assertEquals(17, state.getVisibleTiles());
+        state.zoomOut(12);
+        assertFalse(state.observePlayerLayer(true));
+        assertEquals(29, state.getVisibleTiles());
+        state.toggleMapView();
+        assertFalse(state.observePlayerLayer(true));
+        assertFalse(state.isCaveView());
+        state.toggleMapView();
+        assertTrue(state.observePlayerLayer(false));
+        assertFalse(state.isCaveView());
+        assertTrue(state.observePlayerLayer(true));
+        assertEquals(17, state.getVisibleTiles());
+    }
+
+    @Test public void caveZoomHasIndependentBoundsAndGroundRangeIsRestored() {
+        MiniMapState state = new MiniMapState(120, true);
+        state.toggleMapView();
+        assertEquals(17, state.zoomIn(100));
+        assertEquals(48, state.zoomOut(100));
+        assertEquals(256.0d / 48, state.pixelsPerTile(256), 0.000001d);
+        state.toggleMapView();
+        assertEquals(120, state.getVisibleTiles());
+        state.zoomIn(8);
+        state.toggleMapView();
+        assertEquals(17, state.getVisibleTiles());
+        state.toggleMapView();
+        assertEquals(112, state.getVisibleTiles());
+    }
+
+    @Test public void reconnectStartsInTheActualLayerEvenAfterManualOverride() {
+        MiniMapState state = new MiniMapState();
+        state.observePlayerLayer(true);
+        state.toggleMapView();
+        state.resetPlayerLayerObservation();
+        assertTrue(state.observePlayerLayer(true));
+        assertTrue(state.isCaveView());
+        assertEquals(17, state.getVisibleTiles());
+    }
 }

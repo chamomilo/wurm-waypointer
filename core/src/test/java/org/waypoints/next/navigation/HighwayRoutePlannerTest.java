@@ -7,6 +7,22 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public final class HighwayRoutePlannerTest {
+    @Test public void connectorJoinsSplitTrunkWithoutVisitingDeadEnd() {
+        HighwayTileIndex index = HighwayTileIndex.parse(
+                "[{\"startX\":10,\"startY\":50,\"endX\":110,\"endY\":50,\"type\":2},"
+                        + "{\"startX\":60,\"startY\":50,\"endX\":60,\"endY\":110,\"type\":2}]",
+                128, 128);
+        HighwayRoutePlanner.Plan plan = new HighwayRoutePlanner().plan(
+                50, 50, 60, 110, index);
+        assertTrue(plan.usesHighway());
+        java.util.Set<String> visited = new java.util.HashSet<String>();
+        for (HighwayRoutePlanner.TileStep step : plan.getHighwaySteps()) {
+            assertTrue("Route must not double back through a branch",
+                    visited.add(step.getTileX() + "," + step.getTileY()));
+            assertTrue(step.getTileX() >= 50 && step.getTileX() <= 60);
+        }
+    }
+
     @Test public void choosesLongerRoadWhenItsTravelTimeIsLower() {
         HighwayTileIndex index = HighwayTileIndex.parse(
                 "var highways=["

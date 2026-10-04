@@ -22,8 +22,13 @@ import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public final class WurmWaypointerMod implements WurmClientMod, Configurable, PreInitable, Initable {
-    public static final String VERSION = "1.0.5";
+public final class WurmWaypointerMod implements WurmClientMod, Configurable, PreInitable, Initable,
+        org.gotti.wurmunlimited.modloader.interfaces.ModListener {
+    public static final String VERSION = "1.3.0";
+
+    @Override public void modInitialized(org.gotti.wurmunlimited.modloader.interfaces.ModEntry<?> entry) {
+        org.chamomilo.wurm.update.SharedUpdateCoordinator.modInitialized(entry);
+    }
     private static final Logger LOGGER = Logger.getLogger("WurmWaypointer");
     private static volatile BeamProbeConfiguration configuration =
             BeamProbeConfiguration.disabled();
@@ -148,6 +153,7 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
 
     @Override
     public void init() {
+        com.wurmonline.client.renderer.gui.WaypointerUpdateBridge.claimHost();
         LOGGER.info("Wurm Waypointer " + VERSION + " initialized; "
                 + configuration.diagnosticSummary() + "; "
                 + waypointConfiguration.diagnosticSummary());
@@ -188,6 +194,7 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
                 () -> (proxy, method, args) -> {
                     Object result = method.invoke(proxy, args);
                     WurmWaypointerRuntime.hudReady((HeadsUpDisplay) proxy);
+                    com.wurmonline.client.renderer.gui.WaypointerUpdateBridge.tick((HeadsUpDisplay) proxy);
                     return result;
                 });
         HookManager.getInstance().registerHook(
@@ -195,6 +202,7 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
                 () -> (proxy, method, args) -> {
                     Object result = method.invoke(proxy, args);
                     WurmWaypointerRuntime.hudTick((HeadsUpDisplay) proxy);
+                    com.wurmonline.client.renderer.gui.WaypointerUpdateBridge.tick((HeadsUpDisplay) proxy);
                     return result;
                 });
         HookManager.getInstance().registerHook(

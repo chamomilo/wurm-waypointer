@@ -295,6 +295,17 @@ public final class ServerMapWindowBridge {
         }
     }
 
+    static void renderCaveMiniMapOverlays(WurmComponent map, Queue queue,
+                                         MapViewport viewport, int left, int top, int size) {
+        if (MiniMapWindowBridge.isNavigationLineVisible())
+            drawNavigationLine(queue, viewport, left, top, size, size);
+        drawMiniMapWaypoints(map, queue, viewport, left, top, size,
+                WurmWaypointerRuntime.serverMapWaypoints(),
+                WurmWaypointerRuntime.currentServerIdentity(),
+                WurmWaypointerRuntime.currentPlayerName(), WaypointLayer.CAVE);
+        drawPlayer(map, queue, viewport, left, top, size, size);
+    }
+
     private static void drawOverlays(WorldMap map, Queue queue, State state,
                                      ServerMapSnapshot snapshot,
                                      int left, int top) {
@@ -341,6 +352,12 @@ public final class ServerMapWindowBridge {
     public static boolean leftPressed(WorldMap map, int mouseX, int mouseY) {
         State state = activeState(map);
         if (state == null || !insideContent(map, mouseX, mouseY)) return false;
+        if (insideCenterButton(map, mouseX, mouseY)) {
+            state.centerButtonPressed = true;
+            state.dragging = false;
+            updateHover(map, state, mouseX, mouseY);
+            return true;
+        }
         if (insideCloseButton(map, mouseX, mouseY)) {
             state.closeButtonPressed = true;
             state.dragging = false;
@@ -385,6 +402,10 @@ public final class ServerMapWindowBridge {
     public static boolean mouseDragged(WorldMap map, int mouseX, int mouseY) {
         State state = activeState(map);
         if (state == null) return false;
+        if (state.centerButtonPressed) {
+            updateHover(map, state, mouseX, mouseY);
+            return true;
+        }
         if (state.pressedLayerButton != null) {
             updateHover(map, state, mouseX, mouseY);
             return true;
@@ -422,6 +443,15 @@ public final class ServerMapWindowBridge {
     public static boolean leftReleased(WorldMap map, int mouseX, int mouseY) {
         State state = activeState(map);
         if (state == null) return false;
+        if (state.centerButtonPressed) {
+            state.centerButtonPressed = false;
+            if (insideCenterButton(map, mouseX, mouseY)) {
+                state.viewport.centerOn(WurmWaypointerRuntime.currentPlayerTileX() + 0.5d,
+                        WurmWaypointerRuntime.currentPlayerTileY() + 0.5d);
+            }
+            updateHover(map, state, mouseX, mouseY);
+            return true;
+        }
         if (state.closeButtonPressed) {
             state.closeButtonPressed = false;
             updateHover(map, state, mouseX, mouseY);
@@ -480,6 +510,7 @@ public final class ServerMapWindowBridge {
     public static boolean rightPressed(WorldMap map, int mouseX, int mouseY) {
         State state = activeState(map);
         if (state == null || !insideContent(map, mouseX, mouseY)) return false;
+        if (insideCenterButton(map, mouseX, mouseY)) return true;
         if (insideNavigationLineButton(map, mouseX, mouseY)) return true;
         if (insideMiniMapButton(map, mouseX, mouseY)) return true;
         if (layerButtonAt(map, mouseX, mouseY) != null) return true;
@@ -501,7 +532,8 @@ public final class ServerMapWindowBridge {
                 || insideSearchButton(map, mouseX, mouseY)
                 || insideCloseButton(map, mouseX, mouseY)
                 || insideMiniMapButton(map, mouseX, mouseY)
-                || insideNavigationLineButton(map, mouseX, mouseY)) return true;
+                || insideNavigationLineButton(map, mouseX, mouseY)
+                || insideCenterButton(map, mouseX, mouseY)) return true;
         double steps = -wheelDelta / 3.0d;
         if (steps == 0.0d) steps = wheelDelta < 0 ? 1.0d : -1.0d;
         steps = Math.max(-4.0d, Math.min(4.0d, steps));
@@ -542,7 +574,9 @@ public final class ServerMapWindowBridge {
                 || !insideContent(map, mouseX, mouseY)) return false;
         updateHover(map, state, mouseX, mouseY);
         String hover = "";
-        if (state.navigationLineButtonHover) {
+        if (state.centerButtonHover) {
+            hover = "Center map on your character";
+        } else if (state.navigationLineButtonHover) {
             hover = "NAV LINE: continuous active-navigation line is "
                     + (MiniMapWindowBridge.isNavigationLineVisible()
                     ? "visible" : "hidden") + " on both maps";
@@ -929,6 +963,7 @@ public final class ServerMapWindowBridge {
         try {
             drawLayerButtons(map, queue, state, left, top);
             drawMiniMapButton(map, queue, state, left, top);
+            drawCenterButton(map, queue, state, left, top);
             drawNavigationLineButton(map, queue, state, left, top);
             drawSearchButton(map, queue, state, left, top);
             drawCloseButton(map, queue, state, left, top);
@@ -1375,11 +1410,20 @@ public final class ServerMapWindowBridge {
             WurmComponent map, Queue queue, MapViewport viewport,
             int left, int top, int size, WaypointRevisionSnapshot snapshot,
             ServerIdentity currentServer, String currentUser) {
+        drawMiniMapWaypoints(map, queue, viewport, left, top, size, snapshot,
+                currentServer, currentUser, null);
+    }
+
+    private static void drawMiniMapWaypoints(
+            WurmComponent map, Queue queue, MapViewport viewport,
+            int left, int top, int size, WaypointRevisionSnapshot snapshot,
+            ServerIdentity currentServer, String currentUser, WaypointLayer layer) {
         if (snapshot == null) return;
         int customLabels = 0;
         for (WaypointRecord record : snapshot.getRecords()) {
             if (!visibleWaypoint(record, currentServer, currentUser)) continue;
             WaypointCoordinate coordinate = record.getCoordinate();
+            if (layer != null && coordinate.getLayer() != layer) continue;
             MapPoint point = viewport.mapToScreen(
                     coordinate.getTileX() + 0.5d,
                     coordinate.getTileY() + 0.5d);
@@ -1506,6 +1550,23 @@ public final class ServerMapWindowBridge {
         }
     }
 
+    private static boolean insideCenterButton(WorldMap map, int x, int y) {
+        int left = navigationLineButtonLeft(map.x + CONTENT_OFFSET_X) - LAYER_BUTTON_GAP - 72;
+        int top = map.y + CONTENT_OFFSET_Y + SEARCH_BUTTON_TOP;
+        return x >= left && x < left + 72 && y >= top && y < top + LAYER_BUTTON_HEIGHT;
+    }
+
+    private static void drawCenterButton(WorldMap map, Queue queue, State state, int left, int top) {
+        int x = navigationLineButtonLeft(left) - LAYER_BUTTON_GAP - 72;
+        int y = top + SEARCH_BUTTON_TOP;
+        float edge = state.centerButtonHover ? 0.96f : 0.72f;
+        map.fillRect(queue, edge, edge * 0.79f, edge * 0.42f, 0.95f,
+                x, y, 72, LAYER_BUTTON_HEIGHT);
+        map.fillRect(queue, 0.10f, 0.055f, 0.02f, 0.96f,
+                x + 2, y + 2, 68, LAYER_BUTTON_HEIGHT - 4);
+        text(queue, "CENTER", x + 8, y + 21, 1.0f, 0.92f, 0.72f, 1.0f, left, top);
+    }
+
     private static void drawMiniMapButton(WorldMap map, Queue queue,
                                           State state, int left, int top) {
         int x = miniMapButtonLeft(left);
@@ -1628,6 +1689,16 @@ public final class ServerMapWindowBridge {
 
     private static WaypointRecord nearestWaypoint(
             MapViewport viewport, int screenX, int screenY) {
+        return nearestWaypoint(viewport, screenX, screenY, null);
+    }
+
+    static String caveWaypointHover(MapViewport viewport, int screenX, int screenY) {
+        WaypointRecord record = nearestWaypoint(viewport, screenX, screenY, WaypointLayer.CAVE);
+        return record == null ? "" : waypointHoverText(record);
+    }
+
+    private static WaypointRecord nearestWaypoint(
+            MapViewport viewport, int screenX, int screenY, WaypointLayer layer) {
         WaypointRevisionSnapshot snapshot = WurmWaypointerRuntime
                 .serverMapWaypoints();
         if (snapshot == null) return null;
@@ -1638,6 +1709,7 @@ public final class ServerMapWindowBridge {
         for (WaypointRecord record : snapshot.getRecords()) {
             if (!visibleWaypoint(record, server, user)) continue;
             WaypointCoordinate coordinate = record.getCoordinate();
+            if (layer != null && coordinate.getLayer() != layer) continue;
             MapPoint marker = viewport.mapToScreen(
                     coordinate.getTileX() + 0.5d,
                     coordinate.getTileY() + 0.5d);
@@ -1806,6 +1878,11 @@ public final class ServerMapWindowBridge {
 
     static void requestCustomMarkAt(MapViewport viewport,
                                     int screenX, int screenY) {
+        requestCustomMarkAt(viewport, screenX, screenY, WaypointLayer.SURFACE);
+    }
+
+    static void requestCustomMarkAt(MapViewport viewport,
+                                    int screenX, int screenY, WaypointLayer layer) {
         if (viewport == null) return;
         MapPoint point = viewport.screenToMap(screenX, screenY);
         if (point == null || !viewport.containsMapPoint(point)) return;
@@ -1813,7 +1890,7 @@ public final class ServerMapWindowBridge {
         if (current == null) return;
         CustomMapMarkWindowBridge.open(current,
                 (int) Math.floor(point.getX()),
-                (int) Math.floor(point.getY()));
+                (int) Math.floor(point.getY()), layer);
     }
 
     private static void requestWaypointAt(MapPoint point,
@@ -1832,6 +1909,7 @@ public final class ServerMapWindowBridge {
 
     private static void updateHover(WorldMap map, State state,
                                     int mouseX, int mouseY) {
+        state.centerButtonHover = insideCenterButton(map, mouseX, mouseY);
         state.searchButtonHover = insideSearchButton(map, mouseX, mouseY);
         state.closeButtonHover = insideCloseButton(map, mouseX, mouseY);
         state.miniMapButtonHover = insideMiniMapButton(
@@ -1839,7 +1917,7 @@ public final class ServerMapWindowBridge {
         state.navigationLineButtonHover = insideNavigationLineButton(
                 map, mouseX, mouseY);
         state.hoveredLayerButton = layerButtonAt(map, mouseX, mouseY);
-        if (state.searchButtonHover || state.closeButtonHover
+        if (state.centerButtonHover || state.searchButtonHover || state.closeButtonHover
                 || state.miniMapButtonHover
                 || state.navigationLineButtonHover
                 || state.hoveredLayerButton != null) {
@@ -2208,6 +2286,8 @@ public final class ServerMapWindowBridge {
         private int pressY;
         private int lastX;
         private int lastY;
+        private boolean centerButtonPressed;
+        private boolean centerButtonHover;
         private boolean hoverInside;
         private int hoverTileX;
         private int hoverTileY;

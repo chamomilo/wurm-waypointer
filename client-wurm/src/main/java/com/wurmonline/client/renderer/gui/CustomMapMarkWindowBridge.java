@@ -1,4 +1,5 @@
 package com.wurmonline.client.renderer.gui;
+import org.waypoints.next.model.WaypointLayer;
 
 import org.gotti.wurmunlimited.modloader.ReflectionUtil;
 
@@ -16,11 +17,16 @@ public final class CustomMapMarkWindowBridge {
 
     public static synchronized void open(HeadsUpDisplay hud,
                                          int tileX, int tileY) {
+        open(hud, tileX, tileY, WaypointLayer.SURFACE);
+    }
+
+    public static synchronized void open(HeadsUpDisplay hud,
+                                         int tileX, int tileY, WaypointLayer layer) {
         if (hud == null) return;
         try {
             detach(owner, "replace custom map mark editor");
             owner = hud;
-            window = new CustomMapMarkWindow(tileX, tileY);
+            window = new CustomMapMarkWindow(tileX, tileY, layer);
             window.setInitialSize(390, 155, true);
             window.setPosition(Math.max(20, (hud.getWidth() - window.width) / 2),
                     Math.max(35, (hud.getHeight() - window.height) / 2));

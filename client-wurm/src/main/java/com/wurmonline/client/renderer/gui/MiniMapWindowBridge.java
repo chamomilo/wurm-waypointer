@@ -102,6 +102,7 @@ public final class MiniMapWindowBridge {
         } catch (Throwable failure) {
             LOGGER.log(Level.FINE, "Mini-map close failed open", failure);
         }
+        window.disposeCaveMap();
         window = null;
     }
 
@@ -112,7 +113,9 @@ public final class MiniMapWindowBridge {
         } catch (Throwable failure) {
             LOGGER.log(Level.FINE, "Mini-map detach failed open", failure);
         }
+        if (window != null) window.disposeCaveMap();
         window = null;
+        SETTINGS.resetPlayerLayerObservation();
         if (target == owner) owner = null;
         LOGGER.info("Mini-map detached: reason=" + oneLine(reason));
     }
@@ -125,6 +128,8 @@ public final class MiniMapWindowBridge {
                 owner = hud;
             }
             initializeSettings();
+            if (hud.getWorld() != null && SETTINGS.observePlayerLayer(
+                    hud.getWorld().getPlayerLayer() < 0)) notifySettingsChanged();
             ServerMapSnapshot snapshot = WurmWaypointerRuntime
                     .serverMapSnapshot();
             boolean mapReady = snapshot != null

@@ -3,6 +3,9 @@ package org.waypoints.next.integration;
 import com.wurmonline.client.game.NearTerrainDataBuffer;
 import com.wurmonline.client.game.World;
 import com.wurmonline.mesh.Tiles;
+import com.wurmonline.mesh.FieldData;
+import com.wurmonline.mesh.FoliageAge;
+import com.wurmonline.mesh.TreeData;
 
 /** Exact surface description for tiles currently present in the live client buffer. */
 final class WurmSurfaceTileDescription {
@@ -56,7 +59,19 @@ final class WurmSurfaceTileDescription {
         if (tile == null) return "";
         String name = tile.getTileName(data);
         if (name == null || name.trim().isEmpty()) name = tile.getName();
-        return name == null ? "" : name.trim();
+        name = name == null ? "" : name.trim();
+        if (tile.isTree() || tile.isBush()) {
+            name += " | Age: " + FoliageAge.getFoliageAge(data).getAgeName();
+            if (tile.usesNewData() && tile.canBearFruit() && TreeData.hasFruit(data)) {
+                name += " | Harvestable";
+            }
+        } else if (tile == Tiles.Tile.TILE_FIELD || tile == Tiles.Tile.TILE_FIELD2) {
+            int age = FieldData.getAge(data);
+            name += " | Crop: " + FieldData.getTypeName(tile, data)
+                    + " | Age: " + FieldData.getAgeName(data) + " (" + age + ")";
+            if (age == 5 || age == 6) name += " | Harvestable";
+        }
+        return name;
     }
 
     private static float minimum(float a, float b, float c, float d) {

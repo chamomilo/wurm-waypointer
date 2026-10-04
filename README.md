@@ -2,9 +2,30 @@
 
 ![Wurm Waypointer](docs/wurm-waypointer-banner.png)
 
-I would like to present **Wurm Waypointer**, a new client-side mod created especially for Sklotopolis.
+**Wurm Waypointer 1.3.0** is a client-side navigation and map mod for Wurm Unlimited, created especially for Sklotopolis.
 
 Its main purpose is to let you create waypoints and navigate to them using a glowing, magic-like navigation pulse. Choose your destination and follow the light!
+
+## New in 1.3.0
+
+- The mini-map has a **GROUND / CAVE** button beside **OPEN FULL MAP**. Entering a cave selects CAVE once; leaving selects GROUND once. You can switch manually until the next layer transition.
+- CAVE starts at **17×17 tiles**. Mouse-wheel zoom reaches **48×48 tiles**; GROUND keeps its separate zoom setting.
+- Tunnels, entrances, water, reinforcement, paving, structures and received ore/rock types are shown in contrasting colours. Zinc, silver and marble have distinct colours and patterns.
+- Hover shows the cave tile name, floor/ceiling/clearance, water depth and available reinforcement, paving, cladding and structure information. Ore quality and remaining yield are not supplied by this terrain stream. Unknown tiles remain marked as unknown.
+- Waypoints and custom marks created in CAVE are saved on the cave layer.
+
+## Also included from 1.2.2
+
+- Fixed distant NAV routes using repeated local terrain coordinates, which could produce paths across water. Distant surface routes now use the distant terrain data; cave navigation stops where reliable cave data is unavailable.
+- Fixed highway entry and exit calculations at junctions, avoiding unnecessary trips into branches and back onto the main road.
+
+## Also included from 1.2.1
+
+- `CENTER` on the full MAP returns the view to your character without changing the zoom. The mini-map follows your character automatically.
+- Hover a loaded tree or bush tile on either map to see its age and `Harvestable` when the client reports fruit ready to collect.
+- Hover a loaded field tile to see the crop type, growth stage and `Harvestable` for ripe crops. These details are available only within the client's live terrain range; distant map images do not contain crop or tree state.
+- The mini-map title is centred, and `OPEN FULL MAP` sits two pixels lower.
+- A shared Chamomilo update notification lists available mod releases and opens their ZIP download links for manual installation.
 
 ## Main features
 
@@ -49,7 +70,15 @@ Wurm Waypointer requires a working Wurm Unlimited client modloader.
 
 After installation, the mod should be located at:
 
-`WurmLauncher/mods/wurm-waypointer/wurm-waypointer.jar`
+`WurmLauncher/mods/wurm-waypointer/wurm-waypointer-1.3.0.jar`
+
+When upgrading, keep only the current Waypointer JAR in that folder and check that `mods/wurm-waypointer.properties` points to it. Back up your configuration before extracting an update. Waypoints and custom marks are stored separately in `wurm-waypointer-data` under the client directory.
+
+## Building from source
+
+Use a Java 8 JDK. Copy `local.properties.example` to `local.properties` and set `wurmClientLibDir` to a directory containing your client libraries (`client-patched.jar`, `common.jar`, `javassist.jar`, and `modlauncher.jar`). These proprietary libraries are not included in this repository.
+
+Run `./gradlew test dist` (`gradlew.bat test dist` on Windows). The installable archive is written to `distribution/build/distributions/wurm-waypointer-1.3.0.zip`; the build verifies module boundaries, packaged runtime classes, update metadata and ZIP contents.
 
 ## Replacing other mods
 

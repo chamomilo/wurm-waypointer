@@ -14,6 +14,24 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public final class GroundNavigationRouteEffectTerrainTest {
+    @Test public void localTerrainRejectsRepeatedBufferCoordinates() {
+        assertTrue(GroundNavigationRouteEffect.insideLocalTerrainWindow(
+                1000, 800, 4002.0f, 3202.0f));
+        assertFalse(GroundNavigationRouteEffect.insideLocalTerrainWindow(
+                1512, 800, 4002.0f, 3202.0f));
+        assertFalse(GroundNavigationRouteEffect.insideLocalTerrainWindow(
+                1000, 288, 4002.0f, 3202.0f));
+    }
+
+    @Test public void localTerrainRequiresAllFourCornersInsideWindow() {
+        assertTrue(GroundNavigationRouteEffect.insideLocalTerrainWindow(
+                1254, 545, 4000.0f, 3200.0f));
+        assertFalse(GroundNavigationRouteEffect.insideLocalTerrainWindow(
+                1255, 800, 4000.0f, 3200.0f));
+        assertFalse(GroundNavigationRouteEffect.insideLocalTerrainWindow(
+                1000, 544, 4000.0f, 3200.0f));
+    }
+
     @Test public void tunnelPlanMustActuallyEndAtUndergroundTarget() {
         HighwayTileIndex index = HighwayTileIndex.parse(
                 "["

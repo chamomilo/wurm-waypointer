@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.3.0 — 2026-10-05
+
+- Added a green GROUND / charcoal CAVE mini-map button beside OPEN FULL MAP. Entering or leaving caves selects the corresponding view once; manual overrides last until the next layer transition.
+- Cave view starts at 17×17 tiles and zooms out to the complete 48×48 local terrain window. Ground zoom is preserved independently.
+- Added live tunnels, entrances, water, reinforced/clad/paved cave tiles, structures and all received rock/ore types. Zinc, silver and marble have separate colours and patterns.
+- Cave hover shows coordinates, rock/ore names, floor/paving, reinforcement, partial cladding, floor/ceiling/clearance, water depth and known structure presence. Ore quality and remaining yield are not part of the terrain stream.
+- Cave clicks create cave waypoints and custom marks. Unreceived tiles are visibly unknown; distant ring-buffer aliases are rejected.
+
+## 1.2.2 — 2026-10-04
+
+- Fixed distant NAV paths reading repeated near/cave terrain from Wurm's circular 512-tile buffers, which could invent dry routes across water. Distant surface tiles now use distant terrain.
+- Highway entry/exit connectors now use the graph edges split at junctions, avoiding trips to an original segment endpoint and back through the same branch.
+
+## 1.2.1 — 2026-10-04
+
+- Added a Center button to the full MAP, preserving zoom while returning to the character.
+- Added live tree/bush ages and Harvestable flags, plus crop species, growth stages and Harvestable flags to hover text on both maps.
+- Centred the mini-map title/nameplate and moved Open Full Map down by two pixels.
+- Embedded the shared Chamomilo protocol-1 update coordinator and notification window required by the project working agreements.
+
 ## 1.2.0 — 2026-10-04
 
 - Fixed the borderless mini-map hiding its own canvas together with the native window background, and enabled the mini-map by default on every fresh client start.

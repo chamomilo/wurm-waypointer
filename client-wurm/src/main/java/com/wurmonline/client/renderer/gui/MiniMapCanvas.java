@@ -5,6 +5,10 @@ import com.wurmonline.client.renderer.backend.Queue;
 import com.wurmonline.client.renderer.gui.text.TextFont;
 import com.wurmonline.client.renderer.gui.text.WaypointerMiniMapFonts;
 import com.wurmonline.client.resources.textures.ResourceTexture;
+import com.wurmonline.client.resources.textures.WaypointerCaveTexture;
+import org.waypoints.next.integration.WurmCaveMapSnapshot;
+import org.waypoints.next.map.MapPoint;
+import org.waypoints.next.model.WaypointLayer;
 import org.waypoints.next.integration.WurmWaypointerRuntime;
 import org.waypoints.next.map.MapViewport;
 import org.waypoints.next.map.MiniMapState;
@@ -16,6 +20,8 @@ class MiniMapCanvas extends FlexComponent {
     private static final int FRAME_INSET = 22;
     private static final int OPEN_BUTTON_WIDTH = 120;
     private static final int OPEN_BUTTON_HEIGHT = 20;
+    private static final int MODE_BUTTON_WIDTH = 68;
+    private static final int BUTTON_GAP = 5;
     private static final int WHEEL_ZOOM_TILES = 8;
     private final MiniMapState settings;
     private final TextFont titleText = WaypointerMiniMapFonts.healthbarTitle();
@@ -26,6 +32,13 @@ class MiniMapCanvas extends FlexComponent {
     private boolean leftPressedInside;
     private boolean openMapPressed;
     private boolean openMapHover;
+    private boolean modePressed;
+    private boolean modeHover;
+    private WurmCaveMapSnapshot caveMap;
+    private final WaypointerCaveTexture caveTexture = new WaypointerCaveTexture();
+    private long nextCaveRefresh;
+    private long textureRevision;
+    private boolean textureInitialized;
     private boolean draggingTitle;
     private int lastDragX;
     private int lastDragY;
@@ -39,6 +52,13 @@ class MiniMapCanvas extends FlexComponent {
 
     void settingsChanged() {
         viewportVisibleTiles = -1;
+        nextCaveRefresh = 0;
+    }
+
+    void disposeCaveMap() {
+        caveTexture.dispose();
+        caveMap = null;
+        textureInitialized = false;
     }
 
     void setTitleLabel(String value) {
@@ -48,7 +68,7 @@ class MiniMapCanvas extends FlexComponent {
     boolean mouseWheeledAt(int mouseX, int mouseY, int wheelDelta) {
         if (!contains(mouseX, mouseY) || wheelDelta == 0) return false;
         int steps = Math.max(1, Math.abs(wheelDelta) / 3)
-                * WHEEL_ZOOM_TILES;
+                * (settings.isCaveView() ? 4 : WHEEL_ZOOM_TILES);
         if (wheelDelta < 0) settings.zoomIn(steps);
         else settings.zoomOut(steps);
         settingsChanged();
@@ -63,9 +83,16 @@ class MiniMapCanvas extends FlexComponent {
                 openButtonLeft(fullLeft, fullSize),
                 openButtonTop(fullTop, fullSize),
                 OPEN_BUTTON_WIDTH, OPEN_BUTTON_HEIGHT);
+        modeHover = inside(mouseX, mouseY, modeButtonLeft(fullLeft, fullSize),
+                openButtonTop(fullTop, fullSize), MODE_BUTTON_WIDTH, OPEN_BUTTON_HEIGHT);
         if (pickData == null) return;
         if (openMapHover) {
             pickData.addText("Open the full map");
+            return;
+        }
+        if (modeHover) {
+            pickData.addText("Map view: " + (settings.isCaveView() ? "CAVE" : "GROUND")
+                    + " | Click to switch");
             return;
         }
         int mapSize = mapSize(fullSize);
@@ -73,6 +100,18 @@ class MiniMapCanvas extends FlexComponent {
         int mapTop = mapTop(fullSize);
         if (viewport == null
                 || !inside(mouseX, mouseY, mapLeft, mapTop, mapSize)) {
+            return;
+        }
+        if (settings.isCaveView()) {
+            MapPoint point = viewport.screenToMap(mouseX - mapLeft, mouseY - mapTop);
+            int tileX = (int) Math.floor(point.getX()), tileY = (int) Math.floor(point.getY());
+            if (caveMap != null) for (String line : caveMap.hoverLines(
+                    tileX, tileY))
+                pickData.addText(line);
+            WurmWaypointerRuntime.caveMapStructureHover(pickData, tileX, tileY);
+            String mark = ServerMapWindowBridge.caveWaypointHover(viewport,
+                    mouseX - mapLeft, mouseY - mapTop);
+            if (!mark.isEmpty()) pickData.addText(mark);
             return;
         }
         for (String hover : ServerMapWindowBridge.mapHoverLines(viewport,
@@ -92,14 +131,16 @@ class MiniMapCanvas extends FlexComponent {
                 openButtonLeft(fullLeft, fullSize),
                 openButtonTop(fullTop, fullSize),
                 OPEN_BUTTON_WIDTH, OPEN_BUTTON_HEIGHT);
-        draggingTitle = !openMapPressed && inside(mouseX, mouseY,
-                fullLeft + 3, fullTop,
+        modePressed = inside(mouseX, mouseY, modeButtonLeft(fullLeft, fullSize),
+                openButtonTop(fullTop, fullSize), MODE_BUTTON_WIDTH, OPEN_BUTTON_HEIGHT);
+        draggingTitle = !openMapPressed && !modePressed && inside(mouseX, mouseY,
+                nameplateLeft(fullLeft, fullSize), fullTop,
                 nameplateWidth(fullSize), 22);
         lastDragX = mouseX;
         lastDragY = mouseY;
         leftPressedInside = inside(mouseX, mouseY,
                 mapLeft(fullSize), mapTop(fullSize), mapSize)
-                && !openMapPressed && !draggingTitle;
+                && !openMapPressed && !modePressed && !draggingTitle;
     }
 
     @Override protected void mouseDragged(int mouseX, int mouseY) {
@@ -131,11 +172,26 @@ class MiniMapCanvas extends FlexComponent {
                 OPEN_BUTTON_WIDTH, OPEN_BUTTON_HEIGHT);
         boolean create = leftPressedInside && inside(mouseX, mouseY,
                 mapLeft, mapTop, mapSize);
+        boolean mode = modePressed && inside(mouseX, mouseY,
+                modeButtonLeft(fullLeft, fullSize), openButtonTop(fullTop, fullSize),
+                MODE_BUTTON_WIDTH, OPEN_BUTTON_HEIGHT);
         leftPressedInside = false;
         openMapPressed = false;
+        modePressed = false;
         draggingTitle = false;
         if (open) {
             MiniMapWindowBridge.openWorldMap((MiniMapWindow) this);
+            return;
+        }
+        if (mode) {
+            settings.toggleMapView();
+            settingsChanged();
+            return;
+        }
+        if (create && settings.isCaveView() && viewport != null) {
+            MapPoint point = viewport.screenToMap(mouseX - mapLeft, mouseY - mapTop);
+            if (viewport.containsMapPoint(point)) WurmWaypointerRuntime.serverMapWaypointRequested(
+                    (int) Math.floor(point.getX()), (int) Math.floor(point.getY()), WaypointLayer.CAVE);
             return;
         }
         if (create) ServerMapWindowBridge.requestWaypointAt(viewport,
@@ -149,12 +205,16 @@ class MiniMapCanvas extends FlexComponent {
         int mapTop = mapTop(fullSize);
         if (inside(mouseX, mouseY, mapLeft, mapTop, mapSize)) {
             ServerMapWindowBridge.requestCustomMarkAt(viewport,
-                    mouseX - mapLeft, mouseY - mapTop);
+                    mouseX - mapLeft, mouseY - mapTop,
+                    settings.isCaveView() ? WaypointLayer.CAVE : WaypointLayer.SURFACE);
         }
     }
 
     @Override protected void mouseExited() {
         openMapHover = false;
+        modeHover = false;
+        modePressed = false;
+        openMapPressed = false;
         leftPressedInside = false;
     }
 
@@ -172,7 +232,18 @@ class MiniMapCanvas extends FlexComponent {
                 111.0f / 255.0f, 1.0f, left, top, size, size);
 
         ServerMapSnapshot snapshot = WurmWaypointerRuntime.serverMapSnapshot();
-        if (snapshot == null || snapshot.getProfile() == null
+        if (snapshot != null && snapshot.getProfile() != null && settings.isCaveView()) {
+            MapViewport active = viewport(snapshot.getProfile(), size);
+            int visible = settings.getVisibleTiles();
+            double offset = visible % 2 == 0 ? 0.0d : 0.5d;
+            active.centerOn(WurmWaypointerRuntime.currentPlayerTileX() + offset,
+                    WurmWaypointerRuntime.currentPlayerTileY() + offset);
+            try {
+                renderCave(queue, active, left, top, size);
+            } catch (RuntimeException refreshing) {
+                status(queue, "Cave data loading...", left, top);
+            }
+        } else if (snapshot == null || snapshot.getProfile() == null
                 || !snapshot.hasSurface()) {
             status(queue, "Map loading...", left, top);
         } else {
@@ -188,6 +259,38 @@ class MiniMapCanvas extends FlexComponent {
                 fullLeft, fullTop, fullSize);
         drawNameplate(queue, fullLeft, fullTop, fullSize);
         drawFrameControls(queue, fullLeft, fullTop, fullSize);
+    }
+
+    private void renderCave(Queue queue, MapViewport active, int left, int top, int size) {
+        long now = System.nanoTime();
+        if (caveMap == null || now >= nextCaveRefresh
+                || caveMap.getOriginX() != WurmWaypointerRuntime.currentPlayerTileX() - 24
+                || caveMap.getOriginY() != WurmWaypointerRuntime.currentPlayerTileY() - 24) {
+            caveMap = WurmWaypointerRuntime.currentCaveMap();
+            nextCaveRefresh = now + 200_000_000L;
+            if (caveMap != null && (!textureInitialized || textureRevision != caveMap.getRevision())) {
+                caveTexture.update(caveMap.image());
+                textureRevision = caveMap.getRevision();
+                textureInitialized = true;
+            }
+        }
+        if (caveMap == null || caveTexture.get() == null) {
+            status(queue, "Cave data loading...", left, top);
+            return;
+        }
+        MapPoint corner = active.screenToMap(0, 0);
+        HeadsUpDisplay.scissor.pushClip(left, top, size, size);
+        try {
+            Renderer.texturedQuadAlphaBlend(queue, caveTexture.get(), 1, 1, 1, 1,
+                    left, top, size, size,
+                    (float) ((corner.getX() - caveMap.getOriginX()) / WurmCaveMapSnapshot.SIZE),
+                    (float) ((corner.getY() - caveMap.getOriginY()) / WurmCaveMapSnapshot.SIZE),
+                    (float) (settings.getVisibleTiles() / (double) WurmCaveMapSnapshot.SIZE),
+                    (float) (settings.getVisibleTiles() / (double) WurmCaveMapSnapshot.SIZE));
+            ServerMapWindowBridge.renderCaveMiniMapOverlays(this, queue, active, left, top, size);
+        } finally {
+            HeadsUpDisplay.scissor.popClip();
+        }
     }
 
     private MapViewport viewport(ServerMapProfile profile, int size) {
@@ -275,7 +378,7 @@ class MiniMapCanvas extends FlexComponent {
         ResourceTexture texture = ServerMapWindowBridge
                 .miniMapNameplateTexture();
         if (texture == null) return;
-        int left = fullLeft + 3;
+        int left = nameplateLeft(fullLeft, fullSize);
         int top = fullTop;
         int width = nameplateWidth(fullSize);
         int height = 22;
@@ -296,7 +399,7 @@ class MiniMapCanvas extends FlexComponent {
                 left + width - rightCap, top, rightCap, height,
                 1.0f - rightCapU, 0.0f, rightCapU, 1.0f);
 
-        int textX = fullLeft + 11;
+        int textX = fullLeft + (fullSize - titleText.getWidth(titleLabel)) / 2;
         int textY = top + 20;
         titleText.moveTo(textX, textY);
         titleText.paint(queue, titleLabel,
@@ -308,12 +411,20 @@ class MiniMapCanvas extends FlexComponent {
                 titleText.getWidth(titleLabel) + 30));
     }
 
+    private int nameplateLeft(int fullLeft, int fullSize) {
+        return fullLeft + (fullSize - nameplateWidth(fullSize)) / 2;
+    }
+
     private static int openButtonLeft(int fullLeft, int fullSize) {
         return fullLeft + (fullSize - OPEN_BUTTON_WIDTH) / 2;
     }
 
+    private static int modeButtonLeft(int fullLeft, int fullSize) {
+        return openButtonLeft(fullLeft, fullSize) + OPEN_BUTTON_WIDTH + BUTTON_GAP;
+    }
+
     private static int openButtonTop(int fullTop, int fullSize) {
-        return fullTop + fullSize - OPEN_BUTTON_HEIGHT - 10;
+        return fullTop + fullSize - OPEN_BUTTON_HEIGHT - 8;
     }
 
     private void drawFrameControls(Queue queue, int fullLeft, int fullTop,
@@ -339,6 +450,18 @@ class MiniMapCanvas extends FlexComponent {
         font.paint(queue, button, 0.02f, 0.01f, 0.005f, 1.0f);
         font.moveTo(buttonTextX, baseline);
         font.paint(queue, button, 1.0f, 0.92f, 0.72f, 1.0f);
+
+        int modeLeft = modeButtonLeft(fullLeft, fullSize);
+        boolean cave = settings.isCaveView();
+        float edgeMode = modePressed ? 0.95f : modeHover ? 0.78f : 0.52f;
+        fillRect(queue, edgeMode, edgeMode, edgeMode, 1,
+                modeLeft, buttonTop, MODE_BUTTON_WIDTH, OPEN_BUTTON_HEIGHT);
+        fillRect(queue, cave ? 0.16f : 0.10f, cave ? 0.17f : 0.38f,
+                cave ? 0.19f : 0.15f, 1,
+                modeLeft + 1, buttonTop + 1, MODE_BUTTON_WIDTH - 2, OPEN_BUTTON_HEIGHT - 2);
+        String modeText = cave ? "CAVE" : "GROUND";
+        font.moveTo(modeLeft + (MODE_BUTTON_WIDTH - font.getWidth(modeText)) / 2, baseline);
+        font.paint(queue, modeText, 1, 1, 1, 1);
 
         String scale = "VIEW: " + settings.getVisibleTiles() * 4 + " m";
         int scaleX = fullLeft + 18;

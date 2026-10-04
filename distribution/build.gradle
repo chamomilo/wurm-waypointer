@@ -33,6 +33,18 @@ jar {
 task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
     doLast {
         def contents = zipTree(jar.archiveFile.get().asFile)
+        ['SharedUpdateCoordinator', 'GitHubReleaseClient', 'ModUpdate', 'UpdateTarget'].each { name ->
+            if (contents.matching { include "org/chamomilo/wurm/update/${name}.class" }.files.empty)
+                throw new GradleException('Missing shared updater class: ' + name)
+        }
+        if (contents.matching { include 'com/wurmonline/client/renderer/gui/ChamomiloUpdateWindow.class' }.files.empty)
+            throw new GradleException('Missing shared update window')
+        def updateMetadata = new Properties()
+        rootProject.file('mods/wurm-waypointer.properties').withInputStream { updateMetadata.load(it) }
+        ['sharedClassLoader', 'updateProvider', 'updateCoordinatorProtocol', 'updateId',
+         'updateName', 'updateRepo', 'updateAsset'].each { key ->
+            if (!updateMetadata.getProperty(key)) throw new GradleException('Missing update metadata: ' + key)
+        }
         def requiredClasses = [
                 'org/waypoints/api/WaypointerApi.class',
                 'org/waypoints/api/ObjectMarkRequest.class',
@@ -61,6 +73,8 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
                 'org/waypoints/next/lootmap/LootMapWaypointPlacement.class',
                 'org/waypoints/next/integration/WurmLootMapTerrain.class',
                 'org/waypoints/next/integration/WurmSurfaceTileDescription.class',
+                'org/waypoints/next/integration/WurmCaveMapSnapshot.class',
+                'com/wurmonline/client/resources/textures/WaypointerCaveTexture.class',
                 'org/waypoints/next/surroundings/SurroundingsCatalog.class',
                 'org/waypoints/next/surroundings/SurroundingsClassifier.class',
                 'org/waypoints/next/surroundings/SurroundingsQuery.class',
@@ -224,6 +238,9 @@ task dist(type: Zip, dependsOn: [test, verifyArtifact]) {
         from rootProject.file('README.md')
         from rootProject.file('THIRD_PARTY_NOTICES.md')
         from rootProject.file('LICENSE')
+        into('docs') {
+            from rootProject.file('docs/wurm-waypointer-banner.png')
+        }
         into('assets') {
             from(rootProject.file(
                     'client-wurm/src/main/resources/org/waypoints/next/map')) {
@@ -272,6 +289,7 @@ task dist(type: Zip, dependsOn: [test, verifyArtifact]) {
                 'mods/wurm-waypointer/README.md',
                 'mods/wurm-waypointer/THIRD_PARTY_NOTICES.md',
                 'mods/wurm-waypointer/LICENSE',
+                'mods/wurm-waypointer/docs/wurm-waypointer-banner.png',
                 'mods/wurm-waypointer/assets/sklotopolis-wordmark.png',
                 'mods/wurm-waypointer/assets/mini-map-frame.png',
                 'mods/wurm-waypointer/assets/mini-map-background.png',

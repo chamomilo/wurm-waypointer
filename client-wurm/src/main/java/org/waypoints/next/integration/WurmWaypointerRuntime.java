@@ -1259,6 +1259,25 @@ public final class WurmWaypointerRuntime {
         }
     }
 
+    public static WurmCaveMapSnapshot currentCaveMap() {
+        return WurmCaveMapSnapshot.capture(hud == null ? null : hud.getWorld());
+    }
+
+    /** Reuses the game's own loaded-structure tooltip, including any state it exposes. */
+    public static void caveMapStructureHover(com.wurmonline.client.renderer.PickData pick,
+                                              int tileX, int tileY) {
+        World world = hud == null ? null : hud.getWorld();
+        if (pick == null || world == null || world.getCellRenderer() == null) return;
+        try {
+            com.wurmonline.client.renderer.structures.StructureData structure =
+                    world.getCellRenderer().getStructureAt(tileX, tileY, -1);
+            if (structure != null && structure.getLayer() < 0) {
+                pick.addText("Structure: " + oneLine(structure.getHoverName()));
+                structure.getHoverDescription(pick);
+            }
+        } catch (RuntimeException refreshing) { /* Optional live structure data. */ }
+    }
+
     public static GroundNavigationRouteEffect.RouteSnapshot
     currentNavigationRoute() {
         try { return STATIC_NAVIGATION.currentNavigatorMapRoute(); }
@@ -1271,9 +1290,14 @@ public final class WurmWaypointerRuntime {
 
     public static void serverMapCustomMarkSaved(int tileX, int tileY,
                                                 String text) {
+        serverMapCustomMarkSaved(tileX, tileY, text, WaypointLayer.SURFACE);
+    }
+
+    public static void serverMapCustomMarkSaved(int tileX, int tileY,
+                                                String text, WaypointLayer layer) {
         try {
             if (hud == null || identity == null) return;
-            STATIC_WAYPOINTS.addCustomMapMark(text, tileX, tileY, hud, identity);
+            STATIC_WAYPOINTS.addCustomMapMark(text, tileX, tileY, hud, identity, layer);
         } catch (Throwable failure) {
             LOGGER.log(Level.WARNING, "Unable to save custom map mark", failure);
             event("Could not save custom map mark: "

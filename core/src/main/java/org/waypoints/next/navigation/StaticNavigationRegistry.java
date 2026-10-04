@@ -271,6 +271,7 @@ public final class StaticNavigationRegistry {
         if (record == null || (record.getSourceType() != WaypointSourceType.STATIC
                 && record.getSourceType() != WaypointSourceType.VANILLA_SYSTEM
                 && record.getSourceType() != WaypointSourceType.LOOT_MAP
+                && record.getSourceType() != WaypointSourceType.DEED
                 && record.getSourceType() != WaypointSourceType.ARCHAEOLOGY_REPORT
                 && record.getSourceType() != WaypointSourceType.MANAGED_ANIMAL
                 && record.getSourceType() != WaypointSourceType.MANAGED_ITEM)
@@ -289,6 +290,12 @@ public final class StaticNavigationRegistry {
             return resolution == WaypointResolution.PENDING
                     || resolution == WaypointResolution.SEARCH_STEP
                     || resolution == WaypointResolution.EXACT_SAVED;
+        }
+        if (record.getSourceType() == WaypointSourceType.DEED) {
+            // STALE deeds deliberately keep their last known coordinate usable;
+            // the manager exposes the stale state and data age to the player.
+            return resolution == WaypointResolution.LIVE_EXACT
+                    || resolution == WaypointResolution.STALE;
         }
         return resolution == WaypointResolution.STATIC_EXACT;
     }

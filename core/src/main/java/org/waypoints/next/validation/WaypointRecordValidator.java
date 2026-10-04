@@ -89,6 +89,25 @@ public final class WaypointRecordValidator {
             throw new IllegalArgumentException(
                     "archaeology resolutions are reserved for archaeology waypoints");
         }
+        if (record.getSourceType() == WaypointSourceType.DEED) {
+            if (record.getSourceKey().isEmpty()) {
+                throw new IllegalArgumentException(
+                        "deed waypoint requires a provider source key");
+            }
+            if (record.getCoordinate() == null) {
+                throw new IllegalArgumentException(
+                        "deed waypoint requires its last known coordinates");
+            }
+            if (record.getResolution() != WaypointResolution.LIVE_EXACT
+                    && record.getResolution() != WaypointResolution.STALE) {
+                throw new IllegalArgumentException(
+                        "deed waypoint must be LIVE_EXACT or STALE");
+            }
+            if (record.getLastResolvedAt() == null) {
+                throw new IllegalArgumentException(
+                        "deed waypoint requires a provider data timestamp");
+            }
+        }
         WaypointArrival.requireRadius(record.getArrivalRadiusMetres());
         bounded(record.getGroup(), WaypointLimits.MAX_GROUP, "group");
         if (record.getCreatedAt() == null || record.getUpdatedAt() == null) {

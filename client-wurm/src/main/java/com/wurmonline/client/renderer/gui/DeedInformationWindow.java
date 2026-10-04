@@ -1,6 +1,7 @@
 package com.wurmonline.client.renderer.gui;
 
 import org.waypoints.next.map.Deed;
+import org.waypoints.next.integration.WurmWaypointerRuntime;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -10,13 +11,17 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 /** Read-only native details for a published deed selected on the M-map. */
-final class DeedInformationWindow extends WWindow {
+final class DeedInformationWindow extends WWindow implements ButtonListener {
     private static final int ROW_WIDTH = 430;
     private static final int ROW_HEIGHT = 23;
+    private final Deed deed;
+    private WButton trackButton;
+    private WButton navigationButton;
 
     DeedInformationWindow(Deed deed) {
         super("wurm-waypointer.deed-information", true);
         if (deed == null) throw new IllegalArgumentException("deed is required");
+        this.deed = deed;
         setTitle(deed.getName());
         WurmArrayPanel<FlexComponent> content =
                 new WurmArrayPanel<FlexComponent>(
@@ -35,6 +40,16 @@ final class DeedInformationWindow extends WWindow {
             List<String> lines = wrap("\"" + motto + "\"", 56);
             for (String line : lines) add(content, line);
         }
+        trackButton = new WButton("Track deed waypoint", this);
+        trackButton.setInitialSize(ROW_WIDTH, ROW_HEIGHT, false);
+        trackButton.setHoverString(
+                "Create or update this provider-managed DEED waypoint.");
+        content.addComponent(trackButton);
+        navigationButton = new WButton("Nav to deed", this);
+        navigationButton.setInitialSize(ROW_WIDTH, ROW_HEIGHT, false);
+        navigationButton.setHoverString(
+                "Track this deed waypoint and start the navigator.");
+        content.addComponent(navigationButton);
         setComponent(content);
     }
 
@@ -92,5 +107,18 @@ final class DeedInformationWindow extends WWindow {
 
     @Override void closePressed() {
         DeedInformationWindowBridge.closed(this);
+    }
+
+    @Override public void buttonPressed(WButton button) { }
+
+    @Override public void buttonClicked(WButton button) {
+        if (button == trackButton) {
+            WurmWaypointerRuntime.serverMapDeedWaypointRequested(deed);
+            trackButton.setLabel("Tracked", false);
+        } else if (button == navigationButton) {
+            WurmWaypointerRuntime.serverMapDeedNavigationRequested(deed);
+            trackButton.setLabel("Tracked", false);
+            navigationButton.setLabel("Navigating", false);
+        }
     }
 }

@@ -10,13 +10,13 @@ public class CompassMarkerGeometryTest {
     @Test
     public void cardinalBearingsUseWurmCoordinateConvention() {
         assertPosition(CompassMarkerGeometry.locate(0, 0, 0, 0, -10,
-                100, 200, 100, 100), 150, 211);
+                100, 200, 100, 100), 150, 214);
         assertPosition(CompassMarkerGeometry.locate(0, 0, 0, 10, 0,
-                100, 200, 100, 100), 189, 250);
+                100, 200, 100, 100), 186, 250);
         assertPosition(CompassMarkerGeometry.locate(0, 0, 0, 0, 10,
-                100, 200, 100, 100), 150, 289);
+                100, 200, 100, 100), 150, 286);
         assertPosition(CompassMarkerGeometry.locate(0, 0, 0, -10, 0,
-                100, 200, 100, 100), 111, 250);
+                100, 200, 100, 100), 114, 250);
     }
 
     @Test
@@ -24,9 +24,34 @@ public class CompassMarkerGeometryTest {
         CompassMarkerGeometry.Position eastWhileFacingEast =
                 CompassMarkerGeometry.locate(0, 0, 90, 10, 0,
                         0, 0, 100, 100);
-        assertPosition(eastWhileFacingEast, 50, 11);
+        assertPosition(eastWhileFacingEast, 50, 14);
         assertEquals(-20.0f, CompassMarkerGeometry.normalizeSigned(350.0f - 10.0f),
                 0.0001f);
+    }
+
+    @Test
+    public void northNeedleCounterRotatesWithPlayerFacing() {
+        assertEquals(0.0f, CompassMarkerGeometry.northNeedleRadians(0.0f),
+                0.0001f);
+        assertEquals(-(float) Math.PI / 2.0f,
+                CompassMarkerGeometry.northNeedleRadians(90.0f), 0.0001f);
+        assertEquals((float) Math.PI / 2.0f,
+                CompassMarkerGeometry.northNeedleRadians(270.0f), 0.0001f);
+        assertEquals((float) Math.toRadians(10.0d),
+                CompassMarkerGeometry.northNeedleRadians(350.0f), 0.0001f);
+    }
+
+    @Test
+    public void waypointsStayOnCircularGlassContour() {
+        float expectedRadius = CompassMarkerGeometry.glassContourRadius(128, 128);
+        int centerX = 84;
+        int centerY = 94;
+        CompassMarkerGeometry.Position north = CompassMarkerGeometry.locate(
+                0, 0, 0, 0, -10, 20, 30, 128, 128);
+        CompassMarkerGeometry.Position east = CompassMarkerGeometry.locate(
+                0, 0, 0, 10, 0, 20, 30, 128, 128);
+        assertEquals(Math.round(expectedRadius), centerY - north.getY());
+        assertEquals(Math.round(expectedRadius), east.getX() - centerX);
     }
 
     @Test

@@ -23,7 +23,7 @@ public final class DeedInformationWindowBridge {
             window = new DeedInformationWindow(deed);
             int mottoLines = Math.max(1,
                     (deed.getMotto() == null ? 0 : deed.getMotto().length()) / 56 + 1);
-            window.setInitialSize(470, Math.min(390, 285 + mottoLines * 20), true);
+            window.setInitialSize(470, Math.min(445, 335 + mottoLines * 20), true);
             window.setPosition(Math.max(20, (hud.getWidth() - window.width) / 2),
                     Math.max(35, (hud.getHeight() - window.height) / 2));
             add(hud, window);

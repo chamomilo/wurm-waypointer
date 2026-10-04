@@ -22,13 +22,14 @@ public final class WaypointManagerRow {
     private final double tileX;
     private final double tileY;
     private final Instant expiresAt;
+    private final Instant lastResolvedAt;
 
     WaypointManagerRow(UUID id, boolean enabled, String name,
                        WaypointSourceType sourceType, String serverLabel,
                        String serverFingerprint, String user,
                        WaypointResolution resolution, Integer distanceMetres,
                        MarkerStyle.WorldStyle worldStyle, double tileX, double tileY,
-                       Instant expiresAt) {
+                       Instant expiresAt, Instant lastResolvedAt) {
         this.id = id;
         this.enabled = enabled;
         this.name = name;
@@ -42,6 +43,7 @@ public final class WaypointManagerRow {
         this.tileX = tileX;
         this.tileY = tileY;
         this.expiresAt = expiresAt;
+        this.lastResolvedAt = lastResolvedAt;
     }
 
     public UUID getId() { return id; }
@@ -57,6 +59,7 @@ public final class WaypointManagerRow {
     public double getTileX() { return tileX; }
     public double getTileY() { return tileY; }
     public Instant getExpiresAt() { return expiresAt; }
+    public Instant getLastResolvedAt() { return lastResolvedAt; }
     public boolean isTemporary() { return expiresAt != null; }
     public boolean isSystemManaged() {
         return sourceType == WaypointSourceType.VANILLA_SYSTEM;
@@ -66,6 +69,28 @@ public final class WaypointManagerRow {
     public boolean isToggleOnlyManaged() {
         return sourceType == WaypointSourceType.VANILLA_SYSTEM
                 || sourceType == WaypointSourceType.LOOT_MAP;
+    }
+
+    public boolean isProviderManaged() {
+        return sourceType == WaypointSourceType.DEED;
+    }
+
+    /** Age of the last provider-confirmed position, or -1 when not applicable. */
+    public long getDataAgeMillis(Instant now) {
+        if (sourceType != WaypointSourceType.DEED || lastResolvedAt == null
+                || now == null) return -1L;
+        return Math.max(0L, now.toEpochMilli() - lastResolvedAt.toEpochMilli());
+    }
+
+    public String getDataAgeLabel(Instant now) {
+        long age = getDataAgeMillis(now);
+        if (age < 0L) return "";
+        long minutes = age / 60_000L;
+        if (minutes < 1L) return "now";
+        if (minutes < 60L) return minutes + "m";
+        long hours = minutes / 60L;
+        if (hours < 48L) return hours + "h";
+        return hours / 24L + "d";
     }
 
     public String getShortId() {

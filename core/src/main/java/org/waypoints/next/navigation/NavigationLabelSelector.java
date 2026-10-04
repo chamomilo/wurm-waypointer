@@ -30,7 +30,9 @@ public final class NavigationLabelSelector {
         for (NavigationTarget target : snapshot.getTargets()) {
             if (target.getMarkerStyle().isShowLabel()
                     && target.getMarkerStyle().getWorldStyle()
-                    != MarkerStyle.WorldStyle.COMPASS_ONLY) {
+                    != MarkerStyle.WorldStyle.COMPASS_ONLY
+                    && target.getMarkerStyle().getWorldStyle()
+                    != MarkerStyle.WorldStyle.HIDDEN) {
                 int distance = NavigationMath.distanceMetres(originTileX, originTileY,
                         target.getCoordinate().getTileX(),
                         target.getCoordinate().getTileY());

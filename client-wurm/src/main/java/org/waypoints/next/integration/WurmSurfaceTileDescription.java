@@ -8,12 +8,18 @@ import com.wurmonline.mesh.Tiles;
 final class WurmSurfaceTileDescription {
     private static final float TILE_SIZE = 4.0f;
     private static final float DRY_EPSILON_METRES = 0.001f;
+    // NearTerrainDataBuffer is a coordinate-wrapped ring buffer. Asking it
+    // about a distant map coordinate can therefore return a valid, unrelated
+    // tile whose coordinates have the same low nine bits.
+    private static final int MAXIMUM_LIVE_DISTANCE_TILES = 128;
 
     private WurmSurfaceTileDescription() { }
 
     static String describe(World world, int tileX, int tileY) {
         if (world == null || tileX < 0 || tileY < 0) return "";
         try {
+            if (!withinLiveRange(world.getPlayerCurrentTileX(),
+                    world.getPlayerCurrentTileY(), tileX, tileY)) return "";
             NearTerrainDataBuffer near = world.getNearTerrainBuffer();
             float worldX = tileX * TILE_SIZE;
             float worldY = tileY * TILE_SIZE;
@@ -35,6 +41,14 @@ final class WurmSurfaceTileDescription {
         } catch (RuntimeException terrainRefreshing) {
             return "";
         }
+    }
+
+    static boolean withinLiveRange(int playerTileX, int playerTileY,
+                                   int tileX, int tileY) {
+        return Math.abs((long) tileX - playerTileX)
+                <= MAXIMUM_LIVE_DISTANCE_TILES
+                && Math.abs((long) tileY - playerTileY)
+                <= MAXIMUM_LIVE_DISTANCE_TILES;
     }
 
     static String tileName(byte type, byte data) {

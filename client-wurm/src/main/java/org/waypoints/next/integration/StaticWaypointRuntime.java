@@ -35,8 +35,14 @@ import org.waypoints.next.validation.WaypointLimits;
 import org.waypoints.next.validation.WaypointRecordValidator;
 import org.waypoints.next.ui.WaypointEditData;
 import org.waypoints.next.ui.WaypointManagerContext;
+import org.waypoints.next.deeds.DeedProviderSnapshot;
+import org.waypoints.next.deeds.DeedRecord;
+import org.waypoints.next.deeds.DeedWaypointService;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -73,6 +79,7 @@ final class StaticWaypointRuntime {
     private final WaypointTransferService transfers = new WaypointTransferService();
     private final WaypointShareCodec shares = new WaypointShareCodec();
     private final ServerIdentityRepair serverIdentityRepair = new ServerIdentityRepair();
+    private final DeedWaypointService deedWaypoints = new DeedWaypointService();
     private final ConcurrentLinkedQueue<String> pendingEvents =
             new ConcurrentLinkedQueue<String>();
     private final ExecutorService storageExecutor = Executors.newSingleThreadExecutor(
@@ -100,6 +107,7 @@ final class StaticWaypointRuntime {
 
     synchronized void configureAndLoad(WaypointClientConfiguration value) {
         configuration = value == null ? WaypointClientConfiguration.defaults() : value;
+        migrateLegacyWaypointStore();
         store = new WaypointStore(configuration.getDataFile(), codec);
         transferStore = new WaypointStore(configuration.getTransferFile(), codec);
         ready = false;
@@ -261,6 +269,114 @@ final class StaticWaypointRuntime {
 
     int recordCount() { return manager.snapshot().size(); }
 
+    WaypointRecord trackDeed(DeedProviderSnapshot snapshot, DeedRecord deed,
+                             HeadsUpDisplay hud, ServerIdentity identity) {
+        WaypointManagerContext context = managerContext(hud, identity);
+        Instant now = Instant.now();
+        WaypointRecord record = deedWaypoints.track(manager.snapshot(), snapshot,
+                deed, context.getServer(), context.getUser(), now);
+        WaypointRecord collision = manager.find(record.getId());
+        if (collision == null) manager.add(record);
+        else if (collision.getSourceType() == WaypointSourceType.DEED
+                && collision.getSourceKey().equals(record.getSourceKey())) {
+            manager.update(record);
+        } else {
+            throw new IllegalStateException(
+                    "stable deed UUID collides with another waypoint");
+        }
+        scheduleSave("track deed " + record.getSourceKey());
+        pendingEvents.add(PREFIX + "Tracking deed: " + oneLine(record.getName())
+                + " [" + record.getId().toString().substring(0, 8)
+                + "] at X=" + record.getCoordinate().getTileX()
+                + " Y=" + record.getCoordinate().getTileY() + ".");
+        return record;
+    }
+
+    private void migrateLegacyWaypointStore() {
+        try {
+            Path configured = configuration.getDataFile().toAbsolutePath()
+                    .normalize();
+            Path durableDefault = Paths.get("wurm-waypointer-data",
+                    "waypoints.wpt").toAbsolutePath().normalize();
+            if (!configured.equals(durableDefault)
+                    || Files.isRegularFile(configured)) return;
+            Path legacy = Paths.get("mods", "wurm-waypointer",
+                    "waypoints.wpt").toAbsolutePath().normalize();
+            if (!Files.isRegularFile(legacy)) return;
+            Path parent = configured.getParent();
+            if (parent != null) Files.createDirectories(parent);
+            Files.copy(legacy, configured, StandardCopyOption.COPY_ATTRIBUTES);
+            Path legacyBackup = legacy.resolveSibling(
+                    legacy.getFileName().toString() + ".bak");
+            Path durableBackup = configured.resolveSibling(
+                    configured.getFileName().toString() + ".bak");
+            if (Files.isRegularFile(legacyBackup)
+                    && !Files.exists(durableBackup)) {
+                Files.copy(legacyBackup, durableBackup,
+                        StandardCopyOption.COPY_ATTRIBUTES);
+            }
+            logger.info("Migrated waypoint data outside the mod directory: from=\""
+                    + legacy + "\", to=\"" + configured + "\"");
+        } catch (Throwable failure) {
+            logger.log(Level.WARNING,
+                    "Legacy waypoint data migration failed open", failure);
+        }
+    }
+
+    WaypointRecord addCustomMapMark(String text, int tileX, int tileY,
+                                    HeadsUpDisplay hud,
+                                    ServerIdentity identity) {
+        requireReady();
+        WaypointManagerContext context = managerContext(hud, identity);
+        String name = limitName(text);
+        if (name.isEmpty()) throw new IllegalArgumentException(
+                "custom mark text is required");
+        configuration.getMapBounds().requireContains(tileX, tileY);
+        Instant now = Instant.now();
+        MarkerStyle style = new MarkerStyle(MarkerStyle.WorldStyle.HIDDEN,
+                1.0f, 0.68f, 0.18f, 1.0f, 7.0f, 1.0f,
+                true, false);
+        WaypointRecord record = WaypointRecord.builder().name(name)
+                .description("Custom map mark")
+                .createdByUser(context.getUser())
+                .serverIdentity(context.getServer())
+                .sourceType(WaypointSourceType.CUSTOM_MAP_MARK)
+                .sourceKey("")
+                .coordinate(new WaypointCoordinate(tileX,
+                        tileY, null, WaypointLayer.SURFACE))
+                .resolution(WaypointResolution.STATIC_EXACT)
+                .enabled(true).markerStyle(style)
+                .arrivalRadiusMetres(WaypointArrival.DISABLED)
+                .group("Map marks")
+                .createdAt(now).updatedAt(now).lastResolvedAt(now).build();
+        manager.add(record);
+        scheduleSave("custom map mark " + record.getId());
+        pendingEvents.add(PREFIX + "Custom map mark saved: "
+                + oneLine(record.getName()) + " at X=" + tileX
+                + " Y=" + tileY + ".");
+        return record;
+    }
+
+    DeedWaypointService.Reconciliation reconcileDeeds(
+            DeedProviderSnapshot snapshot, ServerIdentity identity) {
+        if (!ready || identity == null) return DeedWaypointService.Reconciliation.empty();
+        DeedWaypointService.Reconciliation result = deedWaypoints.reconcile(
+                manager.snapshot(), snapshot, identity, Instant.now());
+        if (!result.isChanged()) return result;
+        for (WaypointRecord update : result.getUpdates()) manager.update(update);
+        scheduleSave("deed provider reconcile moved=" + result.getMoved()
+                + " restored=" + result.getRestored() + " stale="
+                + result.getStale());
+        if (result.getMoved() > 0) pendingEvents.add(PREFIX
+                + "Updated " + result.getMoved() + " tracked deed location(s)." );
+        if (result.getRestored() > 0) pendingEvents.add(PREFIX
+                + "Restored " + result.getRestored() + " previously stale deed(s)." );
+        if (result.getStale() > 0) pendingEvents.add(PREFIX
+                + result.getStale() + " tracked deed(s) disappeared from the provider; "
+                + "their last positions are marked Stale until you delete or disable them.");
+        return result;
+    }
+
     void confirmCurrentServer(ServerIdentity confirmed) {
         if (!ready || confirmed == null || !confirmed.isSafeForAutomaticRendering()) return;
         List<WaypointRecord> before = manager.snapshot();
@@ -374,6 +490,10 @@ final class StaticWaypointRuntime {
         requireReady();
         WaypointRecord old = manager.find(id);
         if (old == null) throw new IllegalArgumentException("waypoint does not exist: " + id);
+        if (old.getSourceType() == WaypointSourceType.DEED) {
+            throw new IllegalArgumentException(
+                    "deed coordinates are provider-managed; delete the deed waypoint to stop tracking it");
+        }
         ParsedCoordinate parsed = previewCoordinate(input);
         Instant now = Instant.now();
         WaypointRecord changed = WaypointRecord.copyOf(old).name(name)

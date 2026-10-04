@@ -35,6 +35,7 @@ public final class SklotopolisMapService {
     private volatile ServerMapSnapshot snapshot = ServerMapSnapshot.empty(null);
     private Path cacheRoot;
     private boolean enabled;
+    private boolean legacyDeedsEnabled = true;
     private int syncMinutes;
     private String activeKey = "";
     private ScheduledFuture<?> synchronization;
@@ -55,6 +56,13 @@ public final class SklotopolisMapService {
 
     public synchronized void configure(boolean nextEnabled, Path nextCacheRoot,
                                        int nextSyncMinutes) {
+        configure(nextEnabled, nextCacheRoot, nextSyncMinutes, true);
+    }
+
+    /** The standalone deed-provider module can own deeds while this service owns only surfaces. */
+    public synchronized void configure(boolean nextEnabled, Path nextCacheRoot,
+                                       int nextSyncMinutes,
+                                       boolean nextLegacyDeedsEnabled) {
         cancel();
         if (nextCacheRoot == null) throw new IllegalArgumentException(
                 "map cache root is required");
@@ -63,6 +71,7 @@ public final class SklotopolisMapService {
         enabled = nextEnabled;
         cacheRoot = nextCacheRoot;
         syncMinutes = nextSyncMinutes;
+        legacyDeedsEnabled = nextLegacyDeedsEnabled;
         activeKey = "";
         snapshot = ServerMapSnapshot.empty(null);
         surfaceEtag = "";
@@ -93,10 +102,12 @@ public final class SklotopolisMapService {
                 if (!isActive(expectedKey)) return;
                 if (!cacheLoaded) {
                     cacheLoaded = true;
-                    loadCache(expectedKey, profile, surface, deeds);
+                    loadCache(expectedKey, profile, surface,
+                            legacyDeedsEnabled ? deeds : null);
                 }
                 synchronizeSurface(expectedKey, profile, surface);
-                synchronizeDeeds(expectedKey, profile, deeds);
+                if (legacyDeedsEnabled) synchronizeDeeds(
+                        expectedKey, profile, deeds);
             }
         }, 0L, syncMinutes, TimeUnit.MINUTES);
         logger.info("Server map activated: " + profile + ", cache=\""
@@ -126,7 +137,7 @@ public final class SklotopolisMapService {
             logger.log(Level.WARNING, "Cached server surface was rejected", failure);
         }
         try {
-            if (Files.isRegularFile(deeds)) {
+            if (deeds != null && Files.isRegularFile(deeds)) {
                 byte[] bytes = readFileBounded(deeds, MAXIMUM_DEED_BYTES);
                 List<Deed> parsed = parseDeeds(bytes, profile);
                 publishDeeds(key, parsed, Files.getLastModifiedTime(deeds).toMillis(),

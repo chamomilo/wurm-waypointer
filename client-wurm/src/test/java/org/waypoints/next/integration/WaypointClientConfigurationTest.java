@@ -25,6 +25,23 @@ public class WaypointClientConfigurationTest {
         assertEquals(8, value.getScannerMaximumOutlines());
         assertEquals(80, value.getScannerOutlineDistanceMetres());
         assertTrue(value.getScannerExcludedNames().isEmpty());
+        assertTrue(value.isDeedProviderEnabled());
+        assertTrue(value.getDeedProviderMappings().isEmpty());
+        assertEquals("wurm-waypointer-data\\waypoints.wpt",
+                value.getDataFile().toString());
+    }
+
+    @Test public void productionNavigationNamesOverrideLegacyAliases() {
+        Properties properties = new Properties();
+        properties.setProperty("maximumWorldEffects", "27");
+        properties.setProperty("phase2MaxWorldEffects", "3");
+        properties.setProperty("maximumCompassMarkers", "91");
+
+        WaypointClientConfiguration value =
+                WaypointClientConfiguration.from(properties);
+
+        assertEquals(27, value.getMaximumWorldEffects());
+        assertEquals(91, value.getMaximumCompassMarkers());
     }
 
     @Test public void parsesLocalPathsAndMapBounds() {
@@ -58,6 +75,10 @@ public class WaypointClientConfigurationTest {
         properties.setProperty("serverMapSyncMinutes", "25");
         properties.setProperty("serverMapShowDeeds", "false");
         properties.setProperty("serverMapShowHighways", "false");
+        properties.setProperty("deedProviderEnabled", "false");
+        properties.setProperty("deedProviderCacheDirectory", "mods/test/deeds");
+        properties.setProperty("deedProviderMappings",
+                "example.test:3724|JSON|https://example.test/deeds.json|8192|4096");
         properties.setProperty("phase2MaxCompassMarkers", "32");
         properties.setProperty("phase2MaxWorldEffects", "8");
         properties.setProperty("phase2WorldEffectDistanceMetres", "6000");
@@ -100,6 +121,10 @@ public class WaypointClientConfigurationTest {
         assertEquals(25, value.getServerMapSyncMinutes());
         assertFalse(value.isServerMapShowDeeds());
         assertFalse(value.isServerMapShowHighways());
+        assertFalse(value.isDeedProviderEnabled());
+        assertEquals("mods\\test\\deeds",
+                value.getDeedProviderCacheDirectory().toString());
+        assertTrue(value.getDeedProviderMappings().contains("example.test:3724"));
         assertEquals(32, value.getMaximumCompassMarkers());
         assertEquals(8, value.getMaximumWorldEffects());
         assertEquals(6000, value.getWorldEffectDistanceMetres());

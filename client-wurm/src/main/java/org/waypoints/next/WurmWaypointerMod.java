@@ -3,7 +3,9 @@ package org.waypoints.next;
 import com.wurmonline.client.renderer.gui.HeadsUpDisplay;
 import javassist.ClassPool;
 import javassist.CtClass;
+import javassist.CtMethod;
 import javassist.CtNewMethod;
+import javassist.NotFoundException;
 import org.gotti.wurmunlimited.modloader.classhooks.HookManager;
 import org.gotti.wurmunlimited.modloader.interfaces.Configurable;
 import org.gotti.wurmunlimited.modloader.interfaces.Initable;
@@ -86,6 +88,12 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
                 new FailOpenHookInstaller.HookOperation() {
                     @Override public void install() throws Exception {
                         hookWorldMapWheel(pool);
+                    }
+                });
+        hooks.install("borderless mini-map chrome",
+                new FailOpenHookInstaller.HookOperation() {
+                    @Override public void install() throws Exception {
+                        hookMiniMapChrome(pool);
                     }
                 });
         hooks.install("always-active compass and click gesture",
@@ -235,6 +243,10 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
 
         CtClass map = pool.getCtClass(
                 "com.wurmonline.client.renderer.gui.WorldMap");
+        map.getMethod("pick",
+                "(Lcom/wurmonline/client/renderer/PickData;II)V")
+                .insertBefore("if (com.wurmonline.client.renderer.gui."
+                        + "ServerMapWindowBridge.pick($0, $1, $2, $3)) return;");
         map.getMethod("leftPressed", "(III)V").insertBefore(
                 "if (com.wurmonline.client.renderer.gui.ServerMapWindowBridge."
                         + "leftPressed($0, $1, $2)) return;");
@@ -265,8 +277,54 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
         hud.getMethod("mouseWheeled", "(III)V").insertBefore(
                 "if (com.wurmonline.client.renderer.gui."
                         + "SurroundingsWindowBridge.mouseWheeled($0, $1, $2, $3)) return;"
+                        + "if (com.wurmonline.client.renderer.gui."
+                        + "MiniMapWindowBridge.mouseWheeled($0, $1, $2, $3)) return;"
                         + "if (com.wurmonline.client.renderer.gui.ServerMapWindowBridge."
                         + "mouseWheeled($0.getWorldMap(), $1, $2, $3)) return;");
+    }
+
+    private static void hookMiniMapChrome(ClassPool pool) throws Exception {
+        String miniMap = "this.parent instanceof "
+                + "com.wurmonline.client.renderer.gui.MiniMapWindow";
+        String customWorldMap = "this.parent instanceof "
+                + "com.wurmonline.client.renderer.gui.WorldMap"
+                + " && com.wurmonline.client.renderer.gui."
+                + "ServerMapWindowBridge.usesCustomWindow()";
+        String topBarGuard = "if (" + miniMap + ") { return; }"
+                + "if (" + customWorldMap + ") {"
+                + "com.wurmonline.client.renderer.gui.ServerMapWindowBridge."
+                + "renderWindowTitle((com.wurmonline.client.renderer.gui."
+                + "WorldMap)this.parent, $1); return; }";
+        hideWindowShellPart(pool,
+                "com.wurmonline.client.renderer.gui.WWindow$TopBar",
+                topBarGuard);
+        String transparentMiddle = "if (" + miniMap + " || "
+                + customWorldMap + ") { super.renderComponent($1, $2); return; }";
+        hideWindowShellPart(pool,
+                "com.wurmonline.client.renderer.gui.WWindow$Middle",
+                transparentMiddle);
+        String hideGuard = "if (" + miniMap + " || "
+                + customWorldMap + ") { return; }";
+        hideWindowShellPart(pool,
+                "com.wurmonline.client.renderer.gui.WWindow$SideBar",
+                hideGuard);
+        hideWindowShellPart(pool,
+                "com.wurmonline.client.renderer.gui.WWindow$SouthBar",
+                hideGuard);
+    }
+
+    private static void hideWindowShellPart(ClassPool pool, String className,
+                                            String guard) throws Exception {
+        renderMethod(pool.get(className)).insertBefore(guard);
+    }
+
+    private static CtMethod renderMethod(CtClass type)
+            throws NotFoundException {
+        for (CtMethod method : type.getDeclaredMethods("renderComponent")) {
+            if ("(Lcom/wurmonline/client/renderer/backend/Queue;F)V"
+                    .equals(method.getSignature())) return method;
+        }
+        throw new NotFoundException(type.getName() + ".renderComponent");
     }
 
     private static void hookCompass(ClassPool pool) throws Exception {

@@ -10,5 +10,6 @@ public enum WaypointSourceType {
     MANAGED_ANIMAL,
     MANAGED_ITEM,
     ROUTE_POINT,
-    ARCHAEOLOGY_REPORT
+    ARCHAEOLOGY_REPORT,
+    CUSTOM_MAP_MARK
 }

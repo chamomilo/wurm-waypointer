@@ -12,14 +12,21 @@ Wurm Unlimited client classes and the client modloader are compile-time/runtime
 dependencies supplied by the user's Wurm installation. They are not bundled in
 the Wurm Waypointer artifact.
 
-On recognized Sklotopolis Liberty, Novus, Caza, and Infinity servers, the map
-and navigation modules may retrieve the server operator's published flat map,
-`deeds.json`, and `highways.json` at runtime. That data is validated and cached
-locally but is not copied into the distribution.
+On recognized Sklotopolis Liberty, Novus, Caza, Old Infinity, and Infinity
+servers, the map and navigation modules may retrieve the server operator's
+published flat map, `deeds.json`, and `highways.json` at runtime. Full-size
+runtime data is validated and cached locally. Reduced previews of the five
+public flat maps are included in the distribution for the map loading screen;
+source URLs and the retrieval date are recorded in
+`design/official-sklotopolis-maps/SOURCES.md`.
 
 The compact Sklotopolis wordmark shown on the M-map was supplied by the server
 community for this integration. The Sklotopolis name and artwork remain the
 property of their respective owner; inclusion here grants no broader rights.
+
+The mini-map and main-map titles use the `highres-healthbar-nameplate.png`
+artwork from the High-res HUD project in its original form. That project and
+this distribution are licensed under GPL-3.0.
 
 Wurm Waypointer is licensed under the GNU General Public License version 3 only
 (`GPL-3.0-only`). The license terms are included in `LICENSE`.

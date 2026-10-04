@@ -118,6 +118,52 @@ public class StaticNavigationRegistryTest {
                         .getMarkerStyle().getWorldStyle());
     }
 
+    @Test public void deedWaypointsReachLabelsCompassWorldEffectsAndNavigator() {
+        Instant resolvedAt = Instant.ofEpochMilli(1_700_000_000_000L);
+        WaypointRecord live = WaypointRecord.copyOf(record(
+                "00000000-0000-0000-0000-000000000074", "Haven Legacy",
+                "Chamomilo", novus, 101.5d, 202.5d))
+                .sourceType(WaypointSourceType.DEED)
+                .sourceKey("sklotopolis|haven-legacy")
+                .resolution(WaypointResolution.LIVE_EXACT)
+                .lastResolvedAt(resolvedAt)
+                .build();
+        manager.add(live);
+
+        NavigationSnapshot snapshot = registry.reconcile(
+                manager.revisionSnapshot(),
+                new NavigationContext(novus, "Chamomilo", 64));
+
+        assertEquals(1, snapshot.getTargets().size());
+        NavigationTarget target = snapshot.getTargets().get(0);
+        assertEquals(WaypointSourceType.DEED, target.getSourceType());
+        assertTrue(target.isSelected());
+        assertTrue(target.isCompassVisible());
+        assertTrue(target.isWorldBeamVisible());
+        assertEquals(target.getKey(), registry.toggleNavigator(target.getKey())
+                .getActiveNavigator().getKey());
+    }
+
+    @Test public void staleDeedKeepsItsLastKnownCoordinateRenderable() {
+        WaypointRecord stale = WaypointRecord.copyOf(record(
+                "00000000-0000-0000-0000-000000000075", "Old deed location",
+                "Chamomilo", novus, 301.5d, 402.5d))
+                .sourceType(WaypointSourceType.DEED)
+                .sourceKey("sklotopolis|old-deed")
+                .resolution(WaypointResolution.STALE)
+                .lastResolvedAt(Instant.ofEpochMilli(1_699_000_000_000L))
+                .build();
+        manager.add(stale);
+
+        NavigationTarget target = registry.reconcile(
+                manager.revisionSnapshot(),
+                new NavigationContext(novus, "Chamomilo", 64))
+                .getTargets().get(0);
+
+        assertEquals(stale.getId(), target.getKey().getWaypointId());
+        assertEquals(stale.getCoordinate(), target.getCoordinate());
+    }
+
     @Test public void externalApiMarkerKeepsItsRequestedWorldStyle() {
         MarkerStyle requested = new MarkerStyle(
                 MarkerStyle.WorldStyle.TARGET_CROSSHAIR,

@@ -40,7 +40,7 @@ public final class WaypointManagerViewService {
                 record.getMarkerStyle().getWorldStyle(),
                 coordinate == null ? 0.0d : coordinate.getTileX(),
                 coordinate == null ? 0.0d : coordinate.getTileY(),
-                record.getExpiresAt());
+                record.getExpiresAt(), record.getLastResolvedAt());
     }
 
     private static Integer distance(WaypointRecord record, WaypointManagerQuery query) {

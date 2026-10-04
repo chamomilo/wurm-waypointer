@@ -7,6 +7,8 @@ import com.wurmonline.client.renderer.gui.CompassMarkerClusterHit;
 import com.wurmonline.client.renderer.gui.HeadsUpDisplay;
 import com.wurmonline.client.renderer.gui.DeedSearchWindowBridge;
 import com.wurmonline.client.renderer.gui.DeedInformationWindowBridge;
+import com.wurmonline.client.renderer.gui.CustomMapMarkWindowBridge;
+import com.wurmonline.client.renderer.gui.MiniMapWindowBridge;
 import com.wurmonline.client.renderer.gui.ServerMapWindowBridge;
 import com.wurmonline.client.renderer.gui.WaypointClusterPickerWindowBridge;
 import com.wurmonline.client.renderer.gui.WaypointManagerWindowBridge;
@@ -25,8 +27,10 @@ import org.waypoints.next.model.CapturedServerSelection;
 import org.waypoints.next.model.MarkerStyle;
 import org.waypoints.next.model.ServerIdentity;
 import org.waypoints.next.model.WaypointLayer;
+import org.waypoints.next.model.WaypointRecord;
 import org.waypoints.next.model.WaypointSourceType;
 import org.waypoints.next.map.ServerMapSnapshot;
+import org.waypoints.next.map.Deed;
 import org.waypoints.next.map.SklotopolisMapService;
 import org.waypoints.next.render.BeamProbeConfiguration;
 import org.waypoints.next.render.CompassMarkerSnapshot;
@@ -36,6 +40,7 @@ import org.waypoints.next.render.WurmBeamProbeController;
 import org.waypoints.next.render.WaypointRenderProfiler;
 import org.waypoints.next.render.WaypointRenderRuntimeAccess;
 import org.waypoints.next.render.WaypointRenderRuntimeBridge;
+import com.wurmonline.client.renderer.effects.GroundNavigationRouteEffect;
 import org.waypoints.next.navigation.NavigationTarget;
 import org.waypoints.next.navigation.NavigationTargetKey;
 import org.waypoints.next.navigation.NavigationRouteVisualStyle;
@@ -81,6 +86,8 @@ public final class WurmWaypointerRuntime {
             new ServerIdentitySession(new ServerIdentityResolver());
     private static final StaticWaypointRuntime STATIC_WAYPOINTS =
             new StaticWaypointRuntime(LOGGER);
+    private static final DeedProviderRuntime DEEDS =
+            new DeedProviderRuntime(LOGGER, STATIC_WAYPOINTS);
     private static final SklotopolisHighwayService HIGHWAYS =
             new SklotopolisHighwayService(LOGGER);
     private static final SklotopolisMapService SERVER_MAPS =
@@ -415,6 +422,7 @@ public final class WurmWaypointerRuntime {
         waypointConfiguration = waypointValue == null
                 ? WaypointClientConfiguration.defaults() : waypointValue;
         STATIC_WAYPOINTS.configureAndLoad(waypointConfiguration);
+        DEEDS.configure(waypointConfiguration);
         STATIC_NAVIGATION.configure(waypointConfiguration);
         STATIC_NAVIGATION.setNavigationRouteVisualStyleSink(
                 new java.util.function.Consumer<NavigationRouteVisualStyle>() {
@@ -432,7 +440,7 @@ public final class WurmWaypointerRuntime {
                 });
         SERVER_MAPS.configure(waypointConfiguration.isServerMapEnabled(),
                 waypointConfiguration.getServerMapCacheDirectory(),
-                waypointConfiguration.getServerMapSyncMinutes());
+                waypointConfiguration.getServerMapSyncMinutes(), false);
         VANILLA_LANDMARKS.configure(waypointConfiguration);
         for (DynamicWaypointProvider provider : DYNAMIC_WAYPOINTS) {
             provider.configure(waypointConfiguration);
@@ -459,6 +467,8 @@ public final class WurmWaypointerRuntime {
                 SurroundingsWindowBridge.detach(hud, "HUD replacement/init");
                 DeedSearchWindowBridge.detach(hud, "HUD replacement/init");
                 DeedInformationWindowBridge.detach(hud, "HUD replacement/init");
+                CustomMapMarkWindowBridge.detach(hud, "HUD replacement/init");
+                MiniMapWindowBridge.detach(hud, "HUD replacement/init");
                 ServerMapWindowBridge.resetAll();
             }
             hud = nextHud;
@@ -487,7 +497,10 @@ public final class WurmWaypointerRuntime {
             }
             VANILLA_LANDMARKS.bind(identity);
             SERVER_MAPS.activate(identity);
-            SURROUNDINGS.updateDeeds(SERVER_MAPS.current());
+            MiniMapWindowBridge.tick(currentHud);
+            DEEDS.bind(identity);
+            SURROUNDINGS.updateDeeds(serverMapSnapshot());
+            DeedSearchWindowBridge.refresh(currentHud, serverMapSnapshot());
             if (configuration.isEnabled()) {
                 String serverKey = phase0ServerKey(identity, confirmedWorldName);
                 if (!serverKey.isEmpty()) {
@@ -547,6 +560,7 @@ public final class WurmWaypointerRuntime {
 
     public static boolean handleConsoleCommand(String command, String[] arguments) {
         try {
+            if (handleDeedCommand(command, arguments)) return true;
             if (handleSurroundingsCommand(command, arguments)) return true;
             if (handleNavigatorCommand(command, arguments)) return true;
             if (ARCHAEOLOGY.handleConsoleCommand(command, arguments)) return true;
@@ -556,6 +570,31 @@ public final class WurmWaypointerRuntime {
             LOGGER.log(Level.FINE, "Waypoint console hook failed open", failure);
             return false;
         }
+    }
+
+    private static boolean handleDeedCommand(String command,
+                                             String[] arguments) {
+        String normalized = command == null ? "" : command.trim();
+        if (normalized.startsWith("/")) normalized = normalized.substring(1);
+        if (!"wp".equalsIgnoreCase(normalized)
+                && !"waypoint".equalsIgnoreCase(normalized)) return false;
+        String[] values = WaypointCommandArguments.withoutRepeatedCommand(
+                command, arguments);
+        if (values.length == 0 || !"deeds".equalsIgnoreCase(values[0])) return false;
+        String operation = values.length < 2 ? "open" : values[1];
+        if ("open".equalsIgnoreCase(operation)) {
+            HeadsUpDisplay current = hud;
+            if (current == null) event("HUD is not ready yet.");
+            else DeedSearchWindowBridge.open(current, serverMapSnapshot());
+        } else if ("refresh".equalsIgnoreCase(operation)) {
+            DEEDS.refreshNow();
+            event("Deed provider refresh queued in the background.");
+        } else if ("status".equalsIgnoreCase(operation)) {
+            event("Deed provider: " + DEEDS.status() + ".");
+        } else {
+            event("Usage: /wp deeds [open | refresh | status]");
+        }
+        return true;
     }
 
     private static boolean handleSurroundingsCommand(String command,
@@ -1013,6 +1052,7 @@ public final class WurmWaypointerRuntime {
     public static void componentVisibilityChanged(Object component, boolean visible,
                                                   String operation) {
         try {
+            MiniMapWindowBridge.visibilityChanged(hud, component);
             if (component != null && "com.wurmonline.client.renderer.gui.CompassComponent"
                     .equals(component.getClass().getName())) {
                 LOGGER.info("Compass visibility changed: visible=" + visible
@@ -1035,7 +1075,10 @@ public final class WurmWaypointerRuntime {
             SurroundingsWindowBridge.detach(hud, "disconnect");
             DeedSearchWindowBridge.detach(hud, "disconnect");
             DeedInformationWindowBridge.detach(hud, "disconnect");
+            CustomMapMarkWindowBridge.detach(hud, "disconnect");
+            MiniMapWindowBridge.detach(hud, "disconnect");
             SERVER_MAPS.deactivate();
+            DEEDS.deactivate();
             ServerMapWindowBridge.resetAll();
             hud = null;
             identity = null;
@@ -1064,7 +1107,10 @@ public final class WurmWaypointerRuntime {
             SurroundingsWindowBridge.detach(hud, "server transfer");
             DeedSearchWindowBridge.detach(hud, "server transfer");
             DeedInformationWindowBridge.detach(hud, "server transfer");
+            CustomMapMarkWindowBridge.detach(hud, "server transfer");
+            MiniMapWindowBridge.detach(hud, "server transfer");
             SERVER_MAPS.deactivate();
+            DEEDS.deactivate();
             ServerMapWindowBridge.resetAll();
             identity = null;
             confirmedWorld = null;
@@ -1134,7 +1180,7 @@ public final class WurmWaypointerRuntime {
 
     /** Immutable data consumed by the native M-map bridge. */
     public static ServerMapSnapshot serverMapSnapshot() {
-        return SERVER_MAPS.current();
+        return DEEDS.overlay(SERVER_MAPS.current());
     }
 
     public static HighwayTileIndex serverMapHighways() {
@@ -1153,7 +1199,8 @@ public final class WurmWaypointerRuntime {
             if (snapshot == null) return false;
             for (org.waypoints.next.model.WaypointRecord record
                     : snapshot.getRecords()) {
-                if (id.equals(record.getId())) return true;
+                if (id.equals(record.getId())) return record.getSourceType()
+                        != WaypointSourceType.DEED;
             }
         } catch (Throwable failure) {
             LOGGER.log(Level.FINE, "Server map editability check failed open",
@@ -1209,6 +1256,67 @@ public final class WurmWaypointerRuntime {
                     coordinates);
         } catch (Throwable failure) {
             LOGGER.log(Level.FINE, "Server map waypoint request failed open", failure);
+        }
+    }
+
+    public static GroundNavigationRouteEffect.RouteSnapshot
+    currentNavigationRoute() {
+        try { return STATIC_NAVIGATION.currentNavigatorMapRoute(); }
+        catch (Throwable failure) {
+            LOGGER.log(Level.FINE, "Navigator route snapshot failed open",
+                    failure);
+            return null;
+        }
+    }
+
+    public static void serverMapCustomMarkSaved(int tileX, int tileY,
+                                                String text) {
+        try {
+            if (hud == null || identity == null) return;
+            STATIC_WAYPOINTS.addCustomMapMark(text, tileX, tileY, hud, identity);
+        } catch (Throwable failure) {
+            LOGGER.log(Level.WARNING, "Unable to save custom map mark", failure);
+            event("Could not save custom map mark: "
+                    + oneLine(failure.getMessage()) + ".");
+            throw failure instanceof RuntimeException
+                    ? (RuntimeException) failure
+                    : new IllegalStateException(failure);
+        }
+    }
+
+    /** A deed picker selection tracks a provider-owned DEED waypoint. */
+    public static void serverMapDeedWaypointRequested(Deed deed) {
+        try {
+            if (deed == null || hud == null || identity == null) return;
+            DEEDS.track(deed, hud, identity);
+        } catch (Throwable failure) {
+            LOGGER.log(Level.WARNING, "Unable to track selected deed", failure);
+            event("Could not track deed: " + oneLine(failure.getMessage()) + ".");
+        }
+    }
+
+    /** Tracks a deed if necessary and queues it as the active NAV target. */
+    public static void serverMapDeedNavigationRequested(Deed deed) {
+        try {
+            if (deed == null || hud == null || identity == null) return;
+            WaypointRecord record = DEEDS.track(deed, hud, identity);
+            EXTERNAL_NAVIGATION_REQUESTS.add(record.getId());
+            event("Navigation to deed queued: " + oneLine(record.getName()) + ".");
+        } catch (Throwable failure) {
+            LOGGER.log(Level.WARNING, "Unable to navigate to selected deed",
+                    failure);
+            event("Could not navigate to deed: "
+                    + oneLine(failure.getMessage()) + ".");
+        }
+    }
+
+    public static void serverMapDeedProviderRefreshRequested() {
+        try {
+            DEEDS.refreshNow();
+            event("Deed provider refresh queued in the background.");
+        } catch (Throwable failure) {
+            LOGGER.log(Level.FINE, "Manual deed refresh failed open", failure);
+            event("Could not queue deed provider refresh.");
         }
     }
 

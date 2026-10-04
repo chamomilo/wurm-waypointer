@@ -6,6 +6,7 @@ import org.waypoints.next.navigation.HighwayRoutePlanner;
 import org.waypoints.next.navigation.HighwayTileIndex;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
@@ -55,6 +56,32 @@ public final class GroundNavigationRouteEffectTerrainTest {
         for (HighwayRoutePlanner.TileStep step : preview) {
             assertEquals(HighwayTileIndex.Kind.TUNNEL, step.getKind());
         }
+    }
+
+    @Test public void mapRouteContinuesThroughTunnelAndToFinalTarget() {
+        HighwayTileIndex index = HighwayTileIndex.parse(
+                "["
+                        + "{\"startX\":0,\"startY\":4,\"endX\":3,\"endY\":4,\"type\":2},"
+                        + "{\"startX\":4,\"startY\":4,\"endX\":16,\"endY\":4,\"type\":1},"
+                        + "{\"startX\":17,\"startY\":4,\"endX\":20,\"endY\":4,\"type\":2},"
+                        + "{\"startX\":3,\"startY\":4,\"endX\":3,\"endY\":12,\"type\":2},"
+                        + "{\"startX\":3,\"startY\":12,\"endX\":17,\"endY\":12,\"type\":2},"
+                        + "{\"startX\":17,\"startY\":12,\"endX\":17,\"endY\":4,\"type\":2}"
+                        + "]", 32, 32);
+        HighwayRoutePlanner.Plan complete = new HighwayRoutePlanner()
+                .planAcrossLayers(0, 4, false, 20, 4, false, index, true);
+
+        GroundNavigationRouteEffect.RouteSnapshot route =
+                GroundNavigationRouteEffect.completeMapRoute(
+                        0, 4, complete, 23, 6,
+                        Collections.<GroundRouteTrace.Point>emptyList());
+
+        assertEquals(0, route.getTileX(0));
+        assertEquals(4, route.getTileY(0));
+        assertTrue(contains(route, 10, 4));
+        assertTrue(contains(route, 20, 4));
+        assertEquals(23, route.getTileX(route.getPointCount() - 1));
+        assertEquals(6, route.getTileY(route.getPointCount() - 1));
     }
 
     @Test public void crossingUsesRoadOnSurfaceAndTunnelUnderground() {
@@ -275,6 +302,16 @@ public final class GroundNavigationRouteEffectTerrainTest {
         return new GroundRouteTrace.Point(x, 0, height,
                 GroundRouteTrace.HeightSource.NEAR, 0.0f,
                 GroundRouteTrace.WaterSource.NEAR);
+    }
+
+    private static boolean contains(
+            GroundNavigationRouteEffect.RouteSnapshot route, int x, int y) {
+        for (int index = 0; index < route.getPointCount(); index++) {
+            if (route.getTileX(index) == x && route.getTileY(index) == y) {
+                return true;
+            }
+        }
+        return false;
     }
 
 }

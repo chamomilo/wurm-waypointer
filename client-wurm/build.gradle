@@ -26,6 +26,7 @@ dependencies {
     api project(':feature-archaeology')
     api project(':feature-lootmaps')
     api project(':feature-map')
+    api project(':feature-deeds')
     api project(':feature-surroundings')
     api project(':render-wurm')
     compileOnly files(requiredClientLibraries)

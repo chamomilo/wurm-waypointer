@@ -1,9 +1,15 @@
 package com.wurmonline.client.renderer.gui;
 
 import com.wurmonline.client.game.World;
+import com.wurmonline.client.renderer.Matrix;
 import com.wurmonline.client.renderer.PickData;
+import com.wurmonline.client.renderer.backend.Primitive;
 import com.wurmonline.client.renderer.backend.Queue;
 import com.wurmonline.client.renderer.gui.text.TextFont;
+import com.wurmonline.client.resources.FakeResourceUrl;
+import com.wurmonline.client.resources.ResourceUrl;
+import com.wurmonline.client.resources.textures.ResourceTexture;
+import com.wurmonline.client.resources.textures.ResourceTextureLoader;
 import org.waypoints.next.model.MarkerStyle;
 import org.waypoints.next.navigation.CompassMarkerClusterer;
 import org.waypoints.next.navigation.NavigationSnapshot;
@@ -18,7 +24,12 @@ import org.waypoints.next.render.WaypointDistanceLabel;
 import org.waypoints.next.render.WaypointRenderProfiler;
 import org.waypoints.next.render.WaypointRenderRuntimeBridge;
 
+import java.io.File;
+import java.net.URL;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -31,6 +42,22 @@ public final class WaypointCompassMarkerBridge {
     private static final int[] PROJECTED = new int[3];
     private static final TextFont CLUSTER_FONT = TextFont.getFixedSizeText();
     private static final String[] CLUSTER_COUNT_TEXT = clusterCountText();
+    private static final String COMPASS_BASE_RESOURCE =
+            "/org/waypoints/next/compass/compass-hud-base.png";
+    private static final String COMPASS_NEEDLE_RESOURCE =
+            "/org/waypoints/next/compass/compass-hud-needle.png";
+    private static final File COMPASS_ASSET_DIRECTORY = new File(
+            "mods/wurm-waypointer/assets/compass");
+    private static final Matrix NEEDLE_MATRIX = new Matrix();
+    private static final ExecutorService ARTWORK_WORKER =
+            Executors.newSingleThreadExecutor(new ThreadFactory() {
+                @Override public Thread newThread(Runnable runnable) {
+                    Thread thread = new Thread(runnable,
+                            "wurm-waypointer-compass-artwork");
+                    thread.setDaemon(true);
+                    return thread;
+                }
+            });
 
     private static NavigationTargetKey[] renderedKeys = new NavigationTargetKey[0];
     private static NavigationTarget[] renderedTargets = new NavigationTarget[0];
@@ -56,9 +83,14 @@ public final class WaypointCompassMarkerBridge {
     private static int phase0HitRadius;
     private static boolean phase0Rendered;
     private static boolean renderFailed;
+    private static boolean artworkRenderFailed;
+    private static boolean artworkLoadingStarted;
+    private static boolean firstArtworkRenderLogged;
     private static boolean firstStaticRenderLogged;
     private static boolean firstHoverLogged;
     private static volatile long lastSuccessfulRenderNanos;
+    private static PreparedArtwork compassBase;
+    private static PreparedArtwork compassNeedle;
 
     private WaypointCompassMarkerBridge() { }
 
@@ -70,6 +102,7 @@ public final class WaypointCompassMarkerBridge {
             renderedCount = 0;
             renderedGroupCount = 0;
             phase0Rendered = false;
+            renderArtworkSafely(compass, queue);
             boolean rendered = renderStatic(compass, queue);
             rendered |= renderPhase0(compass, queue);
             if (rendered) lastSuccessfulRenderNanos = System.nanoTime();
@@ -83,6 +116,155 @@ public final class WaypointCompassMarkerBridge {
             WaypointRenderProfiler.recordCompass(
                     System.nanoTime() - profileStartedNanos);
         }
+    }
+
+    private static void renderArtworkSafely(CompassComponent compass, Queue queue) {
+        if (artworkRenderFailed) return;
+        try {
+            renderArtwork(compass, queue);
+        } catch (Throwable failure) {
+            artworkRenderFailed = true;
+            LOGGER.log(Level.WARNING,
+                    "Top-down HUD compass artwork failed open; marker overlay remains active",
+                    failure);
+        }
+    }
+
+    /** Draws the generated top-down dial and its independently rotating needle. */
+    private static void renderArtwork(CompassComponent compass, Queue queue) {
+        ensureArtworkLoading();
+        ResourceTexture base = artworkTexture(compassBase);
+        ResourceTexture needle = artworkTexture(compassNeedle);
+        if (base == null || needle == null) return;
+
+        Renderer.texturedQuadAlphaBlend(queue, base,
+                1.0f, 1.0f, 1.0f, 1.0f,
+                compass.x, compass.y, compass.width, compass.height,
+                0.0f, 0.0f, 1.0f, 1.0f);
+
+        HeadsUpDisplay hud = WurmComponent.hud;
+        World world = hud == null ? null : hud.getWorld();
+        float rotation = world == null ? 0.0f
+                : CompassMarkerGeometry.northNeedleRadians(
+                        world.getPlayerRotX());
+        drawRotatedTexture(queue, needle,
+                compass.x + compass.width * 0.5f,
+                compass.y + compass.height * 0.5f,
+                compass.width, compass.height, rotation);
+
+        if (!firstArtworkRenderLogged) {
+            firstArtworkRenderLogged = true;
+            LOGGER.info("Top-down HUD compass artwork rendered its first frame");
+        }
+    }
+
+    private static synchronized void ensureArtworkLoading() {
+        if (artworkLoadingStarted) return;
+        artworkLoadingStarted = true;
+        compassBase = artwork(COMPASS_BASE_RESOURCE, "compass base");
+        compassNeedle = artwork(COMPASS_NEEDLE_RESOURCE, "compass needle");
+        if (compassBase == null || compassNeedle == null) return;
+        ARTWORK_WORKER.execute(new Runnable() {
+            @Override public void run() {
+                prepareArtwork(compassBase);
+                prepareArtwork(compassNeedle);
+            }
+        });
+    }
+
+    private static PreparedArtwork artwork(String path, String label) {
+        URL url = artworkUrl(path);
+        if (url == null) {
+            LOGGER.warning("HUD " + label + " resource is missing: " + path);
+            return null;
+        }
+        LOGGER.info("HUD " + label + " resolved from " + url);
+        return new PreparedArtwork(new FakeResourceUrl(url), label);
+    }
+
+    /**
+     * Patched com.wurmonline bridge classes are defined by the game loader, which
+     * does not expose resources from the mod JAR. Prefer the distribution's
+     * file-backed copy and retain class-loader fallbacks for development runs.
+     */
+    private static URL artworkUrl(String path) {
+        String resourceName = path.startsWith("/") ? path.substring(1) : path;
+        String fileName = resourceName.substring(resourceName.lastIndexOf('/') + 1);
+        File sidecar = new File(COMPASS_ASSET_DIRECTORY, fileName);
+        if (sidecar.isFile()) {
+            try {
+                return sidecar.toURI().toURL();
+            } catch (Exception ignored) {
+                // Fall through to embedded resource lookup.
+            }
+        }
+
+        URL embedded = resourceFrom(
+                WaypointRenderRuntimeBridge.class.getClassLoader(), resourceName);
+        if (embedded == null) {
+            embedded = resourceFrom(
+                    Thread.currentThread().getContextClassLoader(), resourceName);
+        }
+        if (embedded == null) {
+            embedded = resourceFrom(ClassLoader.getSystemClassLoader(), resourceName);
+        }
+        return embedded != null ? embedded
+                : WaypointCompassMarkerBridge.class.getResource('/' + resourceName);
+    }
+
+    private static URL resourceFrom(ClassLoader loader, String resourceName) {
+        return loader == null ? null : loader.getResource(resourceName);
+    }
+
+    private static void prepareArtwork(PreparedArtwork artwork) {
+        try {
+            ResourceTextureLoader.prepareTexture(
+                    artwork.url, artwork.request, false);
+            artwork.ready = true;
+        } catch (Throwable failure) {
+            artwork.failed = true;
+            artwork.ready = true;
+            LOGGER.log(Level.WARNING,
+                    "HUD " + artwork.label + " could not be prepared", failure);
+        }
+    }
+
+    private static synchronized ResourceTexture artworkTexture(
+            PreparedArtwork artwork) {
+        if (artwork == null || !artwork.ready || artwork.failed) return null;
+        if (artwork.texture == null) {
+            artwork.texture = ResourceTextureLoader.getPreparedTexture(
+                    artwork.url, artwork.request);
+        }
+        ResourceTexture texture = artwork.texture;
+        return texture != null && (texture.isValid() || texture.needReinit())
+                ? texture : null;
+    }
+
+    private static void drawRotatedTexture(Queue queue, ResourceTexture texture,
+                                           float centerX, float centerY,
+                                           float width, float height,
+                                           float rotationRadians) {
+        Primitive primitive = queue.reservePrimitive();
+        primitive.copyStateFrom(Renderer.stateAlphaBlend);
+        primitive.setColor(1.0f, 1.0f, 1.0f, 1.0f);
+        primitive.program = null;
+        primitive.vertex = Primitive.staticVertexSquareCentered2D;
+        primitive.index = null;
+        primitive.setType(Primitive.Type.TRIANGLESTRIP);
+        primitive.num = 2;
+        primitive.lightManager = null;
+        primitive.clearTextures();
+        primitive.texture[0] = texture;
+        primitive.texenv[0] = Primitive.TexEnv.MODULATE;
+        primitive.texturematrix = null;
+        primitive.offset = 0;
+        primitive.clipRect = HeadsUpDisplay.scissor.getCurrent();
+        NEEDLE_MATRIX.fromTranslationRotationAndNonUniformScale(
+                centerX, centerY, 0.0f,
+                0.0f, 0.0f, rotationRadians,
+                width * 0.5f, height * 0.5f, 0.0f);
+        queue.queue(primitive, NEEDLE_MATRIX);
     }
 
     private static boolean renderStatic(CompassComponent compass, Queue queue) {
@@ -846,6 +1028,20 @@ public final class WaypointCompassMarkerBridge {
             int rowWidth = Math.max(1, size - Math.abs(row) * 2);
             compass.fillRect(queue, red, green, blue, alpha,
                     centerX - rowWidth / 2, centerY + row, rowWidth, 1);
+        }
+    }
+
+    private static final class PreparedArtwork {
+        private final ResourceUrl url;
+        private final Object request = new Object();
+        private final String label;
+        private volatile boolean ready;
+        private volatile boolean failed;
+        private ResourceTexture texture;
+
+        private PreparedArtwork(ResourceUrl url, String label) {
+            this.url = url;
+            this.label = label;
         }
     }
 }

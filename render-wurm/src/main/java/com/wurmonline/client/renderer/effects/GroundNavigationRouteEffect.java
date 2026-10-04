@@ -47,6 +47,7 @@ public final class GroundNavigationRouteEffect extends Effect
     private static final Logger LOGGER = Logger.getLogger(
             GroundNavigationRouteEffect.class.getName());
     private static final int MAX_POINTS = 8192;
+    private static final int MAX_MAP_POINTS = 32768;
     private static final int MAX_DASHES = MAX_POINTS * 2;
     private static final int VERTICES_PER_DASH = 6;
     private static final int MAX_VERTICES = MAX_DASHES * VERTICES_PER_DASH;
@@ -101,6 +102,7 @@ public final class GroundNavigationRouteEffect extends Effect
     private final float[] pulseSampleA = new float[3];
     private final float[] pulseSampleB = new float[3];
     private volatile RouteSnapshot route = RouteSnapshot.empty();
+    private volatile RouteSnapshot mapRoute = RouteSnapshot.empty();
     private volatile NavigationRouteStatistics routeStatistics;
     private RouteSnapshot lastDiagnosedRoute = RouteSnapshot.empty();
     private String lastDiagnosedStrategy;
@@ -184,6 +186,21 @@ public final class GroundNavigationRouteEffect extends Effect
     /** Thread-safe summary of the exact point list currently shown by this effect. */
     public NavigationRouteStatistics getRouteStatistics() {
         return routeStatistics;
+    }
+
+    /** Immutable tile path currently rendered by the world NAV effect. */
+    public RouteSnapshot getRouteSnapshot() {
+        return route;
+    }
+
+    /**
+     * Complete route intended for the 2D map. Unlike the ground effect this
+     * snapshot is allowed to cross unloaded tunnel/bridge layers because it
+     * contains only published map coordinates and is never sampled as world
+     * geometry.
+     */
+    public RouteSnapshot getMapRouteSnapshot() {
+        return mapRoute;
     }
 
     @Override public void render(Queue queue, float tickFraction) {
@@ -631,6 +648,7 @@ public final class GroundNavigationRouteEffect extends Effect
                     if (!alive) return;
                     RouteSnapshot next = RouteSnapshot.from(plan.points);
                     route = next;
+                    mapRoute = plan.mapRoute == null ? next : plan.mapRoute;
                     routeStatistics = plan.completeStatistics == null
                             ? NavigationRouteStatistics.calculate(
                             plan.points, plan.reachedFinalTarget,
@@ -680,7 +698,10 @@ public final class GroundNavigationRouteEffect extends Effect
                     if (planEndsAt(directTunnel, targetTileX, targetTileY)) {
                         PlannedRoute throughTunnel = tunnelRoute(startX,
                                 startY, directTunnel, highways, travelLayer);
-                        if (throughTunnel != null) return throughTunnel;
+                        if (throughTunnel != null) return throughTunnel
+                                .withMapRoute(completeMapRoute(startX, startY,
+                                        directTunnel, targetTileX,
+                                        targetTileY, throughTunnel.points));
                     }
                 }
                 HighwayRoutePlanner.Plan layered = highwayPlanner
@@ -692,7 +713,10 @@ public final class GroundNavigationRouteEffect extends Effect
                 if (selectedTunnel.usesHighway()) {
                     PlannedRoute toSelectedExit = tunnelRoute(startX, startY,
                             selectedTunnel, highways, travelLayer);
-                    if (toSelectedExit != null) return toSelectedExit;
+                    if (toSelectedExit != null) return toSelectedExit
+                            .withMapRoute(completeMapRoute(startX, startY,
+                                    layered, targetTileX, targetTileY,
+                                    toSelectedExit.points));
                 }
                 HighwayRoutePlanner.Plan exitTunnel = highwayPlanner
                         .planTunnelToSurfacePortal(startX, startY,
@@ -782,7 +806,70 @@ public final class GroundNavigationRouteEffect extends Effect
                 travelLayer);
         return preview.withCompleteStatistics(
                 NavigationRouteStatistics.calculateCompleteHighwayPlan(
-                        complete, startX, startY, targetTileX, targetTileY));
+                        complete, startX, startY, targetTileX, targetTileY))
+                .withMapRoute(completeMapRoute(startX, startY, complete,
+                        targetTileX, targetTileY, preview.points));
+    }
+
+    /** Builds the complete cross-layer polyline without requiring unloaded terrain. */
+    static RouteSnapshot completeMapRoute(
+            int startX, int startY, HighwayRoutePlanner.Plan complete,
+            int targetX, int targetY,
+            List<GroundRouteTrace.Point> exactVisiblePrefix) {
+        if (complete == null || complete.getHighwaySteps().isEmpty()) {
+            return RouteSnapshot.from(exactVisiblePrefix);
+        }
+        List<int[]> coordinates = new ArrayList<int[]>();
+        HighwayRoutePlanner.TileStep first = complete.getHighwaySteps().get(0);
+        boolean joined = false;
+        if (exactVisiblePrefix != null) {
+            for (GroundRouteTrace.Point point : exactVisiblePrefix) {
+                appendCoordinate(coordinates, point.getTileX(), point.getTileY());
+                if (point.getTileX() == first.getTileX()
+                        && point.getTileY() == first.getTileY()) {
+                    joined = true;
+                    break;
+                }
+            }
+        }
+        if (!joined) {
+            coordinates.clear();
+            appendRasterCoordinates(coordinates, startX, startY,
+                    first.getTileX(), first.getTileY());
+        }
+        for (HighwayRoutePlanner.TileStep step : complete.getHighwaySteps()) {
+            appendCoordinate(coordinates, step.getTileX(), step.getTileY());
+        }
+        int[] last = coordinates.get(coordinates.size() - 1);
+        appendRasterCoordinates(coordinates, last[0], last[1], targetX, targetY);
+        return RouteSnapshot.fromCoordinates(coordinates);
+    }
+
+    private static void appendRasterCoordinates(List<int[]> target,
+                                                int startX, int startY,
+                                                int targetX, int targetY) {
+        int x = startX;
+        int y = startY;
+        int dx = Math.abs(targetX - x);
+        int dy = Math.abs(targetY - y);
+        int stepX = x < targetX ? 1 : -1;
+        int stepY = y < targetY ? 1 : -1;
+        int error = dx - dy;
+        while (true) {
+            appendCoordinate(target, x, y);
+            if (x == targetX && y == targetY) return;
+            int doubled = error * 2;
+            if (doubled > -dy) { error -= dy; x += stepX; }
+            if (doubled < dx) { error += dx; y += stepY; }
+        }
+    }
+
+    private static void appendCoordinate(List<int[]> target, int x, int y) {
+        if (!target.isEmpty()) {
+            int[] last = target.get(target.size() - 1);
+            if (last[0] == x && last[1] == y) return;
+        }
+        if (target.size() < MAX_MAP_POINTS) target.add(new int[]{x, y});
     }
 
     private PlannedRoute bridgeStage(int startX, int startY,
@@ -1597,6 +1684,7 @@ public final class GroundNavigationRouteEffect extends Effect
         private final int rejectedUnknownEdges;
         private final int rejectedCornerEdges;
         private final NavigationRouteStatistics completeStatistics;
+        private final RouteSnapshot mapRoute;
 
         private PlannedRoute(List<GroundRouteTrace.Point> points,
                              boolean reachedFinalTarget, String strategy,
@@ -1605,7 +1693,7 @@ public final class GroundNavigationRouteEffect extends Effect
                              int rejectedCornerEdges) {
             this(points, reachedFinalTarget, strategy, expandedNodes,
                     rejectedSlopeEdges, rejectedWaterEdges,
-                    rejectedUnknownEdges, rejectedCornerEdges, null);
+                    rejectedUnknownEdges, rejectedCornerEdges, null, null);
         }
 
         private PlannedRoute(List<GroundRouteTrace.Point> points,
@@ -1613,7 +1701,8 @@ public final class GroundNavigationRouteEffect extends Effect
                              int expandedNodes, int rejectedSlopeEdges,
                              int rejectedWaterEdges, int rejectedUnknownEdges,
                              int rejectedCornerEdges,
-                             NavigationRouteStatistics completeStatistics) {
+                             NavigationRouteStatistics completeStatistics,
+                             RouteSnapshot mapRoute) {
             this.points = points;
             this.reachedFinalTarget = reachedFinalTarget;
             this.strategy = strategy;
@@ -1623,13 +1712,22 @@ public final class GroundNavigationRouteEffect extends Effect
             this.rejectedUnknownEdges = rejectedUnknownEdges;
             this.rejectedCornerEdges = rejectedCornerEdges;
             this.completeStatistics = completeStatistics;
+            this.mapRoute = mapRoute;
         }
 
         private PlannedRoute withCompleteStatistics(
                 NavigationRouteStatistics statistics) {
             return new PlannedRoute(points, reachedFinalTarget, strategy,
                     expandedNodes, rejectedSlopeEdges, rejectedWaterEdges,
-                    rejectedUnknownEdges, rejectedCornerEdges, statistics);
+                    rejectedUnknownEdges, rejectedCornerEdges, statistics,
+                    mapRoute);
+        }
+
+        private PlannedRoute withMapRoute(RouteSnapshot value) {
+            return new PlannedRoute(points, reachedFinalTarget, strategy,
+                    expandedNodes, rejectedSlopeEdges, rejectedWaterEdges,
+                    rejectedUnknownEdges, rejectedCornerEdges,
+                    completeStatistics, value);
         }
     }
 
@@ -1858,7 +1956,7 @@ public final class GroundNavigationRouteEffect extends Effect
                 && next.count - commonSuffix <= allowedChangedPrefix;
     }
 
-    private static final class RouteSnapshot {
+    public static final class RouteSnapshot {
         private static final RouteSnapshot EMPTY = new RouteSnapshot(
                 new int[0], new int[0], new float[0], new int[0], 0);
         private final int[] tileX;
@@ -1910,6 +2008,36 @@ public final class GroundNavigationRouteEffect extends Effect
                 signature[i] = pointSignature;
             }
             return new RouteSnapshot(x, y, height, signature, count);
+        }
+
+        private static RouteSnapshot fromCoordinates(List<int[]> points) {
+            if (points == null || points.isEmpty()) return EMPTY;
+            int count = Math.min(MAX_MAP_POINTS, points.size());
+            int[] x = new int[count];
+            int[] y = new int[count];
+            float[] height = new float[count];
+            int[] signature = new int[count];
+            for (int i = 0; i < count; i++) {
+                int[] point = points.get(i);
+                x[i] = point[0];
+                y[i] = point[1];
+                signature[i] = 31 * (31 + x[i]) + y[i];
+            }
+            return new RouteSnapshot(x, y, height, signature, count);
+        }
+
+        public int getPointCount() { return count; }
+
+        public int getTileX(int index) { return tileX[checked(index)]; }
+
+        public int getTileY(int index) { return tileY[checked(index)]; }
+
+        private int checked(int index) {
+            if (index < 0 || index >= count) {
+                throw new IndexOutOfBoundsException("route point " + index
+                        + " outside 0.." + (count - 1));
+            }
+            return index;
         }
     }
 

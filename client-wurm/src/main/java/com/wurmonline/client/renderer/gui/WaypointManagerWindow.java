@@ -388,6 +388,8 @@ final class WaypointManagerWindow extends WWindow
                 ? "Enable or disable this server's managed vanilla landmark. This On/Off choice is remembered per server."
                 : data.getSourceType() == WaypointSourceType.LOOT_MAP
                 ? "Show or hide the active Loot Map waypoint without deleting hunt progress. New readings keep this choice."
+                : data.getSourceType() == WaypointSourceType.DEED
+                ? "Show or hide this provider-managed deed waypoint. Feed refreshes keep this choice."
                 : "Enable or disable this waypoint's compass marker, label, and world effect.");
         rowActions.put(on, new RowAction(ActionKind.TOGGLE, data.getId(),
                 data.isEnabled(), data.getName() + " [" + data.getShortId() + "]"));
@@ -407,11 +409,23 @@ final class WaypointManagerWindow extends WWindow
         row.addComponent(cell(new WurmLabel(data.getServerLabel(),
                 data.getServerFingerprint()), SERVER_WIDTH));
         row.addComponent(cell(new WurmLabel(data.getUser()), USER_WIDTH));
-        WurmLabel status = new WurmLabel(data.isTemporary()
-                ? "Temporary" : title(data.getResolution().name()));
+        String age = data.getDataAgeLabel(java.time.Instant.now());
+        String statusText = data.isTemporary() ? "Temporary"
+                : title(data.getResolution().name());
+        if (!age.isEmpty()) statusText = (data.getResolution()
+                == org.waypoints.next.model.WaypointResolution.STALE
+                ? "Stale " : "Live ") + age;
+        WurmLabel status = new WurmLabel(statusText);
         if (data.isTemporary()) registerHover(status,
                 "Automatically deleted at " + data.getExpiresAt()
                         + ". Press Refresh if it expires while this Manager window is open.");
+        else if (!age.isEmpty()) registerHover(status,
+                "Provider data age: " + age + ". Last confirmed at "
+                        + data.getLastResolvedAt()
+                        + (data.getResolution()
+                        == org.waypoints.next.model.WaypointResolution.STALE
+                        ? ". The deed disappeared from a valid newer catalog; delete it or leave it disabled until it reappears."
+                        : ". Coordinates follow valid provider updates automatically."));
         row.addComponent(cell(status, STATUS_WIDTH));
         WurmLabel distance = new WurmLabel(data.getDistanceMetres() == null
                 ? "-" : data.getDistanceMetres() + "m");
@@ -433,6 +447,25 @@ final class WaypointManagerWindow extends WWindow
             row.addComponent(cell(new WurmLabel("-"), SHARE_WIDTH));
             row.addComponent(cell(new WurmLabel("-"), COPY_WIDTH));
             row.addComponent(cell(new WurmLabel("-"), DELETE_WIDTH));
+            registerTableRow(row);
+            return row;
+        }
+
+        if (data.isProviderManaged()) {
+            WurmLabel fixed = new WurmLabel("Fixed");
+            registerHover(fixed,
+                    "Provider-managed deed coordinates cannot be edited manually; feed updates move this UUID automatically.");
+            row.addComponent(cell(fixed, EDIT_WIDTH));
+            row.addComponent(cell(new WurmLabel("-"), SHARE_WIDTH));
+            row.addComponent(cell(new WurmLabel("-"), COPY_WIDTH));
+            WButton delete = button("Delete", DELETE_WIDTH);
+            delete.setHoverString(data.getResolution()
+                    == org.waypoints.next.model.WaypointResolution.STALE
+                    ? "Resolve this stale deed by deleting its last-known waypoint after confirmation."
+                    : "Stop tracking this deed after an explicit Yes/No confirmation.");
+            rowActions.put(delete, new RowAction(ActionKind.DELETE, data.getId(), false,
+                    data.getName() + " [" + data.getShortId() + "]"));
+            row.addComponent(delete);
             registerTableRow(row);
             return row;
         }

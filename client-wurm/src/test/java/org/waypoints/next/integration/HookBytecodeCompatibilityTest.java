@@ -25,6 +25,7 @@ public class HookBytecodeCompatibilityTest {
         invokeInstaller("hookConnectionLifecycle", pool);
         invokeInstaller("hookWorldMap", pool);
         invokeInstaller("hookWorldMapWheel", pool);
+        invokeInstaller("hookMiniMapChrome", pool);
         invokeInstaller("hookCompass", pool);
         invokeInstaller("hookCompassMarker", pool);
         invokeInstaller("hookEffectRenderer", pool);
@@ -49,6 +50,8 @@ public class HookBytecodeCompatibilityTest {
         assertTrue(pool.get("com.wurmonline.client.renderer.gui.WurmComponent")
                 .toBytecode().length > 0);
         assertTrue(pool.get("com.wurmonline.client.renderer.gui.HeadsUpDisplay")
+                .toBytecode().length > 0);
+        assertTrue(pool.get("com.wurmonline.client.renderer.gui.WWindow$Middle")
                 .toBytecode().length > 0);
         assertTrue(pool.get("com.wurmonline.client.renderer.effects.EffectRender")
                 .toBytecode().length > 0);

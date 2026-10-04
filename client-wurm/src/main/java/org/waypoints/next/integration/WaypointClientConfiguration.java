@@ -36,6 +36,9 @@ public final class WaypointClientConfiguration
     private final int serverMapSyncMinutes;
     private final boolean serverMapShowDeeds;
     private final boolean serverMapShowHighways;
+    private final boolean deedProviderEnabled;
+    private final Path deedProviderCacheDirectory;
+    private final String deedProviderMappings;
     private final MapBounds mapBounds;
     private final int maximumCompassMarkers;
     private final int maximumWorldEffects;
@@ -71,6 +74,9 @@ public final class WaypointClientConfiguration
                                         int serverMapSyncMinutes,
                                         boolean serverMapShowDeeds,
                                         boolean serverMapShowHighways,
+                                        boolean deedProviderEnabled,
+                                        Path deedProviderCacheDirectory,
+                                        String deedProviderMappings,
                                         MapBounds mapBounds,
                                         int maximumCompassMarkers,
                                         int maximumWorldEffects,
@@ -109,6 +115,9 @@ public final class WaypointClientConfiguration
         this.serverMapSyncMinutes = serverMapSyncMinutes;
         this.serverMapShowDeeds = serverMapShowDeeds;
         this.serverMapShowHighways = serverMapShowHighways;
+        this.deedProviderEnabled = deedProviderEnabled;
+        this.deedProviderCacheDirectory = deedProviderCacheDirectory;
+        this.deedProviderMappings = deedProviderMappings;
         this.mapBounds = mapBounds;
         this.maximumCompassMarkers = maximumCompassMarkers;
         this.maximumWorldEffects = maximumWorldEffects;
@@ -135,9 +144,9 @@ public final class WaypointClientConfiguration
         ConfigurationProperties source =
                 new ConfigurationProperties(properties, warningSink);
         return new WaypointClientConfiguration(
-                source.path("waypointDataFile", "mods/wurm-waypointer/waypoints.wpt"),
-                source.path("waypointTransferFile", "mods/wurm-waypointer/waypoints-transfer.wpt"),
-                source.path("vanillaLandmarkStateFile", "mods/wurm-waypointer/vanilla-landmarks.state"),
+                source.path("waypointDataFile", "wurm-waypointer-data/waypoints.wpt"),
+                source.path("waypointTransferFile", "wurm-waypointer-data/waypoints-transfer.wpt"),
+                source.path("vanillaLandmarkStateFile", "wurm-waypointer-data/vanilla-landmarks.state"),
                 source.path("lootMapLogDirectory", "mods/wurm-waypointer/lootmap-hunts"),
                 source.path("archaeologySessionFile", "mods/wurm-waypointer/archaeology-sessions.properties"),
                 source.path("archaeologyKnownLocationsFile", "mods/wurm-waypointer/archaeology-known-locations.properties"),
@@ -161,13 +170,21 @@ public final class WaypointClientConfiguration
                 source.integer("serverMapSyncMinutes", 60, 5, 1440),
                 source.bool("serverMapShowDeeds", true),
                 source.bool("serverMapShowHighways", true),
+                source.bool("deedProviderEnabled", true),
+                source.path("deedProviderCacheDirectory", "mods/wurm-waypointer/deeds"),
+                source.textValue("deedProviderMappings", "", 16_384),
                 new MapBounds(source.integer("waypointMapWidth", 4096, 1, 65536),
                         source.integer("waypointMapHeight", 4096, 1, 65536)),
-                source.integer("phase2MaxCompassMarkers", 64, 1, 1024),
-                source.integer("phase2MaxWorldEffects", 16, 0, 1024),
-                source.integer("phase2WorldEffectDistanceMetres", 12000, 1, 100000),
-                source.integer("phase2MaxWorldLabels", 16, 0, 1024),
-                source.integer("phase2WorldLabelDistanceMetres", 12000, 1, 100000),
+                source.integer("maximumCompassMarkers",
+                        "phase2MaxCompassMarkers", 64, 1, 1024),
+                source.integer("maximumWorldEffects",
+                        "phase2MaxWorldEffects", 16, 0, 1024),
+                source.integer("worldEffectDistanceMetres",
+                        "phase2WorldEffectDistanceMetres", 12000, 1, 100000),
+                source.integer("maximumWorldLabels",
+                        "phase2MaxWorldLabels", 16, 0, 1024),
+                source.integer("worldLabelDistanceMetres",
+                        "phase2WorldLabelDistanceMetres", 12000, 1, 100000),
                 source.bool("scannerNotifications", true),
                 source.bool("scannerOutlines", true),
                 source.integer("scannerMaximumOutlines", 8, 0, 32),
@@ -221,6 +238,9 @@ public final class WaypointClientConfiguration
     public int getServerMapSyncMinutes() { return serverMapSyncMinutes; }
     public boolean isServerMapShowDeeds() { return serverMapShowDeeds; }
     public boolean isServerMapShowHighways() { return serverMapShowHighways; }
+    public boolean isDeedProviderEnabled() { return deedProviderEnabled; }
+    public Path getDeedProviderCacheDirectory() { return deedProviderCacheDirectory; }
+    public String getDeedProviderMappings() { return deedProviderMappings; }
     public MapBounds getMapBounds() { return mapBounds; }
     @Override public int getMapWidth() { return mapBounds.getWidth(); }
     @Override public int getMapHeight() { return mapBounds.getHeight(); }
@@ -271,12 +291,16 @@ public final class WaypointClientConfiguration
                 + "\", serverMapSyncMinutes=" + serverMapSyncMinutes
                 + ", serverMapShowDeeds=" + serverMapShowDeeds
                 + ", serverMapShowHighways=" + serverMapShowHighways
+                + ", deedProviderEnabled=" + deedProviderEnabled
+                + ", deedProviderCacheDirectory=\"" + deedProviderCacheDirectory
+                + "\", deedProviderMappings="
+                + (deedProviderMappings.isEmpty() ? "none" : "configured")
                 + ", mapBounds=" + mapBounds.getWidth() + "x" + mapBounds.getHeight()
-                + ", phase2MaxCompassMarkers=" + maximumCompassMarkers
-                + ", phase2MaxWorldEffects=" + maximumWorldEffects
-                + ", phase2WorldEffectDistanceMetres=" + worldEffectDistanceMetres
-                + ", phase2MaxWorldLabels=" + maximumWorldLabels
-                + ", phase2WorldLabelDistanceMetres=" + worldLabelDistanceMetres
+                + ", maximumCompassMarkers=" + maximumCompassMarkers
+                + ", maximumWorldEffects=" + maximumWorldEffects
+                + ", worldEffectDistanceMetres=" + worldEffectDistanceMetres
+                + ", maximumWorldLabels=" + maximumWorldLabels
+                + ", worldLabelDistanceMetres=" + worldLabelDistanceMetres
                 + ", scannerNotifications=" + scannerNotifications
                 + ", scannerOutlines=" + scannerOutlines
                 + ", scannerMaximumOutlines=" + scannerMaximumOutlines

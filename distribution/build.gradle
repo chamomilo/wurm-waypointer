@@ -10,6 +10,7 @@ dependencies {
     bundled project(':feature-archaeology')
     bundled project(':feature-lootmaps')
     bundled project(':feature-map')
+    bundled project(':feature-deeds')
     bundled project(':feature-surroundings')
     bundled project(':render-wurm')
     bundled project(':client-wurm')
@@ -17,7 +18,7 @@ dependencies {
 
 jar {
     dependsOn ':api:jar', ':core:jar', ':feature-archaeology:jar', ':feature-lootmaps:jar',
-            ':feature-map:jar', ':feature-surroundings:jar',
+            ':feature-map:jar', ':feature-deeds:jar', ':feature-surroundings:jar',
             ':render-wurm:jar', ':client-wurm:jar'
     archiveFileName = "wurm-waypointer-${project.version}.jar"
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
@@ -76,11 +77,20 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
                 'org/waypoints/next/surroundings/UniqueStatus.class',
                 'org/waypoints/next/map/ServerMapProfile.class',
                 'org/waypoints/next/map/SklotopolisMapProfiles.class',
+                'org/waypoints/next/map/DeedSearchRanker.class',
                 'org/waypoints/next/map/MapViewport.class',
+                'org/waypoints/next/map/MiniMapState.class',
                 'org/waypoints/next/map/SurfaceTileIndex.class',
                 'org/waypoints/next/map/DeedParser.class',
                 'org/waypoints/next/map/ServerMapSnapshot.class',
                 'org/waypoints/next/map/SklotopolisMapService.class',
+                'org/waypoints/next/deeds/DeedProvider.class',
+                'org/waypoints/next/deeds/SklotopolisDeedProvider.class',
+                'org/waypoints/next/deeds/GenericJsonDeedProvider.class',
+                'org/waypoints/next/deeds/GenericCsvDeedProvider.class',
+                'org/waypoints/next/deeds/NoDeedProvider.class',
+                'org/waypoints/next/deeds/DeedWaypointService.class',
+                'org/waypoints/next/integration/DeedProviderRuntime.class',
                 'org/waypoints/next/model/ServerEndpoint.class',
                 'org/waypoints/next/service/ServerIdentitySession.class',
                 'org/waypoints/next/model/WaypointRecord.class',
@@ -116,12 +126,18 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
                 'com/wurmonline/client/renderer/gui/WaypointManagerWindow.class',
                 'com/wurmonline/client/renderer/gui/WaypointManagerWindowBridge.class',
                 'com/wurmonline/client/renderer/gui/ServerMapWindowBridge.class',
+                'com/wurmonline/client/renderer/gui/MiniMapCanvas.class',
+                'com/wurmonline/client/renderer/gui/MiniMapWindow.class',
+                'com/wurmonline/client/renderer/gui/MiniMapWindowBridge.class',
+                'com/wurmonline/client/renderer/gui/text/WaypointerMiniMapFonts.class',
                 'com/wurmonline/client/resources/WaypointerFileResourceUrl.class',
                 'com/wurmonline/client/resources/textures/WaypointerTextureFilters.class',
                 'com/wurmonline/client/renderer/gui/DeedSearchWindow.class',
                 'com/wurmonline/client/renderer/gui/DeedSearchWindowBridge.class',
                 'com/wurmonline/client/renderer/gui/DeedInformationWindow.class',
                 'com/wurmonline/client/renderer/gui/DeedInformationWindowBridge.class',
+                'com/wurmonline/client/renderer/gui/CustomMapMarkWindow.class',
+                'com/wurmonline/client/renderer/gui/CustomMapMarkWindowBridge.class',
                 'com/wurmonline/client/renderer/gui/SurroundingsWindow.class',
                 'com/wurmonline/client/renderer/gui/SurroundingsMonitoringWindow.class',
                 'com/wurmonline/client/renderer/gui/SurroundingsScrollPanel.class',
@@ -162,6 +178,31 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
             throw new GradleException(
                     'Installable Wurm Waypointer artifact is missing ' + mapWordmark)
         }
+        [
+                'org/waypoints/next/map/mini-map-frame.png',
+                'org/waypoints/next/map/mini-map-background.png',
+                'org/waypoints/next/map/mini-map-nameplate.png',
+                'org/waypoints/next/map/main-map-frame.png',
+                'org/waypoints/next/map/gallery/liberty.png',
+                'org/waypoints/next/map/gallery/novus.png',
+                'org/waypoints/next/map/gallery/caza.png',
+                'org/waypoints/next/map/gallery/infinity-r5.png',
+                'org/waypoints/next/map/gallery/old-infinity.png'
+        ].each { mapAsset ->
+            if (contents.matching { include mapAsset }.files.empty) {
+                throw new GradleException(
+                        'Installable Wurm Waypointer artifact is missing ' + mapAsset)
+            }
+        }
+        [
+                'org/waypoints/next/compass/compass-hud-base.png',
+                'org/waypoints/next/compass/compass-hud-needle.png'
+        ].each { compassAsset ->
+            if (contents.matching { include compassAsset }.files.empty) {
+                throw new GradleException(
+                        'Installable Wurm Waypointer artifact is missing ' + compassAsset)
+            }
+        }
         def forbidden = contents.matching {
             include 'com/hypercore/**'
             include 'com/wurmonline/client/renderer/gui/WaypointComponent.class'
@@ -187,6 +228,23 @@ task dist(type: Zip, dependsOn: [test, verifyArtifact]) {
             from(rootProject.file(
                     'client-wurm/src/main/resources/org/waypoints/next/map')) {
                 include 'sklotopolis-wordmark.png'
+                include 'mini-map-frame.png'
+                include 'mini-map-background.png'
+                include 'mini-map-nameplate.png'
+                include 'main-map-frame.png'
+            }
+        }
+        into('assets/gallery') {
+            from(rootProject.file(
+                    'client-wurm/src/main/resources/org/waypoints/next/map/gallery')) {
+                include '*.png'
+            }
+        }
+        into('assets/compass') {
+            from(rootProject.file(
+                    'render-wurm/src/main/resources/org/waypoints/next/compass')) {
+                include 'compass-hud-base.png'
+                include 'compass-hud-needle.png'
             }
         }
     }
@@ -215,6 +273,17 @@ task dist(type: Zip, dependsOn: [test, verifyArtifact]) {
                 'mods/wurm-waypointer/THIRD_PARTY_NOTICES.md',
                 'mods/wurm-waypointer/LICENSE',
                 'mods/wurm-waypointer/assets/sklotopolis-wordmark.png',
+                'mods/wurm-waypointer/assets/mini-map-frame.png',
+                'mods/wurm-waypointer/assets/mini-map-background.png',
+                'mods/wurm-waypointer/assets/mini-map-nameplate.png',
+                'mods/wurm-waypointer/assets/main-map-frame.png',
+                'mods/wurm-waypointer/assets/gallery/liberty.png',
+                'mods/wurm-waypointer/assets/gallery/novus.png',
+                'mods/wurm-waypointer/assets/gallery/caza.png',
+                'mods/wurm-waypointer/assets/gallery/infinity-r5.png',
+                'mods/wurm-waypointer/assets/gallery/old-infinity.png',
+                'mods/wurm-waypointer/assets/compass/compass-hud-base.png',
+                'mods/wurm-waypointer/assets/compass/compass-hud-needle.png',
                 "mods/wurm-waypointer/wurm-waypointer-${project.version}.jar"
         ].sort()
         if (actual != expected) {

@@ -41,6 +41,16 @@ final class ConfigurationProperties {
         return invalid(key, defaultValue, "true or false", null);
     }
 
+    String textValue(String key, String defaultValue, int maximumLength) {
+        String value = text(key, defaultValue);
+        if (value.length() > maximumLength || value.indexOf('\r') >= 0
+                || value.indexOf('\n') >= 0) {
+            return invalid(key, defaultValue,
+                    "at most " + maximumLength + " characters on one line", null);
+        }
+        return value;
+    }
+
     int integer(String key, int defaultValue, int minimum, int maximum) {
         String value = text(key, Integer.toString(defaultValue));
         try {
@@ -50,6 +60,12 @@ final class ConfigurationProperties {
         } catch (RuntimeException invalid) {
             return invalid(key, defaultValue, minimum + ".." + maximum, invalid);
         }
+    }
+
+    int integer(String key, String legacyKey, int defaultValue,
+                int minimum, int maximum) {
+        String selected = source.containsKey(key) ? key : legacyKey;
+        return integer(selected, defaultValue, minimum, maximum);
     }
 
     float decimal(String key, float defaultValue, float minimum, float maximum) {

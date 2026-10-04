@@ -2,6 +2,9 @@ package org.waypoints.next.render;
 
 /** Pure Wurm-bearing and compass-marker geometry. */
 public final class CompassMarkerGeometry {
+    /** Radius of the visible glass contour inside the circular HUD artwork. */
+    private static final float GLASS_CONTOUR_RADIUS_RATIO = 0.36f;
+
     private CompassMarkerGeometry() {
     }
 
@@ -38,12 +41,22 @@ public final class CompassMarkerGeometry {
         // Wurm uses 0=north, 90=east, while world Y increases southward.
         float bearing = normalize((float) Math.toDegrees(Math.atan2(deltaX, -deltaY)));
         float relativeRadians = (float) Math.toRadians(normalizeSigned(bearing - playerFacing));
-        float radius = Math.min(compassWidth, compassHeight) * 0.39f;
+        float radius = glassContourRadius(compassWidth, compassHeight);
         int markerX = Math.round(centerX + (float) Math.sin(relativeRadians) * radius);
         int markerY = Math.round(centerY - (float) Math.cos(relativeRadians) * radius);
         output[0] = markerX;
         output[1] = markerY;
         output[2] = 0;
+    }
+
+    /** Pixel radius used by every waypoint travelling around the glass rim. */
+    public static float glassContourRadius(int compassWidth, int compassHeight) {
+        return Math.min(compassWidth, compassHeight) * GLASS_CONTOUR_RADIUS_RATIO;
+    }
+
+    /** Rotation for a north-up needle rendered over the player-relative dial. */
+    public static float northNeedleRadians(float playerFacing) {
+        return (float) Math.toRadians(-normalizeSigned(playerFacing));
     }
 
     public static boolean hit(Position marker, int mouseX, int mouseY, int radius) {

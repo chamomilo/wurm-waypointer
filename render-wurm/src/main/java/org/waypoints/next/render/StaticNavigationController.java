@@ -449,6 +449,20 @@ public final class StaticNavigationController {
         return frame;
     }
 
+    public synchronized GroundNavigationRouteEffect.RouteSnapshot
+    currentNavigatorRoute() {
+        GroundNavigationRouteEffect current = navigatorEffect;
+        return current == null || !current.isAlive()
+                ? null : current.getRouteSnapshot();
+    }
+
+    public synchronized GroundNavigationRouteEffect.RouteSnapshot
+    currentNavigatorMapRoute() {
+        GroundNavigationRouteEffect current = navigatorEffect;
+        return current == null || !current.isAlive()
+                ? null : current.getMapRouteSnapshot();
+    }
+
     public synchronized void rendererCleared(Object clearedRenderer) {
         if (clearedRenderer == null || renderer != clearedRenderer) return;
         int invalidated = effects.size();

@@ -5,9 +5,12 @@ import com.wurmonline.client.resources.textures.ResourceTexture;
 import com.wurmonline.client.resources.textures.ResourceTextureLoader;
 import com.wurmonline.client.resources.textures.WaypointerTextureFilters;
 import com.wurmonline.client.renderer.Matrix;
+import com.wurmonline.client.renderer.PickData;
 import com.wurmonline.client.renderer.backend.Primitive;
 import com.wurmonline.client.renderer.backend.Queue;
+import com.wurmonline.client.renderer.effects.GroundNavigationRouteEffect;
 import com.wurmonline.client.renderer.gui.text.TextFont;
+import com.wurmonline.client.renderer.gui.text.WaypointerMiniMapFonts;
 import org.waypoints.next.integration.WurmWaypointerRuntime;
 import org.waypoints.next.map.Deed;
 import org.waypoints.next.map.MapPoint;
@@ -15,6 +18,7 @@ import org.waypoints.next.map.MapOverlayVisibility;
 import org.waypoints.next.map.MapViewport;
 import org.waypoints.next.map.ServerMapProfile;
 import org.waypoints.next.map.ServerMapSnapshot;
+import org.waypoints.next.map.SklotopolisMapProfiles;
 import org.waypoints.next.map.SurfaceTileIndex;
 import org.waypoints.next.model.MarkerStyle;
 import org.waypoints.next.model.ServerIdentity;
@@ -22,10 +26,13 @@ import org.waypoints.next.model.WaypointCoordinate;
 import org.waypoints.next.model.WaypointLayer;
 import org.waypoints.next.model.WaypointRecord;
 import org.waypoints.next.navigation.HighwayTileIndex;
+import org.waypoints.next.navigation.NavigationTarget;
+import org.waypoints.next.render.NavigationRenderFrame;
 import org.waypoints.next.service.WaypointRevisionSnapshot;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -47,13 +54,20 @@ public final class ServerMapWindowBridge {
     private static final int CONTENT_WIDTH = 920;
     private static final int CONTENT_HEIGHT = 620;
     private static final int DRAG_THRESHOLD_PIXELS = 5;
+    private static final int MAIN_MAP_FRAME_INSET = 22;
+    private static final int MAIN_MAP_FRAME_OVERSCAN = 2;
+    private static final int MAIN_MAP_EDGE_GUARD = 2;
+    private static final double OVERVIEW_PIXELS_PER_TILE = 0.25d;
+    private static final int MAXIMUM_OVERVIEW_HIGHWAY_SEGMENTS = 3_000;
     private static final int SEARCH_BUTTON_SIZE = 32;
-    private static final int SEARCH_BUTTON_RIGHT = 8;
+    private static final int SEARCH_BUTTON_RIGHT = MAIN_MAP_FRAME_INSET + 8;
     private static final int SEARCH_BUTTON_TOP = 25;
     private static final int LAYER_BUTTON_WIDTH = 64;
     private static final int LAYER_BUTTON_HEIGHT = 32;
     private static final int LAYER_BUTTON_GAP = 4;
     private static final int LAYER_BUTTON_COUNT = 3;
+    private static final int MINI_MAP_BUTTON_WIDTH = 88;
+    private static final int NAV_LINE_BUTTON_WIDTH = 88;
     private static final MapOverlayVisibility.Layer[] LAYER_BUTTONS = {
             MapOverlayVisibility.Layer.DEEDS,
             MapOverlayVisibility.Layer.HIGHWAYS,
@@ -69,6 +83,28 @@ public final class ServerMapWindowBridge {
     private static final float MAP_WATER_BLUE = 111.0f / 255.0f;
     private static final Path WORDMARK_FILE = Paths.get("mods",
             "wurm-waypointer", "assets", "sklotopolis-wordmark.png");
+    private static final Path MINI_MAP_FRAME_FILE = Paths.get("mods",
+            "wurm-waypointer", "assets", "mini-map-frame.png");
+    private static final Path MINI_MAP_BACKGROUND_FILE = Paths.get("mods",
+            "wurm-waypointer", "assets", "mini-map-background.png");
+    private static final Path MINI_MAP_NAMEPLATE_FILE = Paths.get("mods",
+            "wurm-waypointer", "assets", "mini-map-nameplate.png");
+    private static final Path MAIN_MAP_FRAME_FILE = Paths.get("mods",
+            "wurm-waypointer", "assets", "main-map-frame.png");
+    private static final Path[] MAP_GALLERY_FILES = {
+            galleryFile("liberty.png"), galleryFile("novus.png"),
+            galleryFile("caza.png"), galleryFile("infinity-r5.png"),
+            galleryFile("old-infinity.png")
+    };
+    private static final String[] MAP_GALLERY_LABELS = {
+            "LIBERTY", "NOVUS", "CAZA", "INFINITY R5", "OLD INFINITY"
+    };
+    private static final String[] MAP_GALLERY_PROFILE_IDS = {
+            "sklotopolis-liberty", "sklotopolis-novus", "sklotopolis-caza",
+            "sklotopolis-infinity-r5", "sklotopolis-old-infinity"
+    };
+    private static final TextFont MAIN_TITLE_TEXT =
+            WaypointerMiniMapFonts.healthbarTitle();
     private static final Matrix LINE_MATRIX = new Matrix();
     private static final Map<WorldMap, State> STATES =
             new WeakHashMap<WorldMap, State>();
@@ -84,8 +120,18 @@ public final class ServerMapWindowBridge {
             });
     private static PreparedSurface prepared;
     private static PreparedArtwork wordmark;
+    private static PreparedArtwork miniMapFrame;
+    private static PreparedArtwork miniMapBackground;
+    private static PreparedArtwork miniMapNameplate;
+    private static PreparedArtwork mainMapFrame;
+    private static final PreparedArtwork[] mapGallery =
+            new PreparedArtwork[MAP_GALLERY_FILES.length];
 
     private ServerMapWindowBridge() { }
+
+    private static Path galleryFile(String name) {
+        return Paths.get("mods", "wurm-waypointer", "assets", "gallery", name);
+    }
 
     /** Called instead of ClusterMap.render; false means render vanilla content. */
     public static boolean render(Queue queue) {
@@ -93,34 +139,39 @@ public final class ServerMapWindowBridge {
             HeadsUpDisplay hud = WurmComponent.hud;
             WorldMap map = hud == null ? null : hud.getWorldMap();
             ServerMapSnapshot snapshot = WurmWaypointerRuntime.serverMapSnapshot();
-            if (map == null || queue == null || snapshot == null
-                    || snapshot.getProfile() == null || !snapshot.hasSurface()) {
-                return false;
+            ServerMapProfile profile = customProfile(snapshot);
+            if (map == null || queue == null || profile == null) return false;
+
+            int left = map.x + CONTENT_OFFSET_X;
+            int top = map.y + CONTENT_OFFSET_Y;
+            PreparedSurface surface = snapshot != null && snapshot.hasSurface()
+                    ? prepare(snapshot) : null;
+            if (surface == null || !surface.ready || surface.failed) {
+                renderLoadingGallery(map, queue, profile, left, top);
+                return true;
             }
-            PreparedSurface surface = prepare(snapshot);
-            if (!surface.ready || surface.failed) return false;
             if (surface.texture == null) {
                 surface.texture = WaypointerTextureFilters
                         .useCrispMagnification(
                                 ResourceTextureLoader.getPreparedTexture(
                                         surface.url, surface.request));
             }
-            scheduleSurfaceIndex(surface, snapshot.getProfile());
+            scheduleSurfaceIndex(surface, profile);
             if (surface.texture == null) {
                 reportOnce("texture-unavailable",
                         "Prepared server map texture is missing", null);
-                return false;
+                renderLoadingGallery(map, queue, profile, left, top);
+                return true;
             }
             if (!surface.texture.isValid() && !surface.texture.needReinit()) {
                 reportOnce("texture-invalid",
                         "Prepared server map texture cannot be initialized", null);
-                return false;
+                renderLoadingGallery(map, queue, profile, left, top);
+                return true;
             }
 
-            State state = state(map, snapshot.getProfile());
+            State state = state(map, profile);
             state.viewport.resize(CONTENT_WIDTH, CONTENT_HEIGHT);
-            int left = map.x + CONTENT_OFFSET_X;
-            int top = map.y + CONTENT_OFFSET_Y;
             HeadsUpDisplay.scissor.pushClip(
                     left, top, CONTENT_WIDTH, CONTENT_HEIGHT);
             try {
@@ -129,7 +180,7 @@ public final class ServerMapWindowBridge {
                 if (!state.firstFrameLogged) {
                     state.firstFrameLogged = true;
                     LOGGER.info("Native server map rendered its first frame: profile="
-                            + snapshot.getProfile().getId() + ", texture="
+                            + profile.getId() + ", texture="
                             + surface.texture.getWidth() + "x"
                             + surface.texture.getHeight() + ", glReady="
                             + surface.texture.isValid() + ", queuedForGlInit="
@@ -156,16 +207,7 @@ public final class ServerMapWindowBridge {
                         HeadsUpDisplay.scissor.popClip();
                     }
                 }
-                try {
-                    drawBranding(queue, wordmarkTexture(),
-                            snapshot.getProfile(), left, top);
-                    drawStatus(map, queue, state, snapshot.getProfile(), left, top);
-                    drawLayerButtons(map, queue, state, left, top);
-                    drawSearchButton(map, queue, state, left, top);
-                } catch (Throwable failure) {
-                    reportOnce("status", "Server map status overlay failed open",
-                            failure);
-                }
+                drawMainMapChrome(map, queue, state, profile, left, top);
                 return true;
             } finally {
                 HeadsUpDisplay.scissor.popClip();
@@ -176,27 +218,112 @@ public final class ServerMapWindowBridge {
         }
     }
 
+    /** True only on a known Sklotopolis world; other servers keep vanilla chrome. */
+    public static boolean usesCustomWindow() {
+        try {
+            return customProfile(WurmWaypointerRuntime.serverMapSnapshot()) != null;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    /** Replaces the stock World Map title bar with the reused healthbar plate. */
+    public static void renderWindowTitle(WorldMap map, Queue queue) {
+        if (map == null || queue == null) return;
+        ServerMapProfile profile = customProfile(
+                WurmWaypointerRuntime.serverMapSnapshot());
+        if (profile == null) return;
+        String display = profile.getDisplayName() == null ? ""
+                : profile.getDisplayName().trim().replace(' ', '-');
+        drawNameplate(queue, miniMapNameplateTexture(),
+                map.x + CONTENT_OFFSET_X + 3, map.y,
+                Math.max(54, Math.min(CONTENT_WIDTH - 5,
+                        MAIN_TITLE_TEXT.getWidth("Map of: " + display) + 30)),
+                "Map of: " + display);
+    }
+
+    /** Draws the compact player-centred view without taking ownership of it. */
+    static boolean renderMiniMap(WurmComponent map, Queue queue,
+                                 MapViewport viewport,
+                                 ServerMapSnapshot snapshot,
+                                 boolean showDeeds,
+                                 int left, int top, int size) {
+        try {
+            if (map == null || queue == null || viewport == null
+                    || snapshot == null || snapshot.getProfile() == null
+                    || !snapshot.hasSurface() || size < 1) return false;
+            PreparedSurface surface = prepare(snapshot);
+            if (!surface.ready || surface.failed) return false;
+            if (surface.texture == null) {
+                surface.texture = WaypointerTextureFilters
+                        .useCrispMagnification(
+                                ResourceTextureLoader.getPreparedTexture(
+                                        surface.url, surface.request));
+            }
+            scheduleSurfaceIndex(surface, snapshot.getProfile());
+            if (surface.texture == null
+                    || (!surface.texture.isValid()
+                    && !surface.texture.needReinit())) return false;
+
+            HeadsUpDisplay.scissor.pushClip(left, top, size, size);
+            try {
+                map.fillRect(queue, MAP_WATER_RED, MAP_WATER_GREEN,
+                        MAP_WATER_BLUE, 1.0f, left, top, size, size);
+                drawSurface(queue, surface.texture, viewport,
+                        left, top, size, size);
+                if (MiniMapWindowBridge.areRoadsVisible()) {
+                    drawHighways(queue, viewport, left, top, size, size,
+                            WurmWaypointerRuntime.serverMapHighways());
+                }
+                if (showDeeds) drawMiniMapDeeds(map, queue, viewport,
+                        left, top, size, snapshot.getDeeds());
+                if (MiniMapWindowBridge.isNavigationLineVisible()) {
+                    drawNavigationLine(queue, viewport, left, top, size, size);
+                }
+                drawMiniMapWaypoints(map, queue, viewport, left, top, size,
+                        WurmWaypointerRuntime.serverMapWaypoints(),
+                        WurmWaypointerRuntime.currentServerIdentity(),
+                        WurmWaypointerRuntime.currentPlayerName());
+                drawPlayer(map, queue, viewport, left, top, size, size);
+                return true;
+            } finally {
+                HeadsUpDisplay.scissor.popClip();
+            }
+        } catch (Throwable failure) {
+            reportOnce("mini-map", "Mini-map render failed open", failure);
+            return false;
+        }
+    }
+
     private static void drawOverlays(WorldMap map, Queue queue, State state,
                                      ServerMapSnapshot snapshot,
                                      int left, int top) {
         // Once the validated surface has rendered, an optional overlay
         // failure must not return control to vanilla ClusterMap: it would
         // paint its own map on top and hide the working server surface.
-        if (state.overlays.isVisible(
+        if (layerVisible(state,
                 MapOverlayVisibility.Layer.HIGHWAYS)) try {
-            drawHighways(map, queue, state.viewport, left, top,
+            drawHighways(queue, state.viewport, left, top,
+                    CONTENT_WIDTH, CONTENT_HEIGHT,
                     WurmWaypointerRuntime.serverMapHighways());
         } catch (Throwable failure) {
             reportOnce("highways", "Server map Highways overlay failed open",
                     failure);
         }
-        if (state.overlays.isVisible(MapOverlayVisibility.Layer.DEEDS)) try {
+        if (layerVisible(state, MapOverlayVisibility.Layer.DEEDS)) try {
             drawDeeds(map, queue, state.viewport, left, top,
                     snapshot.getDeeds(), state);
         } catch (Throwable failure) {
             reportOnce("deeds", "Server map deed overlay failed open", failure);
         }
-        if (state.overlays.isVisible(MapOverlayVisibility.Layer.WAYPOINTS)) try {
+        if (MiniMapWindowBridge.isNavigationLineVisible()) try {
+            drawNavigationLine(queue, state.viewport, left, top,
+                    CONTENT_WIDTH, CONTENT_HEIGHT);
+        } catch (Throwable failure) {
+            reportOnce("navigation-line",
+                    "Server map navigation line failed open", failure);
+        }
+        if (layerVisible(state, MapOverlayVisibility.Layer.WAYPOINTS)) try {
             drawWaypoints(map, queue, state.viewport, left, top,
                     WurmWaypointerRuntime.serverMapWaypoints(),
                     WurmWaypointerRuntime.currentServerIdentity(),
@@ -214,6 +341,24 @@ public final class ServerMapWindowBridge {
     public static boolean leftPressed(WorldMap map, int mouseX, int mouseY) {
         State state = activeState(map);
         if (state == null || !insideContent(map, mouseX, mouseY)) return false;
+        if (insideCloseButton(map, mouseX, mouseY)) {
+            state.closeButtonPressed = true;
+            state.dragging = false;
+            updateHover(map, state, mouseX, mouseY);
+            return true;
+        }
+        if (insideNavigationLineButton(map, mouseX, mouseY)) {
+            state.navigationLineButtonPressed = true;
+            state.dragging = false;
+            updateHover(map, state, mouseX, mouseY);
+            return true;
+        }
+        if (insideMiniMapButton(map, mouseX, mouseY)) {
+            state.miniMapButtonPressed = true;
+            state.dragging = false;
+            updateHover(map, state, mouseX, mouseY);
+            return true;
+        }
         MapOverlayVisibility.Layer layer = layerButtonAt(map, mouseX, mouseY);
         if (layer != null) {
             state.pressedLayerButton = layer;
@@ -248,6 +393,18 @@ public final class ServerMapWindowBridge {
             updateHover(map, state, mouseX, mouseY);
             return true;
         }
+        if (state.closeButtonPressed) {
+            updateHover(map, state, mouseX, mouseY);
+            return true;
+        }
+        if (state.miniMapButtonPressed) {
+            updateHover(map, state, mouseX, mouseY);
+            return true;
+        }
+        if (state.navigationLineButtonPressed) {
+            updateHover(map, state, mouseX, mouseY);
+            return true;
+        }
         if (!state.dragging) return false;
         int dx = mouseX - state.lastX;
         int dy = mouseY - state.lastY;
@@ -265,11 +422,36 @@ public final class ServerMapWindowBridge {
     public static boolean leftReleased(WorldMap map, int mouseX, int mouseY) {
         State state = activeState(map);
         if (state == null) return false;
+        if (state.closeButtonPressed) {
+            state.closeButtonPressed = false;
+            updateHover(map, state, mouseX, mouseY);
+            if (insideCloseButton(map, mouseX, mouseY)) {
+                HeadsUpDisplay current = WurmComponent.hud;
+                if (current != null) current.hideComponent(map);
+            }
+            return true;
+        }
+        if (state.navigationLineButtonPressed) {
+            state.navigationLineButtonPressed = false;
+            updateHover(map, state, mouseX, mouseY);
+            if (insideNavigationLineButton(map, mouseX, mouseY)) {
+                MiniMapWindowBridge.toggleNavigationLine();
+            }
+            return true;
+        }
+        if (state.miniMapButtonPressed) {
+            state.miniMapButtonPressed = false;
+            updateHover(map, state, mouseX, mouseY);
+            if (insideMiniMapButton(map, mouseX, mouseY)) {
+                MiniMapWindowBridge.toggle(WurmComponent.hud);
+            }
+            return true;
+        }
         if (state.pressedLayerButton != null) {
             MapOverlayVisibility.Layer pressed = state.pressedLayerButton;
             state.pressedLayerButton = null;
             if (pressed == layerButtonAt(map, mouseX, mouseY)) {
-                state.overlays.toggle(pressed);
+                toggleLayer(state, pressed);
             }
             updateHover(map, state, mouseX, mouseY);
             return true;
@@ -282,7 +464,7 @@ public final class ServerMapWindowBridge {
                 ServerMapSnapshot snapshot = WurmWaypointerRuntime
                         .serverMapSnapshot();
                 if (current != null && snapshot != null) {
-                    DeedSearchWindowBridge.open(current, snapshot.getDeeds());
+                    DeedSearchWindowBridge.open(current, snapshot);
                 }
             }
             return true;
@@ -298,10 +480,15 @@ public final class ServerMapWindowBridge {
     public static boolean rightPressed(WorldMap map, int mouseX, int mouseY) {
         State state = activeState(map);
         if (state == null || !insideContent(map, mouseX, mouseY)) return false;
+        if (insideNavigationLineButton(map, mouseX, mouseY)) return true;
+        if (insideMiniMapButton(map, mouseX, mouseY)) return true;
         if (layerButtonAt(map, mouseX, mouseY) != null) return true;
         if (insideSearchButton(map, mouseX, mouseY)) return true;
+        if (insideCloseButton(map, mouseX, mouseY)) return true;
         updateHover(map, state, mouseX, mouseY);
-        requestWaypoint(map, state, mouseX, mouseY);
+        requestCustomMarkAt(state.viewport,
+                mouseX - map.x - CONTENT_OFFSET_X,
+                mouseY - map.y - CONTENT_OFFSET_Y);
         return true;
     }
 
@@ -311,7 +498,10 @@ public final class ServerMapWindowBridge {
         if (state == null || !insideContent(map, mouseX, mouseY)
                 || !isTopmostMapTarget(map, mouseX, mouseY)) return false;
         if (layerButtonAt(map, mouseX, mouseY) != null
-                || insideSearchButton(map, mouseX, mouseY)) return true;
+                || insideSearchButton(map, mouseX, mouseY)
+                || insideCloseButton(map, mouseX, mouseY)
+                || insideMiniMapButton(map, mouseX, mouseY)
+                || insideNavigationLineButton(map, mouseX, mouseY)) return true;
         double steps = -wheelDelta / 3.0d;
         if (steps == 0.0d) steps = wheelDelta < 0 ? 1.0d : -1.0d;
         steps = Math.max(-4.0d, Math.min(4.0d, steps));
@@ -345,6 +535,40 @@ public final class ServerMapWindowBridge {
         if (state != null) updateHover(map, state, mouseX, mouseY);
     }
 
+    public static boolean pick(WorldMap map, PickData pickData,
+                               int mouseX, int mouseY) {
+        State state = activeState(map);
+        if (state == null || pickData == null
+                || !insideContent(map, mouseX, mouseY)) return false;
+        updateHover(map, state, mouseX, mouseY);
+        String hover = "";
+        if (state.navigationLineButtonHover) {
+            hover = "NAV LINE: continuous active-navigation line is "
+                    + (MiniMapWindowBridge.isNavigationLineVisible()
+                    ? "visible" : "hidden") + " on both maps";
+        } else if (state.miniMapButtonHover) {
+            hover = "MINI MAP: " + (MiniMapWindowBridge.isEnabled()
+                    ? "enabled" : "disabled");
+        } else if (state.hoveredLayerButton != null) {
+            hover = layerButtonHelp(state.hoveredLayerButton,
+                    layerVisible(state, state.hoveredLayerButton));
+        } else if (state.searchButtonHover) {
+            hover = "Search deeds";
+        } else if (state.closeButtonHover) {
+            hover = "Close map";
+        } else {
+            List<String> lines = mapHoverLines(state.viewport,
+                    mouseX - map.x - CONTENT_OFFSET_X,
+                    mouseY - map.y - CONTENT_OFFSET_Y,
+                    layerVisible(state, MapOverlayVisibility.Layer.DEEDS),
+                    layerVisible(state, MapOverlayVisibility.Layer.WAYPOINTS));
+            for (String line : lines) pickData.addText(line);
+            return true;
+        }
+        if (hover != null && !hover.isEmpty()) pickData.addText(hover);
+        return true;
+    }
+
     public static boolean suppressVanillaContextMenu(WorldMap map) {
         return activeState(map) != null;
     }
@@ -367,7 +591,22 @@ public final class ServerMapWindowBridge {
         STATES.clear();
         prepared = null;
         wordmark = null;
+        miniMapFrame = null;
+        miniMapBackground = null;
+        miniMapNameplate = null;
+        mainMapFrame = null;
+        for (int index = 0; index < mapGallery.length; index++) {
+            mapGallery[index] = null;
+        }
         REPORTED_FAILURES.clear();
+    }
+
+    private static ServerMapProfile customProfile(ServerMapSnapshot snapshot) {
+        if (snapshot != null && snapshot.getProfile() != null) {
+            return snapshot.getProfile();
+        }
+        return SklotopolisMapProfiles.resolve(
+                WurmWaypointerRuntime.currentServerIdentity());
     }
 
     private static synchronized PreparedSurface prepare(
@@ -455,6 +694,84 @@ public final class ServerMapWindowBridge {
         }
     }
 
+    static synchronized ResourceTexture miniMapFrameTexture() {
+        miniMapFrame = prepareArtwork(miniMapFrame, MINI_MAP_FRAME_FILE,
+                "Mini-map frame", "mini-map-frame-prepare");
+        return readyArtwork(miniMapFrame, "mini-map-frame");
+    }
+
+    static synchronized ResourceTexture miniMapBackgroundTexture() {
+        miniMapBackground = prepareArtwork(miniMapBackground,
+                MINI_MAP_BACKGROUND_FILE, "Mini-map background",
+                "mini-map-background-prepare");
+        return readyArtwork(miniMapBackground, "mini-map-background");
+    }
+
+    static synchronized ResourceTexture miniMapNameplateTexture() {
+        miniMapNameplate = prepareArtwork(miniMapNameplate,
+                MINI_MAP_NAMEPLATE_FILE, "Mini-map nameplate",
+                "mini-map-nameplate-prepare");
+        return readyArtwork(miniMapNameplate, "mini-map-nameplate");
+    }
+
+    private static synchronized ResourceTexture mainMapFrameTexture() {
+        mainMapFrame = prepareArtwork(mainMapFrame, MAIN_MAP_FRAME_FILE,
+                "Main-map frame", "main-map-frame-prepare");
+        return readyArtwork(mainMapFrame, "main-map-frame");
+    }
+
+    private static synchronized ResourceTexture mapGalleryTexture(int index) {
+        if (index < 0 || index >= mapGallery.length) return null;
+        mapGallery[index] = prepareArtwork(mapGallery[index],
+                MAP_GALLERY_FILES[index],
+                "Sklotopolis map preview " + MAP_GALLERY_LABELS[index],
+                "map-gallery-prepare-" + index);
+        return readyArtwork(mapGallery[index], "map-gallery-" + index);
+    }
+
+    private static PreparedArtwork prepareArtwork(PreparedArtwork current,
+                                                    Path path,
+                                                    String label,
+                                                    final String failureKey) {
+        if (current != null) return current;
+        final PreparedArtwork next = new PreparedArtwork(
+                new WaypointerFileResourceUrl(path, 1L), label);
+        TEXTURE_WORKER.execute(new Runnable() {
+            @Override public void run() {
+                try {
+                    ResourceTextureLoader.prepareTexture(next.url,
+                            next.request, false);
+                    next.ready = true;
+                } catch (Throwable failure) {
+                    next.failed = true;
+                    next.ready = true;
+                    reportOnce(failureKey,
+                            next.label + " could not be prepared", failure);
+                }
+            }
+        });
+        return next;
+    }
+
+    private static ResourceTexture readyArtwork(PreparedArtwork artwork,
+                                                 String failureKey) {
+        try {
+            if (artwork == null || !artwork.ready || artwork.failed) return null;
+            if (artwork.texture == null) {
+                artwork.texture = ResourceTextureLoader.getPreparedTexture(
+                        artwork.url, artwork.request);
+            }
+            ResourceTexture texture = artwork.texture;
+            return texture != null && (texture.isValid() || texture.needReinit())
+                    ? texture : null;
+        } catch (Throwable failure) {
+            reportOnce(failureKey, artwork == null
+                    ? "Map artwork failed open"
+                    : artwork.label + " failed open", failure);
+            return null;
+        }
+    }
+
     private static synchronized State state(WorldMap map,
                                             ServerMapProfile profile) {
         State value = STATES.get(map);
@@ -483,14 +800,21 @@ public final class ServerMapWindowBridge {
 
     private static void drawSurface(Queue queue, ResourceTexture texture,
                                     MapViewport viewport, int left, int top) {
+        drawSurface(queue, texture, viewport, left, top,
+                CONTENT_WIDTH, CONTENT_HEIGHT);
+    }
+
+    private static void drawSurface(Queue queue, ResourceTexture texture,
+                                    MapViewport viewport, int left, int top,
+                                    int viewportWidth, int viewportHeight) {
         double imageLeft = viewport.getImageLeft();
         double imageTop = viewport.getImageTop();
         double imageWidth = viewport.getImageWidth();
         double imageHeight = viewport.getImageHeight();
         double clipLeft = Math.max(0.0d, imageLeft);
         double clipTop = Math.max(0.0d, imageTop);
-        double clipRight = Math.min(CONTENT_WIDTH, imageLeft + imageWidth);
-        double clipBottom = Math.min(CONTENT_HEIGHT, imageTop + imageHeight);
+        double clipRight = Math.min(viewportWidth, imageLeft + imageWidth);
+        double clipBottom = Math.min(viewportHeight, imageTop + imageHeight);
         if (clipRight <= clipLeft || clipBottom <= clipTop) return;
         float u = (float) ((clipLeft - imageLeft) / imageWidth);
         float v = (float) ((clipTop - imageTop) / imageHeight);
@@ -503,28 +827,252 @@ public final class ServerMapWindowBridge {
                 (float) (clipBottom - clipTop), u, v, uScale, vScale);
     }
 
-    private static void drawBranding(Queue queue, ResourceTexture logo,
-                                     ServerMapProfile profile,
-                                     int left, int top) {
-        if (logo != null) {
-            Renderer.texturedQuadAlphaBlend(queue, logo,
-                    1.0f, 1.0f, 1.0f, 0.96f,
-                    left + 10.0f, top + 28.0f, 188.0f, 43.0f,
-                    0.0f, 0.0f, 1.0f, 1.0f);
+    private static void renderLoadingGallery(WorldMap map, Queue queue,
+                                             ServerMapProfile profile,
+                                             int left, int top) {
+        HeadsUpDisplay.scissor.pushClip(left, top, CONTENT_WIDTH, CONTENT_HEIGHT);
+        try {
+            map.fillRect(queue, 0.075f, 0.050f, 0.030f, 1.0f,
+                    left, top, CONTENT_WIDTH, CONTENT_HEIGHT);
+            drawArtwork(queue, miniMapBackgroundTexture(), left, top,
+                    CONTENT_WIDTH, CONTENT_HEIGHT, 0.92f);
+
+            int cardSize = 164;
+            int rowGap = 30;
+            int firstRowLeft = left
+                    + (CONTENT_WIDTH - cardSize * 3 - rowGap * 2) / 2;
+            int secondRowLeft = left
+                    + (CONTENT_WIDTH - cardSize * 2 - rowGap) / 2;
+            int firstRowTop = top + 116;
+            int secondRowTop = top + 348;
+            for (int index = 0; index < MAP_GALLERY_FILES.length; index++) {
+                int column = index < 3 ? index : index - 3;
+                int x = (index < 3 ? firstRowLeft : secondRowLeft)
+                        + column * (cardSize + rowGap);
+                int y = index < 3 ? firstRowTop : secondRowTop;
+                drawGalleryCard(map, queue, profile, index,
+                        x, y, cardSize);
+            }
+
+            drawMainMapEdgeGuard(map, queue, left, top);
+            drawMainMapFrame(queue, left, top);
+            drawBranding(queue, wordmarkTexture(), left, top);
+            String loading = "LOADING " + mapWorldName(profile) + " MAP...";
+            int loadingX = left
+                    + (CONTENT_WIDTH - MAIN_TITLE_TEXT.getWidth(loading)) / 2;
+            MAIN_TITLE_TEXT.moveTo(loadingX, top + CONTENT_HEIGHT - 32);
+            MAIN_TITLE_TEXT.paint(queue, loading,
+                    0.97f, 0.90f, 0.68f, 1.0f);
+        } finally {
+            HeadsUpDisplay.scissor.popClip();
         }
-        String display = profile == null ? "" : profile.getDisplayName();
+    }
+
+    private static void drawGalleryCard(WorldMap map, Queue queue,
+                                        ServerMapProfile profile, int index,
+                                        int x, int y, int size) {
+        boolean active = profile != null && profile.getId().equals(
+                MAP_GALLERY_PROFILE_IDS[index]);
+        float edgeRed = active ? 0.96f : 0.28f;
+        float edgeGreen = active ? 0.76f : 0.21f;
+        float edgeBlue = active ? 0.30f : 0.13f;
+        map.fillRect(queue, 0.025f, 0.020f, 0.015f, 0.98f,
+                x - 5, y - 5, size + 10, size + 10);
+        map.fillRect(queue, edgeRed, edgeGreen, edgeBlue, 1.0f,
+                x - 3, y - 3, size + 6, size + 6);
+        map.fillRect(queue, 0.055f, 0.040f, 0.028f, 1.0f,
+                x, y, size, size);
+        ResourceTexture texture = mapGalleryTexture(index);
+        if (texture == null) {
+            map.fillRect(queue, MAP_WATER_RED, MAP_WATER_GREEN,
+                    MAP_WATER_BLUE, 1.0f, x + 3, y + 3,
+                    size - 6, size - 6);
+        } else {
+            drawArtwork(queue, texture, x + 3, y + 3,
+                    size - 6, size - 6, 1.0f);
+        }
+        String label = MAP_GALLERY_LABELS[index];
+        int labelX = x + (size - MAIN_TITLE_TEXT.getWidth(label)) / 2;
+        MAIN_TITLE_TEXT.moveTo(labelX + 1, y + size + 22);
+        MAIN_TITLE_TEXT.paint(queue, label,
+                0.03f, 0.015f, 0.008f, 1.0f);
+        MAIN_TITLE_TEXT.moveTo(labelX, y + size + 21);
+        MAIN_TITLE_TEXT.paint(queue, label,
+                active ? 1.0f : 0.88f,
+                active ? 0.86f : 0.78f,
+                active ? 0.53f : 0.62f, 1.0f);
+    }
+
+    private static void drawMainMapChrome(WorldMap map, Queue queue,
+                                          State state,
+                                          ServerMapProfile profile,
+                                          int left, int top) {
+        try {
+            drawMainMapEdgeGuard(map, queue, left, top);
+            drawMainMapFrame(queue, left, top);
+        } catch (Throwable failure) {
+            reportOnce("main-map-frame", "Server map frame failed open",
+                    failure);
+        }
+        try {
+            drawBranding(queue, wordmarkTexture(), left, top);
+        } catch (Throwable failure) {
+            reportOnce("main-map-branding", "Server map branding failed open",
+                    failure);
+        }
+        try {
+            drawStatus(map, queue, state, profile, left, top);
+        } catch (Throwable failure) {
+            reportOnce("main-map-status", "Server map status failed open",
+                    failure);
+        }
+        try {
+            drawLayerButtons(map, queue, state, left, top);
+            drawMiniMapButton(map, queue, state, left, top);
+            drawNavigationLineButton(map, queue, state, left, top);
+            drawSearchButton(map, queue, state, left, top);
+            drawCloseButton(map, queue, state, left, top);
+        } catch (Throwable failure) {
+            reportOnce("main-map-controls", "Server map controls failed open",
+                    failure);
+        }
+    }
+
+    private static void drawMainMapEdgeGuard(WorldMap map, Queue queue,
+                                             int left, int top) {
+        float red = 0.025f;
+        float green = 0.018f;
+        float blue = 0.012f;
+        map.fillRect(queue, red, green, blue, 1.0f,
+                left, top, CONTENT_WIDTH, MAIN_MAP_EDGE_GUARD);
+        map.fillRect(queue, red, green, blue, 1.0f,
+                left, top + CONTENT_HEIGHT - MAIN_MAP_EDGE_GUARD,
+                CONTENT_WIDTH, MAIN_MAP_EDGE_GUARD);
+        map.fillRect(queue, red, green, blue, 1.0f,
+                left, top, MAIN_MAP_EDGE_GUARD, CONTENT_HEIGHT);
+        map.fillRect(queue, red, green, blue, 1.0f,
+                left + CONTENT_WIDTH - MAIN_MAP_EDGE_GUARD, top,
+                MAIN_MAP_EDGE_GUARD, CONTENT_HEIGHT);
+    }
+
+    private static void drawMainMapFrame(Queue queue, int left, int top) {
+        ResourceTexture texture = mainMapFrameTexture();
+        if (texture == null) return;
+        int frameLeft = left - MAIN_MAP_FRAME_OVERSCAN;
+        int frameTop = top - MAIN_MAP_FRAME_OVERSCAN;
+        int frameWidth = CONTENT_WIDTH + MAIN_MAP_FRAME_OVERSCAN * 2;
+        int frameHeight = CONTENT_HEIGHT + MAIN_MAP_FRAME_OVERSCAN * 2;
+        int border = MAIN_MAP_FRAME_INSET + MAIN_MAP_FRAME_OVERSCAN;
+        float textureWidth = Math.max(1.0f, texture.getWidth());
+        float textureHeight = Math.max(1.0f, texture.getHeight());
+        float outerLeft = 20.0f / textureWidth;
+        float outerTop = 24.0f / textureHeight;
+        float innerLeft = 96.0f / textureWidth;
+        float innerTop = 96.0f / textureHeight;
+        float innerRight = (textureWidth - 96.0f) / textureWidth;
+        float innerBottom = (textureHeight - 96.0f) / textureHeight;
+        float outerRight = (textureWidth - 19.0f) / textureWidth;
+        float outerBottom = (textureHeight - 22.0f) / textureHeight;
+        int middleWidth = frameWidth - border * 2;
+        int middleHeight = frameHeight - border * 2;
+        drawFramePiece(queue, texture, frameLeft, frameTop, border, border,
+                outerLeft, outerTop,
+                innerLeft - outerLeft, innerTop - outerTop);
+        drawFramePiece(queue, texture, frameLeft + border, frameTop,
+                middleWidth, border, innerLeft, outerTop,
+                innerRight - innerLeft, innerTop - outerTop);
+        drawFramePiece(queue, texture, frameLeft + frameWidth - border,
+                frameTop,
+                border, border, innerRight, outerTop,
+                outerRight - innerRight, innerTop - outerTop);
+        drawFramePiece(queue, texture, frameLeft, frameTop + border,
+                border, middleHeight, outerLeft, innerTop,
+                innerLeft - outerLeft, innerBottom - innerTop);
+        drawFramePiece(queue, texture, frameLeft + frameWidth - border,
+                frameTop + border, border, middleHeight,
+                innerRight, innerTop,
+                outerRight - innerRight, innerBottom - innerTop);
+        drawFramePiece(queue, texture, frameLeft,
+                frameTop + frameHeight - border,
+                border, border, outerLeft, innerBottom,
+                innerLeft - outerLeft, outerBottom - innerBottom);
+        drawFramePiece(queue, texture, frameLeft + border,
+                frameTop + frameHeight - border, middleWidth, border,
+                innerLeft, innerBottom,
+                innerRight - innerLeft, outerBottom - innerBottom);
+        drawFramePiece(queue, texture,
+                frameLeft + frameWidth - border,
+                frameTop + frameHeight - border, border, border,
+                innerRight, innerBottom,
+                outerRight - innerRight, outerBottom - innerBottom);
+    }
+
+    private static void drawFramePiece(Queue queue, ResourceTexture texture,
+                                       int left, int top, int width, int height,
+                                       float u, float v,
+                                       float uScale, float vScale) {
+        Renderer.texturedQuadAlphaBlend(queue, texture,
+                1.0f, 1.0f, 1.0f, 1.0f,
+                left, top, width, height,
+                u, v, uScale, vScale);
+    }
+
+    private static void drawArtwork(Queue queue, ResourceTexture texture,
+                                    int left, int top, int width, int height,
+                                    float alpha) {
+        if (texture == null) return;
+        Renderer.texturedQuadAlphaBlend(queue, texture,
+                1.0f, 1.0f, 1.0f, alpha,
+                left, top, width, height,
+                0.0f, 0.0f, 1.0f, 1.0f);
+    }
+
+    private static void drawNameplate(Queue queue, ResourceTexture texture,
+                                      int left, int top, int width,
+                                      String label) {
+        if (texture == null || label == null) return;
+        int height = 22;
+        int leftCap = 12;
+        int rightCap = 24;
+        float leftCapU = leftCap / 128.0f;
+        float rightCapU = rightCap / 128.0f;
+        Renderer.texturedQuadAlphaBlend(queue, texture,
+                1.0f, 1.0f, 1.0f, 1.0f,
+                left, top, leftCap, height,
+                0.0f, 0.0f, leftCapU, 1.0f);
+        Renderer.texturedQuadAlphaBlend(queue, texture,
+                1.0f, 1.0f, 1.0f, 1.0f,
+                left + leftCap, top, width - leftCap - rightCap, height,
+                leftCapU, 0.0f, 1.0f - leftCapU - rightCapU, 1.0f);
+        Renderer.texturedQuadAlphaBlend(queue, texture,
+                1.0f, 1.0f, 1.0f, 1.0f,
+                left + width - rightCap, top, rightCap, height,
+                1.0f - rightCapU, 0.0f, rightCapU, 1.0f);
+        MAIN_TITLE_TEXT.moveTo(left + 8, top + 20);
+        MAIN_TITLE_TEXT.paint(queue, label,
+                0.97f, 0.92f, 0.78f, 1.0f);
+    }
+
+    private static String mapWorldName(ServerMapProfile profile) {
+        String display = profile == null || profile.getDisplayName() == null
+                ? "SKLOTOPOLIS" : profile.getDisplayName();
         String prefix = "Sklotopolis ";
         String world = display.regionMatches(true, 0, prefix, 0,
                 Math.min(prefix.length(), display.length()))
                 && display.length() >= prefix.length()
                 ? display.substring(prefix.length()) : display;
         world = world.trim().toUpperCase(Locale.ENGLISH);
-        if (world.isEmpty()) return;
-        TextFont font = TextFont.getHeaderText();
-        font.moveTo(left + 14, top + 98);
-        font.paint(queue, world, 0.19f, 0.09f, 0.025f, 0.88f);
-        font.moveTo(left + 12, top + 96);
-        font.paint(queue, world, 0.92f, 0.72f, 0.42f, 1.0f);
+        return world.isEmpty() ? "SKLOTOPOLIS" : world;
+    }
+
+    private static void drawBranding(Queue queue, ResourceTexture logo,
+                                     int left, int top) {
+        if (logo != null) {
+            Renderer.texturedQuadAlphaBlend(queue, logo,
+                    1.0f, 1.0f, 1.0f, 0.96f,
+                    left + 28.0f, top + 28.0f, 188.0f, 43.0f,
+                    0.0f, 0.0f, 1.0f, 1.0f);
+        }
     }
 
     /** Seamless surround matching Sklotopolis open water (#373F6F). */
@@ -539,8 +1087,45 @@ public final class ServerMapWindowBridge {
                                   MapViewport viewport, int left, int top,
                                   List<Deed> deeds, State state) {
         if (deeds == null || deeds.isEmpty()) return;
+        boolean overview = viewport.getPixelsPerTile()
+                < OVERVIEW_PIXELS_PER_TILE;
         int labels = 0;
         for (Deed deed : deeds) {
+            MapPoint point = viewport.mapToScreen(
+                    deed.getX() + 0.5d, deed.getY() + 0.5d);
+            int x = left + (int) Math.round(point.getX());
+            int y = top + (int) Math.round(point.getY());
+            boolean anchorVisible = x >= left - 8 && y >= top - 8
+                    && x <= left + CONTENT_WIDTH + 8
+                    && y <= top + CONTENT_HEIGHT + 8;
+            if (overview) {
+                boolean hovered = sameDeed(deed, state.hoveredDeed);
+                MapPoint deedA = viewport.mapToScreen(
+                        deed.getMinimumX(), deed.getMinimumY());
+                MapPoint deedB = viewport.mapToScreen(
+                        deed.getMaximumX() + 1.0d,
+                        deed.getMaximumY() + 1.0d);
+                outline(map, queue, left, top, deedA, deedB,
+                        hovered ? 1.0f
+                                : deed.isSpawnPoint() ? 1.0f : 0.25f,
+                        hovered ? 0.91f
+                                : deed.isSpawnPoint() ? 0.8f : 1.0f,
+                        hovered ? 0.48f : 0.25f,
+                        0.92f, hovered ? 2 : 1);
+                if (anchorVisible) {
+                    float markerRed = deed.isSpawnPoint() ? 1.0f : 0.92f;
+                    float markerGreen = deed.isSpawnPoint() ? 0.76f : 1.0f;
+                    float markerBlue = deed.isSpawnPoint() ? 0.12f : 0.60f;
+                    map.fillRect(queue,
+                            hovered ? 1.0f : 0.08f,
+                            hovered ? 0.91f : 0.05f,
+                            hovered ? 0.48f : 0.02f,
+                            1.0f, x - 3, y - 3, 7, 7);
+                    map.fillRect(queue, markerRed, markerGreen, markerBlue,
+                            1.0f, x - 1, y - 1, 3, 3);
+                }
+                continue;
+            }
             MapPoint perimeterA = viewport.mapToScreen(
                     deed.getPerimeterMinimumX(), deed.getPerimeterMinimumY());
             MapPoint perimeterB = viewport.mapToScreen(
@@ -556,13 +1141,7 @@ public final class ServerMapWindowBridge {
                     deed.isSpawnPoint() ? 1.0f : 0.25f,
                     deed.isSpawnPoint() ? 0.8f : 1.0f,
                     0.25f, 0.9f, 2);
-            MapPoint point = viewport.mapToScreen(
-                    deed.getX() + 0.5d, deed.getY() + 0.5d);
-            int x = left + (int) Math.round(point.getX());
-            int y = top + (int) Math.round(point.getY());
-            if (x >= left - 8 && y >= top - 8
-                    && x <= left + CONTENT_WIDTH + 8
-                    && y <= top + CONTENT_HEIGHT + 8) {
+            if (anchorVisible) {
                 float markerRed = deed.isSpawnPoint() ? 1.0f : 0.92f;
                 float markerGreen = deed.isSpawnPoint() ? 0.76f : 1.0f;
                 float markerBlue = deed.isSpawnPoint() ? 0.12f : 0.60f;
@@ -586,15 +1165,77 @@ public final class ServerMapWindowBridge {
         }
     }
 
-    private static void drawHighways(WorldMap map, Queue queue,
-                                     MapViewport viewport, int left, int top,
+    private static void drawMiniMapDeeds(WurmComponent map, Queue queue,
+                                         MapViewport viewport,
+                                         int left, int top, int size,
+                                         List<Deed> deeds) {
+        if (deeds == null || deeds.isEmpty()) return;
+        int labels = 0;
+        for (Deed deed : deeds) {
+            MapPoint perimeterA = viewport.mapToScreen(
+                    deed.getPerimeterMinimumX(), deed.getPerimeterMinimumY());
+            MapPoint perimeterB = viewport.mapToScreen(
+                    deed.getPerimeterMaximumX() + 1.0d,
+                    deed.getPerimeterMaximumY() + 1.0d);
+            outline(map, queue, left, top, size, size,
+                    perimeterA, perimeterB,
+                    0.25f, 0.78f, 1.0f, 0.55f, 1);
+            MapPoint deedA = viewport.mapToScreen(
+                    deed.getMinimumX(), deed.getMinimumY());
+            MapPoint deedB = viewport.mapToScreen(
+                    deed.getMaximumX() + 1.0d,
+                    deed.getMaximumY() + 1.0d);
+            outline(map, queue, left, top, size, size, deedA, deedB,
+                    deed.isSpawnPoint() ? 1.0f : 0.25f,
+                    deed.isSpawnPoint() ? 0.8f : 1.0f,
+                    0.25f, 0.92f, 2);
+
+            MapPoint anchor = viewport.mapToScreen(
+                    deed.getX() + 0.5d, deed.getY() + 0.5d);
+            int anchorX = left + (int) Math.round(anchor.getX());
+            int anchorY = top + (int) Math.round(anchor.getY());
+            if (anchorX < left - 8 || anchorY < top - 8
+                    || anchorX > left + size + 8
+                    || anchorY > top + size + 8) continue;
+            float markerRed = deed.isSpawnPoint() ? 1.0f : 0.92f;
+            float markerGreen = deed.isSpawnPoint() ? 0.76f : 1.0f;
+            float markerBlue = deed.isSpawnPoint() ? 0.12f : 0.60f;
+            map.fillRect(queue, 0.08f, 0.05f, 0.02f, 0.92f,
+                    anchorX - 4, anchorY - 4, 9, 9);
+            map.fillRect(queue, markerRed, markerGreen, markerBlue, 1.0f,
+                    anchorX - 2, anchorY - 2, 5, 5);
+            if (labels++ < 80) {
+                text(queue, deed.getName(), anchorX + 6, anchorY - 4,
+                        1.0f, 0.94f, 0.70f, 1.0f,
+                        left, top, size, size);
+            }
+        }
+    }
+
+    private static void drawHighways(Queue queue, MapViewport viewport,
+                                     int left, int top,
+                                     int clipWidth, int clipHeight,
                                      HighwayTileIndex index) {
         if (index == null || index.isEmpty()) return;
-        for (HighwayTileIndex.Segment segment : index.getSegments()) {
+        List<HighwayTileIndex.Segment> segments = index.getSegments();
+        int maximum = viewport.getPixelsPerTile() < OVERVIEW_PIXELS_PER_TILE
+                ? MAXIMUM_OVERVIEW_HIGHWAY_SEGMENTS : Integer.MAX_VALUE;
+        int selectionAccumulator = 0;
+        for (HighwayTileIndex.Segment segment : segments) {
+            if (segments.size() > maximum) {
+                selectionAccumulator += maximum;
+                if (selectionAccumulator < segments.size()) continue;
+                selectionAccumulator -= segments.size();
+            }
             MapPoint a = viewport.mapToScreen(segment.getStartX() + 0.5d,
                     segment.getStartY() + 0.5d);
             MapPoint b = viewport.mapToScreen(segment.getEndX() + 0.5d,
                     segment.getEndY() + 0.5d);
+            float[] clipped = clipLine(
+                    left + (float) a.getX(), top + (float) a.getY(),
+                    left + (float) b.getX(), top + (float) b.getY(),
+                    left, top, left + clipWidth, top + clipHeight);
+            if (clipped == null) continue;
             float red = 0.96f, green = 0.76f, blue = 0.22f;
             float width = 2.0f;
             if (segment.getKind() == HighwayTileIndex.Kind.BRIDGE) {
@@ -602,10 +1243,88 @@ public final class ServerMapWindowBridge {
             } else if (segment.getKind() == HighwayTileIndex.Kind.TUNNEL) {
                 red = 1.0f; green = 0.3f; blue = 0.86f; width = 3.0f;
             }
-            line(queue, left + (float) a.getX(), top + (float) a.getY(),
-                    left + (float) b.getX(), top + (float) b.getY(),
+            line(queue, clipped[0], clipped[1], clipped[2], clipped[3],
                     width, red, green, blue, 0.92f);
         }
+    }
+
+    private static void drawNavigationLine(Queue queue,
+                                           MapViewport viewport,
+                                           int left, int top,
+                                           int width, int height) {
+        NavigationTarget active = activeNavigationTarget();
+        if (active == null || active.getCoordinate() == null) return;
+        GroundNavigationRouteEffect.RouteSnapshot route =
+                WurmWaypointerRuntime.currentNavigationRoute();
+        if (route == null || route.getPointCount() < 2) return;
+        MarkerStyle style = active.getMarkerStyle();
+        float red = style == null ? 1.0f : style.getRed();
+        float green = style == null ? 0.25f : style.getGreen();
+        float blue = style == null ? 0.20f : style.getBlue();
+        MapPoint emitted = viewport.mapToScreen(
+                route.getTileX(0) + 0.5d,
+                route.getTileY(0) + 0.5d);
+        for (int index = 1; index < route.getPointCount(); index++) {
+            MapPoint next = viewport.mapToScreen(
+                    route.getTileX(index) + 0.5d,
+                    route.getTileY(index) + 0.5d);
+            double dx = next.getX() - emitted.getX();
+            double dy = next.getY() - emitted.getY();
+            boolean last = index == route.getPointCount() - 1;
+            if (!last && dx * dx + dy * dy < 0.75d * 0.75d) continue;
+            float[] clipped = clipLine(
+                    left + (float) emitted.getX(),
+                    top + (float) emitted.getY(),
+                    left + (float) next.getX(),
+                    top + (float) next.getY(),
+                    left, top, left + width, top + height);
+            if (clipped != null) {
+                line(queue, clipped[0], clipped[1], clipped[2], clipped[3],
+                        5.0f, 0.0f, 0.0f, 0.0f, 0.72f);
+                line(queue, clipped[0], clipped[1], clipped[2], clipped[3],
+                        3.0f, red, green, blue, 0.98f);
+            }
+            emitted = next;
+        }
+    }
+
+    private static NavigationTarget activeNavigationTarget() {
+        NavigationRenderFrame frame = WurmWaypointerRuntime
+                .currentNavigationFrame();
+        return frame == null || frame.getSnapshot() == null
+                ? null : frame.getSnapshot().getActiveNavigator();
+    }
+
+    /** Liang-Barsky clipping keeps distant targets from creating huge quads. */
+    private static float[] clipLine(float x1, float y1, float x2, float y2,
+                                    float minimumX, float minimumY,
+                                    float maximumX, float maximumY) {
+        double deltaX = x2 - x1;
+        double deltaY = y2 - y1;
+        double[] p = {-deltaX, deltaX, -deltaY, deltaY};
+        double[] q = {x1 - minimumX, maximumX - x1,
+                y1 - minimumY, maximumY - y1};
+        double start = 0.0d;
+        double end = 1.0d;
+        for (int index = 0; index < p.length; index++) {
+            if (Math.abs(p[index]) < 0.000001d) {
+                if (q[index] < 0.0d) return null;
+                continue;
+            }
+            double ratio = q[index] / p[index];
+            if (p[index] < 0.0d) {
+                if (ratio > end) return null;
+                start = Math.max(start, ratio);
+            } else {
+                if (ratio < start) return null;
+                end = Math.min(end, ratio);
+            }
+        }
+        return new float[]{
+                (float) (x1 + start * deltaX),
+                (float) (y1 + start * deltaY),
+                (float) (x1 + end * deltaX),
+                (float) (y1 + end * deltaY)};
     }
 
     private static void drawWaypoints(WorldMap map, Queue queue,
@@ -643,7 +1362,8 @@ public final class ServerMapWindowBridge {
                 map.fillRect(queue, red, green, blue, 1.0f,
                         x - 3, y - 3, 7, 7);
             }
-            if (hovered || (viewport.getPixelsPerTile() >= 1.0d
+            if (hovered || isCustomMapMark(record)
+                    || (viewport.getPixelsPerTile() >= 1.0d
                     && labels++ < 60)) {
                 text(queue, record.getName(), x + 6, y - 4,
                         red, green, blue, 1.0f, left, top);
@@ -651,7 +1371,42 @@ public final class ServerMapWindowBridge {
         }
     }
 
-    private static void drawSurroundingsMark(WorldMap map, Queue queue,
+    private static void drawMiniMapWaypoints(
+            WurmComponent map, Queue queue, MapViewport viewport,
+            int left, int top, int size, WaypointRevisionSnapshot snapshot,
+            ServerIdentity currentServer, String currentUser) {
+        if (snapshot == null) return;
+        int customLabels = 0;
+        for (WaypointRecord record : snapshot.getRecords()) {
+            if (!visibleWaypoint(record, currentServer, currentUser)) continue;
+            WaypointCoordinate coordinate = record.getCoordinate();
+            MapPoint point = viewport.mapToScreen(
+                    coordinate.getTileX() + 0.5d,
+                    coordinate.getTileY() + 0.5d);
+            int x = left + (int) Math.round(point.getX());
+            int y = top + (int) Math.round(point.getY());
+            if (x < left - 6 || y < top - 6 || x > left + size + 6
+                    || y > top + size + 6) continue;
+            MarkerStyle style = record.getMarkerStyle();
+            float red = style == null ? 1.0f : style.getRed();
+            float green = style == null ? 0.85f : style.getGreen();
+            float blue = style == null ? 0.2f : style.getBlue();
+            if (isSurroundingsMark(record)) {
+                drawSurroundingsMark(map, queue, x, y, red, green, blue);
+            } else {
+                map.fillRect(queue, 0.0f, 0.0f, 0.0f, 0.82f,
+                        x - 3, y - 3, 7, 7);
+                map.fillRect(queue, red, green, blue, 1.0f,
+                        x - 2, y - 2, 5, 5);
+            }
+            if (isCustomMapMark(record) && customLabels++ < 24) {
+                text(queue, record.getName(), x + 5, y - 3,
+                        red, green, blue, 1.0f, left, top);
+            }
+        }
+    }
+
+    private static void drawSurroundingsMark(WurmComponent map, Queue queue,
                                              int x, int y, float red,
                                              float green, float blue) {
         map.fillRect(queue, 0.0f, 0.0f, 0.0f, 0.86f,
@@ -666,13 +1421,20 @@ public final class ServerMapWindowBridge {
 
     private static void drawPlayer(WorldMap map, Queue queue,
                                    MapViewport viewport, int left, int top) {
+        drawPlayer(map, queue, viewport, left, top,
+                CONTENT_WIDTH, CONTENT_HEIGHT);
+    }
+
+    private static void drawPlayer(WurmComponent map, Queue queue,
+                                   MapViewport viewport, int left, int top,
+                                   int width, int height) {
         MapPoint point = viewport.mapToScreen(
                 WurmWaypointerRuntime.currentPlayerTileX() + 0.5d,
                 WurmWaypointerRuntime.currentPlayerTileY() + 0.5d);
         int x = left + (int) Math.round(point.getX());
         int y = top + (int) Math.round(point.getY());
-        if (x < left || y < top || x >= left + CONTENT_WIDTH
-                || y >= top + CONTENT_HEIGHT) return;
+        if (x < left || y < top || x >= left + width
+                || y >= top + height) return;
         map.fillRect(queue, 0.0f, 0.0f, 0.0f, 0.9f, x - 7, y - 2, 15, 5);
         map.fillRect(queue, 0.0f, 0.0f, 0.0f, 0.9f, x - 2, y - 7, 5, 15);
         map.fillRect(queue, 1.0f, 1.0f, 1.0f, 1.0f, x - 6, y - 1, 13, 3);
@@ -682,33 +1444,38 @@ public final class ServerMapWindowBridge {
     private static void drawStatus(WorldMap map, Queue queue, State state,
                                    ServerMapProfile profile, int left, int top) {
         map.fillRect(queue, 0.16f, 0.09f, 0.035f, 0.90f,
-                left, top, CONTENT_WIDTH, 20);
-        map.fillRect(queue, 0.16f, 0.09f, 0.035f, 0.90f,
-                left, top + CONTENT_HEIGHT - 20, CONTENT_WIDTH, 20);
-        String header = profile.getDisplayName() + "  zoom "
-                + String.format(Locale.ENGLISH, "%.2f px/tile",
-                Double.valueOf(state.viewport.getPixelsPerTile()));
-        text(queue, header, left + 6, top + 15,
-                1.0f, 0.92f, 0.72f, 1.0f, left, top);
+                left + 22, top + CONTENT_HEIGHT - 42,
+                CONTENT_WIDTH - 44, 20);
         String coordinate = state.hoverInside
                 ? "X=" + state.hoverTileX + " Y=" + state.hoverTileY
                         + "  Tile: " + hoveredTileDescription(state) + "  "
                 : "";
-        String action = state.hoveredLayerButton != null
-                ? layerButtonHelp(state.hoveredLayerButton, state.overlays
-                        .isVisible(state.hoveredLayerButton))
+        String action = state.navigationLineButtonHover
+                ? "Click: turn active navigation line "
+                        + (MiniMapWindowBridge.isNavigationLineVisible()
+                        ? "off" : "on")
+                : state.miniMapButtonHover
+                ? "Click: turn mini-map "
+                        + (MiniMapWindowBridge.isEnabled() ? "off" : "on")
+                : state.hoveredLayerButton != null
+                ? layerButtonHelp(state.hoveredLayerButton,
+                        layerVisible(state, state.hoveredLayerButton))
                 : state.searchButtonHover
                 ? "Search deeds"
+                : state.closeButtonHover
+                ? "Close map"
+                : state.hoveredDeed != null
+                ? "Deed: " + state.hoveredDeed.getName()
+                        + " | click: information"
                 : state.hoveredWaypointId != null
                 ? "Waypoint: " + state.hoveredWaypointName
                         + (state.hoveredWaypointEditable
                         ? " | click: edit" : " | managed marker")
-                : state.hoveredDeed != null
-                ? "Deed: " + state.hoveredDeed.getName()
-                        + " | click: information"
-                : "Wheel: zoom | drag: pan | click/right-click: add waypoint";
-        text(queue, coordinate + action,
-                left + 6, top + CONTENT_HEIGHT - 5,
+                : "Wheel: zoom | drag: pan | click: waypoint | right-click: custom mark";
+        String zoom = String.format(Locale.ENGLISH, "Zoom %.2f px/tile | ",
+                Double.valueOf(state.viewport.getPixelsPerTile()));
+        text(queue, zoom + coordinate + action,
+                left + 28, top + CONTENT_HEIGHT - 27,
                 1.0f, 0.92f, 0.72f, 1.0f, left, top);
     }
 
@@ -717,7 +1484,7 @@ public final class ServerMapWindowBridge {
         for (MapOverlayVisibility.Layer layer : LAYER_BUTTONS) {
             int x = layerButtonLeft(left, layer);
             int y = top + SEARCH_BUTTON_TOP;
-            boolean visible = state.overlays.isVisible(layer);
+            boolean visible = layerVisible(state, layer);
             boolean hovered = state.hoveredLayerButton == layer;
             boolean pressed = state.pressedLayerButton == layer && hovered;
             float edge = pressed ? 1.0f : hovered ? 0.96f
@@ -737,6 +1504,56 @@ public final class ServerMapWindowBridge {
                     visible ? 0.92f : 0.55f,
                     visible ? 0.72f : 0.52f, 1.0f, left, top);
         }
+    }
+
+    private static void drawMiniMapButton(WorldMap map, Queue queue,
+                                          State state, int left, int top) {
+        int x = miniMapButtonLeft(left);
+        int y = top + SEARCH_BUTTON_TOP;
+        boolean enabled = MiniMapWindowBridge.isEnabled();
+        boolean hovered = state.miniMapButtonHover;
+        boolean pressed = state.miniMapButtonPressed && hovered;
+        float edge = pressed ? 1.0f : hovered ? 0.96f
+                : enabled ? 0.72f : 0.38f;
+        map.fillRect(queue, 0.10f, 0.055f, 0.02f, 0.94f,
+                x, y, MINI_MAP_BUTTON_WIDTH, LAYER_BUTTON_HEIGHT);
+        map.fillRect(queue, edge, edge * 0.79f, edge * 0.42f, 0.95f,
+                x + 2, y + 2, MINI_MAP_BUTTON_WIDTH - 4,
+                LAYER_BUTTON_HEIGHT - 4);
+        float fill = enabled ? 0.20f : 0.09f;
+        map.fillRect(queue, fill, enabled ? 0.12f : 0.09f,
+                enabled ? 0.05f : 0.08f, 0.96f,
+                x + 4, y + 4, MINI_MAP_BUTTON_WIDTH - 8,
+                LAYER_BUTTON_HEIGHT - 8);
+        text(queue, "MINI MAP", x + 8, y + 21,
+                enabled ? 1.0f : 0.58f,
+                enabled ? 0.92f : 0.55f,
+                enabled ? 0.72f : 0.52f, 1.0f, left, top);
+    }
+
+    private static void drawNavigationLineButton(
+            WorldMap map, Queue queue, State state, int left, int top) {
+        int x = navigationLineButtonLeft(left);
+        int y = top + SEARCH_BUTTON_TOP;
+        boolean enabled = MiniMapWindowBridge.isNavigationLineVisible();
+        boolean hovered = state.navigationLineButtonHover;
+        boolean pressed = state.navigationLineButtonPressed && hovered;
+        float edge = pressed ? 1.0f : hovered ? 0.96f
+                : enabled ? 0.72f : 0.38f;
+        map.fillRect(queue, 0.10f, 0.055f, 0.02f, 0.94f,
+                x, y, NAV_LINE_BUTTON_WIDTH, LAYER_BUTTON_HEIGHT);
+        map.fillRect(queue, edge, edge * 0.79f, edge * 0.42f, 0.95f,
+                x + 2, y + 2, NAV_LINE_BUTTON_WIDTH - 4,
+                LAYER_BUTTON_HEIGHT - 4);
+        float fill = enabled ? 0.20f : 0.09f;
+        map.fillRect(queue, fill, enabled ? 0.12f : 0.09f,
+                enabled ? 0.05f : 0.08f, 0.96f,
+                x + 4, y + 4, NAV_LINE_BUTTON_WIDTH - 8,
+                LAYER_BUTTON_HEIGHT - 8);
+        text(queue, "NAV LINE", x + 8, y + 21,
+                enabled ? 1.0f : 0.58f,
+                enabled ? 0.92f : 0.55f,
+                enabled ? 0.72f : 0.52f, 1.0f, left, top);
     }
 
     private static String layerButtonLabel(MapOverlayVisibility.Layer layer) {
@@ -772,9 +1589,140 @@ public final class ServerMapWindowBridge {
         return broad.isEmpty() ? "unknown" : broad + " (map)";
     }
 
+    static List<String> mapHoverLines(MapViewport viewport,
+                                      int screenX, int screenY,
+                                      boolean showDeeds,
+                                      boolean showWaypoints) {
+        List<String> lines = new ArrayList<String>(3);
+        if (viewport == null) return lines;
+        MapPoint point = viewport.screenToMap(screenX, screenY);
+        if (!viewport.containsMapPoint(point)) return lines;
+        int tileX = (int) Math.floor(point.getX());
+        int tileY = (int) Math.floor(point.getY());
+
+        String live = WurmWaypointerRuntime.serverMapLiveTileDescription(
+                tileX, tileY);
+        if (live != null && !live.isEmpty()) {
+            lines.add("X=" + tileX + " Y=" + tileY + " | Tile: " + live);
+        } else {
+            PreparedSurface current = prepared;
+            SurfaceTileIndex index = current == null ? null : current.tileIndex;
+            String broad = index == null ? "" : index.describe(tileX, tileY);
+            lines.add("X=" + tileX + " Y=" + tileY + " | Tile: "
+                    + (broad.isEmpty() ? "Unknown terrain"
+                    : broad + " (published map)"));
+        }
+
+        if (showDeeds) {
+            String deed = deedHoverText(viewport, screenX, screenY,
+                    tileX, tileY);
+            if (!deed.isEmpty()) lines.add(deed);
+        }
+        if (showWaypoints) {
+            WaypointRecord nearest = nearestWaypoint(
+                    viewport, screenX, screenY);
+            if (nearest != null) lines.add(waypointHoverText(nearest));
+        }
+        return lines;
+    }
+
+    private static WaypointRecord nearestWaypoint(
+            MapViewport viewport, int screenX, int screenY) {
+        WaypointRevisionSnapshot snapshot = WurmWaypointerRuntime
+                .serverMapWaypoints();
+        if (snapshot == null) return null;
+        ServerIdentity server = WurmWaypointerRuntime.currentServerIdentity();
+        String user = WurmWaypointerRuntime.currentPlayerName();
+        WaypointRecord best = null;
+        double bestDistance = WAYPOINT_HIT_RADIUS * WAYPOINT_HIT_RADIUS;
+        for (WaypointRecord record : snapshot.getRecords()) {
+            if (!visibleWaypoint(record, server, user)) continue;
+            WaypointCoordinate coordinate = record.getCoordinate();
+            MapPoint marker = viewport.mapToScreen(
+                    coordinate.getTileX() + 0.5d,
+                    coordinate.getTileY() + 0.5d);
+            double deltaX = marker.getX() - screenX;
+            double deltaY = marker.getY() - screenY;
+            double distance = deltaX * deltaX + deltaY * deltaY;
+            if (distance <= bestDistance) {
+                bestDistance = distance;
+                best = record;
+            }
+        }
+        return best;
+    }
+
+    private static String waypointHoverText(WaypointRecord record) {
+        String state = title(record.getResolution().name());
+        NavigationTarget active = activeNavigationTarget();
+        if (active != null && active.getKey() != null
+                && record.getId().equals(active.getKey().getWaypointId())) {
+            state = "Active NAV, " + state;
+        } else if (record.isTemporary()) {
+            state = "Temporary, " + state;
+        }
+        return "Waypoint: " + record.getName() + " | " + state;
+    }
+
+    private static String deedHoverText(MapViewport viewport,
+                                        int screenX, int screenY,
+                                        int tileX, int tileY) {
+        ServerMapSnapshot snapshot = WurmWaypointerRuntime.serverMapSnapshot();
+        if (snapshot == null || snapshot.getDeeds() == null) return "";
+        Deed best = null;
+        String bestState = "";
+        double bestScore = Double.POSITIVE_INFINITY;
+        for (Deed deed : snapshot.getDeeds()) {
+            String state = "";
+            double priority = 0.0d;
+            if (inside(tileX, tileY, deed.getMinimumX(), deed.getMinimumY(),
+                    deed.getMaximumX(), deed.getMaximumY())) {
+                state = "inside settlement";
+            } else if (inside(tileX, tileY,
+                    deed.getPerimeterMinimumX(), deed.getPerimeterMinimumY(),
+                    deed.getPerimeterMaximumX(),
+                    deed.getPerimeterMaximumY())) {
+                state = "inside perimeter";
+                priority = 1_000_000.0d;
+            } else {
+                MapPoint marker = viewport.mapToScreen(
+                        deed.getX() + 0.5d, deed.getY() + 0.5d);
+                double deltaX = marker.getX() - screenX;
+                double deltaY = marker.getY() - screenY;
+                double distance = deltaX * deltaX + deltaY * deltaY;
+                if (distance > DEED_HIT_RADIUS * DEED_HIT_RADIUS) continue;
+                state = "settlement centre";
+                priority = 2_000_000.0d;
+            }
+            double centerX = deed.getX() - tileX;
+            double centerY = deed.getY() - tileY;
+            double score = priority + centerX * centerX + centerY * centerY;
+            if (score < bestScore) {
+                bestScore = score;
+                best = deed;
+                bestState = state;
+            }
+        }
+        return best == null ? "" : "Deed: " + best.getName()
+                + " | " + bestState;
+    }
+
+    private static boolean inside(int x, int y, int minimumX, int minimumY,
+                                  int maximumX, int maximumY) {
+        return x >= minimumX && y >= minimumY
+                && x <= maximumX && y <= maximumY;
+    }
+
+    private static String title(String value) {
+        String clean = value == null ? "" : value.toLowerCase(Locale.ENGLISH)
+                .replace('_', ' ');
+        return clean.isEmpty() ? clean
+                : Character.toUpperCase(clean.charAt(0)) + clean.substring(1);
+    }
+
     private static void drawSearchButton(WorldMap map, Queue queue, State state,
                                          int left, int top) {
-        int x = left + CONTENT_WIDTH - SEARCH_BUTTON_RIGHT - SEARCH_BUTTON_SIZE;
+        int x = searchButtonLeft(left);
         int y = top + SEARCH_BUTTON_TOP;
         float edge = state.searchButtonHover ? 1.0f : 0.72f;
         map.fillRect(queue, 0.10f, 0.055f, 0.02f, 0.94f,
@@ -802,15 +1750,30 @@ public final class ServerMapWindowBridge {
                 3.0f, icon, icon * 0.86f, icon * 0.55f, 1.0f);
     }
 
+    private static void drawCloseButton(WorldMap map, Queue queue, State state,
+                                        int left, int top) {
+        int x = closeButtonLeft(left);
+        int y = top + SEARCH_BUTTON_TOP;
+        boolean hovered = state.closeButtonHover;
+        boolean pressed = state.closeButtonPressed && hovered;
+        float edge = pressed ? 1.0f : hovered ? 0.96f : 0.72f;
+        map.fillRect(queue, 0.10f, 0.055f, 0.02f, 0.94f,
+                x, y, SEARCH_BUTTON_SIZE, SEARCH_BUTTON_SIZE);
+        map.fillRect(queue, edge, edge * 0.64f, edge * 0.34f, 0.95f,
+                x + 2, y + 2, SEARCH_BUTTON_SIZE - 4,
+                SEARCH_BUTTON_SIZE - 4);
+        map.fillRect(queue, hovered ? 0.28f : 0.16f, 0.07f, 0.035f, 0.98f,
+                x + 4, y + 4, SEARCH_BUTTON_SIZE - 8,
+                SEARCH_BUTTON_SIZE - 8);
+        float icon = hovered ? 1.0f : 0.90f;
+        line(queue, x + 10, y + 10, x + 22, y + 22,
+                2.5f, icon, icon * 0.82f, icon * 0.58f, 1.0f);
+        line(queue, x + 22, y + 10, x + 10, y + 22,
+                2.5f, icon, icon * 0.82f, icon * 0.58f, 1.0f);
+    }
+
     private static void requestWaypoint(WorldMap map, State state,
                                         int mouseX, int mouseY) {
-        if (state.hoveredWaypointId != null) {
-            if (state.hoveredWaypointEditable) {
-                WurmWaypointerRuntime.serverMapWaypointEditRequested(
-                        state.hoveredWaypointId);
-            }
-            return;
-        }
         if (state.hoveredDeed != null) {
             Deed selected = state.hoveredDeed;
             state.viewport.focusOn(selected.getX() + 0.5d,
@@ -822,10 +1785,41 @@ public final class ServerMapWindowBridge {
             }
             return;
         }
+        if (state.hoveredWaypointId != null) {
+            if (state.hoveredWaypointEditable) {
+                WurmWaypointerRuntime.serverMapWaypointEditRequested(
+                        state.hoveredWaypointId);
+            }
+            return;
+        }
         MapPoint point = state.viewport.screenToMap(
                 mouseX - map.x - CONTENT_OFFSET_X,
                 mouseY - map.y - CONTENT_OFFSET_Y);
-        if (!state.viewport.containsMapPoint(point)) return;
+        requestWaypointAt(point, state.viewport);
+    }
+
+    static void requestWaypointAt(MapViewport viewport,
+                                  int screenX, int screenY) {
+        if (viewport == null) return;
+        requestWaypointAt(viewport.screenToMap(screenX, screenY), viewport);
+    }
+
+    static void requestCustomMarkAt(MapViewport viewport,
+                                    int screenX, int screenY) {
+        if (viewport == null) return;
+        MapPoint point = viewport.screenToMap(screenX, screenY);
+        if (point == null || !viewport.containsMapPoint(point)) return;
+        HeadsUpDisplay current = WurmComponent.hud;
+        if (current == null) return;
+        CustomMapMarkWindowBridge.open(current,
+                (int) Math.floor(point.getX()),
+                (int) Math.floor(point.getY()));
+    }
+
+    private static void requestWaypointAt(MapPoint point,
+                                          MapViewport viewport) {
+        if (point == null || viewport == null
+                || !viewport.containsMapPoint(point)) return;
         int tileX = (int) Math.floor(point.getX());
         int tileY = (int) Math.floor(point.getY());
         HighwayTileIndex.Tile highway = WurmWaypointerRuntime
@@ -839,8 +1833,16 @@ public final class ServerMapWindowBridge {
     private static void updateHover(WorldMap map, State state,
                                     int mouseX, int mouseY) {
         state.searchButtonHover = insideSearchButton(map, mouseX, mouseY);
+        state.closeButtonHover = insideCloseButton(map, mouseX, mouseY);
+        state.miniMapButtonHover = insideMiniMapButton(
+                map, mouseX, mouseY);
+        state.navigationLineButtonHover = insideNavigationLineButton(
+                map, mouseX, mouseY);
         state.hoveredLayerButton = layerButtonAt(map, mouseX, mouseY);
-        if (state.searchButtonHover || state.hoveredLayerButton != null) {
+        if (state.searchButtonHover || state.closeButtonHover
+                || state.miniMapButtonHover
+                || state.navigationLineButtonHover
+                || state.hoveredLayerButton != null) {
             state.hoverInside = false;
             clearHoveredWaypoint(state);
             state.hoveredDeed = null;
@@ -864,7 +1866,7 @@ public final class ServerMapWindowBridge {
     private static void updateHoveredDeed(WorldMap map, State state,
                                           int mouseX, int mouseY) {
         state.hoveredDeed = null;
-        if (!state.overlays.isVisible(MapOverlayVisibility.Layer.DEEDS)) return;
+        if (!layerVisible(state, MapOverlayVisibility.Layer.DEEDS)) return;
         ServerMapSnapshot snapshot = WurmWaypointerRuntime.serverMapSnapshot();
         if (snapshot == null || snapshot.getDeeds() == null) return;
         double bestDistanceSquared = DEED_HIT_RADIUS * DEED_HIT_RADIUS;
@@ -883,7 +1885,7 @@ public final class ServerMapWindowBridge {
 
     private static void updateHoveredWaypoint(WorldMap map, State state,
                                                int mouseX, int mouseY) {
-        if (!state.overlays.isVisible(MapOverlayVisibility.Layer.WAYPOINTS)) {
+        if (!layerVisible(state, MapOverlayVisibility.Layer.WAYPOINTS)) {
             clearHoveredWaypoint(state);
             return;
         }
@@ -927,28 +1929,40 @@ public final class ServerMapWindowBridge {
     private static void outline(WorldMap map, Queue queue, int left, int top,
                                 MapPoint a, MapPoint b, float red, float green,
                                 float blue, float alpha, int thickness) {
+        outline(map, queue, left, top, CONTENT_WIDTH, CONTENT_HEIGHT,
+                a, b, red, green, blue, alpha, thickness);
+    }
+
+    private static void outline(WurmComponent map, Queue queue,
+                                int left, int top,
+                                int clipWidth, int clipHeight,
+                                MapPoint a, MapPoint b, float red, float green,
+                                float blue, float alpha, int thickness) {
         int x1 = left + (int) Math.floor(Math.min(a.getX(), b.getX()));
         int y1 = top + (int) Math.floor(Math.min(a.getY(), b.getY()));
         int x2 = left + (int) Math.ceil(Math.max(a.getX(), b.getX()));
         int y2 = top + (int) Math.ceil(Math.max(a.getY(), b.getY()));
+        fillClipped(map, queue, red, green, blue, alpha, x1, y1,
+                x2 - x1, thickness, left, top, clipWidth, clipHeight);
         fillClipped(map, queue, red, green, blue, alpha,
-                x1, y1, x2 - x1, thickness, left, top);
+                x1, y2 - thickness, x2 - x1, thickness,
+                left, top, clipWidth, clipHeight);
+        fillClipped(map, queue, red, green, blue, alpha, x1, y1,
+                thickness, y2 - y1, left, top, clipWidth, clipHeight);
         fillClipped(map, queue, red, green, blue, alpha,
-                x1, y2 - thickness, x2 - x1, thickness, left, top);
-        fillClipped(map, queue, red, green, blue, alpha,
-                x1, y1, thickness, y2 - y1, left, top);
-        fillClipped(map, queue, red, green, blue, alpha,
-                x2 - thickness, y1, thickness, y2 - y1, left, top);
+                x2 - thickness, y1, thickness, y2 - y1,
+                left, top, clipWidth, clipHeight);
     }
 
-    private static void fillClipped(WorldMap map, Queue queue,
+    private static void fillClipped(WurmComponent map, Queue queue,
                                     float red, float green, float blue, float alpha,
                                     int x, int y, int width, int height,
-                                    int left, int top) {
+                                    int left, int top,
+                                    int clipWidth, int clipHeight) {
         int clipX = Math.max(left, x);
         int clipY = Math.max(top, y);
-        int clipRight = Math.min(left + CONTENT_WIDTH, x + width);
-        int clipBottom = Math.min(top + CONTENT_HEIGHT, y + height);
+        int clipRight = Math.min(left + clipWidth, x + width);
+        int clipBottom = Math.min(top + clipHeight, y + height);
         if (clipRight <= clipX || clipBottom <= clipY) return;
         map.fillRect(queue, red, green, blue, alpha, clipX, clipY,
                 clipRight - clipX, clipBottom - clipY);
@@ -987,8 +2001,15 @@ public final class ServerMapWindowBridge {
     private static void text(Queue queue, String value, int x, int y,
                              float red, float green, float blue, float alpha,
                              int left, int top) {
+        text(queue, value, x, y, red, green, blue, alpha,
+                left, top, CONTENT_WIDTH, CONTENT_HEIGHT);
+    }
+
+    private static void text(Queue queue, String value, int x, int y,
+                             float red, float green, float blue, float alpha,
+                             int left, int top, int width, int height) {
         if (value == null || value.isEmpty() || x < left || y < top
-                || x >= left + CONTENT_WIDTH || y >= top + CONTENT_HEIGHT) return;
+                || x >= left + width || y >= top + height) return;
         TextFont font = TextFont.getFixedSizeText();
         font.moveTo(x, y);
         font.paint(queue, value, red, green, blue, alpha);
@@ -1002,11 +2023,35 @@ public final class ServerMapWindowBridge {
 
     private static boolean insideSearchButton(WorldMap map, int x, int y) {
         if (map == null) return false;
-        int left = map.x + CONTENT_OFFSET_X + CONTENT_WIDTH
-                - SEARCH_BUTTON_RIGHT - SEARCH_BUTTON_SIZE;
+        int left = searchButtonLeft(map.x + CONTENT_OFFSET_X);
         int top = map.y + CONTENT_OFFSET_Y + SEARCH_BUTTON_TOP;
         return x >= left && y >= top && x < left + SEARCH_BUTTON_SIZE
                 && y < top + SEARCH_BUTTON_SIZE;
+    }
+
+    private static boolean insideCloseButton(WorldMap map, int x, int y) {
+        if (map == null) return false;
+        int left = closeButtonLeft(map.x + CONTENT_OFFSET_X);
+        int top = map.y + CONTENT_OFFSET_Y + SEARCH_BUTTON_TOP;
+        return x >= left && y >= top && x < left + SEARCH_BUTTON_SIZE
+                && y < top + SEARCH_BUTTON_SIZE;
+    }
+
+    private static boolean insideMiniMapButton(WorldMap map, int x, int y) {
+        if (map == null) return false;
+        int left = miniMapButtonLeft(map.x + CONTENT_OFFSET_X);
+        int top = map.y + CONTENT_OFFSET_Y + SEARCH_BUTTON_TOP;
+        return x >= left && y >= top && x < left + MINI_MAP_BUTTON_WIDTH
+                && y < top + LAYER_BUTTON_HEIGHT;
+    }
+
+    private static boolean insideNavigationLineButton(
+            WorldMap map, int x, int y) {
+        if (map == null) return false;
+        int left = navigationLineButtonLeft(map.x + CONTENT_OFFSET_X);
+        int top = map.y + CONTENT_OFFSET_Y + SEARCH_BUTTON_TOP;
+        return x >= left && y >= top && x < left + NAV_LINE_BUTTON_WIDTH
+                && y < top + LAYER_BUTTON_HEIGHT;
     }
 
     private static MapOverlayVisibility.Layer layerButtonAt(
@@ -1026,12 +2071,53 @@ public final class ServerMapWindowBridge {
 
     private static int layerButtonLeft(int contentLeft,
                                        MapOverlayVisibility.Layer layer) {
-        int searchLeft = contentLeft + CONTENT_WIDTH
-                - SEARCH_BUTTON_RIGHT - SEARCH_BUTTON_SIZE;
+        int searchLeft = searchButtonLeft(contentLeft);
         int index = layer.ordinal();
         return searchLeft - LAYER_BUTTON_GAP
                 - (LAYER_BUTTON_COUNT - index) * LAYER_BUTTON_WIDTH
                 - (LAYER_BUTTON_COUNT - index - 1) * LAYER_BUTTON_GAP;
+    }
+
+    private static int miniMapButtonLeft(int contentLeft) {
+        return layerButtonLeft(contentLeft, MapOverlayVisibility.Layer.DEEDS)
+                - LAYER_BUTTON_GAP - MINI_MAP_BUTTON_WIDTH;
+    }
+
+    private static int navigationLineButtonLeft(int contentLeft) {
+        return miniMapButtonLeft(contentLeft)
+                - LAYER_BUTTON_GAP - NAV_LINE_BUTTON_WIDTH;
+    }
+
+    private static int closeButtonLeft(int contentLeft) {
+        return contentLeft + CONTENT_WIDTH
+                - SEARCH_BUTTON_RIGHT - SEARCH_BUTTON_SIZE;
+    }
+
+    private static int searchButtonLeft(int contentLeft) {
+        return closeButtonLeft(contentLeft)
+                - LAYER_BUTTON_GAP - SEARCH_BUTTON_SIZE;
+    }
+
+    private static boolean layerVisible(State state,
+                                        MapOverlayVisibility.Layer layer) {
+        if (layer == MapOverlayVisibility.Layer.DEEDS) {
+            return MiniMapWindowBridge.areDeedsVisible();
+        }
+        if (layer == MapOverlayVisibility.Layer.HIGHWAYS) {
+            return MiniMapWindowBridge.areRoadsVisible();
+        }
+        return state.overlays.isVisible(layer);
+    }
+
+    private static void toggleLayer(State state,
+                                    MapOverlayVisibility.Layer layer) {
+        if (layer == MapOverlayVisibility.Layer.DEEDS) {
+            MiniMapWindowBridge.toggleDeeds();
+        } else if (layer == MapOverlayVisibility.Layer.HIGHWAYS) {
+            MiniMapWindowBridge.toggleRoads();
+        } else {
+            state.overlays.toggle(layer);
+        }
     }
 
     private static boolean visibleWaypoint(WaypointRecord record,
@@ -1048,6 +2134,11 @@ public final class ServerMapWindowBridge {
                 == org.waypoints.next.model.WaypointSourceType.MANAGED_ANIMAL
                 || record.getSourceType()
                 == org.waypoints.next.model.WaypointSourceType.MANAGED_ITEM;
+    }
+
+    private static boolean isCustomMapMark(WaypointRecord record) {
+        return record != null && record.getSourceType()
+                == org.waypoints.next.model.WaypointSourceType.CUSTOM_MAP_MARK;
     }
 
     private static boolean sameDeed(Deed left, Deed right) {
@@ -1126,6 +2217,12 @@ public final class ServerMapWindowBridge {
         private Deed hoveredDeed;
         private boolean searchButtonHover;
         private boolean searchButtonPressed;
+        private boolean closeButtonHover;
+        private boolean closeButtonPressed;
+        private boolean miniMapButtonHover;
+        private boolean miniMapButtonPressed;
+        private boolean navigationLineButtonHover;
+        private boolean navigationLineButtonPressed;
         private MapOverlayVisibility.Layer hoveredLayerButton;
         private MapOverlayVisibility.Layer pressedLayerButton;
         private boolean firstFrameLogged;

@@ -58,7 +58,8 @@ task verifyArchitectureBoundaries {
     doLast {
         def violations = []
     [project(':api'), project(':feature-archaeology'), project(':feature-lootmaps'),
-     project(':feature-map'), project(':feature-surroundings')].each { feature ->
+     project(':feature-map'), project(':feature-deeds'),
+     project(':feature-surroundings')].each { feature ->
             fileTree(new File(feature.projectDir, 'src')) {
                 include '**/*.java'
             }.each { source ->

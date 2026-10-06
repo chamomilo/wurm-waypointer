@@ -2,9 +2,15 @@
 
 ![Wurm Waypointer](docs/wurm-waypointer-banner.png)
 
-**Wurm Waypointer 1.3.2** is a client-side navigation and map mod for Wurm Unlimited, created especially for Sklotopolis.
+**Wurm Waypointer 1.4.0** is a client-side navigation and map mod for Wurm Unlimited, created especially for Sklotopolis.
 
 Its main purpose is to let you create waypoints and navigate to them using a glowing, magic-like navigation pulse. Choose your destination and follow the light!
+
+## New in 1.4.0
+
+The Chamomilo versions window appears at every launch, including when everything is current or GitHub checks fail. It lists all mods from the public catalogue in [wurm-keybinder/chamomilo-mods.properties](https://github.com/chamomilo/wurm-keybinder/blob/main/chamomilo-mods.properties), verifies public repository membership and detects disabled or unloaded installations. Each row shows installed/latest versions; UPDATE and INSTALL open manual ZIP downloads. New catalogue entries appear without upgrading the updater. The window uses a thinner version of the map's high-resolution wood-and-metal frame.
+
+If Keybinder is installed, also install Keybinder 0.10.0: its earlier load order owns the shared updater. Verified catalogue data is cached under your user home in .chamomilo/mod-catalog.properties for offline startup.
 
 ## New in 1.3.2
 

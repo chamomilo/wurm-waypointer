@@ -32,12 +32,19 @@ public final class WaypointerUpdateBridge {
         if (shown || updates == null || updates.isEmpty()) return;
         try {
             window = new ChamomiloUpdateWindow(hud, updates, "Chamomilo mod updates",
-                    "Updates are available. Download a ZIP and install it manually.",
+                    "Chamomilo mod catalogue. Download a ZIP and install it manually.",
                     "Download", "Open {0}", "Later", "Dismiss this notification",
                     update -> {
-                        try { java.awt.Desktop.getDesktop().browse(
-                                java.net.URI.create(update.getDownloadUrl())); }
-                        catch (Exception failure) { LOGGER.log(Level.WARNING, "Cannot open download", failure); }
+                        try {
+                            if (!java.awt.Desktop.isDesktopSupported()
+                                    || !java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.BROWSE))
+                                throw new IllegalStateException("Browser integration unavailable");
+                            java.awt.Desktop.getDesktop().browse(java.net.URI.create(update.getDownloadUrl()));
+                        } catch (Exception failure) {
+                            LOGGER.log(Level.WARNING, "Cannot open download: " + update.getDownloadUrl(), failure);
+                            hud.textMessage(":Event", 255, 220, 160, "Download " + update.getDisplayName()
+                                    + " manually: " + update.getDownloadUrl());
+                        }
                     }, () -> hud.hideComponent(window));
             ReflectionUtil.getMethod(HeadsUpDisplay.class, "addComponent",
                     new Class<?>[]{WurmComponent.class}).invoke(hud, window);

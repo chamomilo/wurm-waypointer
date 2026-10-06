@@ -15,6 +15,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.nio.file.Paths;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
@@ -57,16 +59,19 @@ public final class SharedUpdateCoordinator {
     public static boolean startOnce() {
         final Host host = REGISTRY.owner();
         if (host == null || !STARTED.compareAndSet(false, true)) return false;
-        final List<UpdateTarget> targets = REGISTRY.snapshot();
         Thread thread = new Thread(new Runnable() {
-            @Override public void run() { checkAll(host, targets); }
+            @Override public void run() {
+                List<UpdateTarget> targets = ModCatalog.onlineSnapshot(Paths.get("mods"), REGISTRY.snapshot());
+                LOGGER.info("Checking Chamomilo catalogue: " + targets.size() + " mods");
+                checkAll(host, targets, new GitHubReleaseClient());
+            }
         }, "Chamomilo mod update coordinator");
         thread.setDaemon(true);
         thread.start();
         return true;
     }
 
-    private static void checkAll(Host host, List<UpdateTarget> targets) {
+    static void checkAll(Host host, List<UpdateTarget> targets, final GitHubReleaseClient client) {
         if (targets.isEmpty()) {
             deliver(host, Collections.<ModUpdate>emptyList());
             return;
@@ -97,13 +102,11 @@ public final class SharedUpdateCoordinator {
         for (final Map.Entry<String, List<UpdateTarget>> group : byRepository.entrySet()) {
             futures.add(executor.submit(new Callable<List<ModUpdate>>() {
                 @Override public List<ModUpdate> call() throws Exception {
-                    GitHubReleaseClient client = new GitHubReleaseClient();
                     GitHubReleaseClient.ReleaseSnapshot release =
                             client.readLatest(group.getKey());
                     List<ModUpdate> updates = new ArrayList<ModUpdate>();
                     for (UpdateTarget target : group.getValue()) {
-                        ModUpdate update = GitHubReleaseClient.findUpdate(target, release);
-                        if (update != null) updates.add(update);
+                        updates.add(GitHubReleaseClient.catalogueRow(target, release));
                     }
                     return updates;
                 }
@@ -112,29 +115,40 @@ public final class SharedUpdateCoordinator {
         executor.shutdown();
 
         List<ModUpdate> updates = new ArrayList<ModUpdate>();
+        final long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
         int index = 0;
         for (Map.Entry<String, List<UpdateTarget>> group : byRepository.entrySet()) {
             try {
-                updates.addAll(futures.get(index).get());
+                updates.addAll(futures.get(index).get(
+                        Math.max(1, deadline - System.nanoTime()), TimeUnit.NANOSECONDS));
             } catch (InterruptedException failure) {
                 Thread.currentThread().interrupt();
                 reportFailure(host, group.getKey(), failure);
-                break;
+                addFailedRows(updates, group.getValue());
             } catch (ExecutionException failure) {
                 Throwable cause = failure.getCause() == null ? failure : failure.getCause();
                 reportFailure(host, group.getKey(), cause);
+                addFailedRows(updates, group.getValue());
             } catch (Throwable failure) {
                 reportFailure(host, group.getKey(), failure);
+                addFailedRows(updates, group.getValue());
             }
             index++;
         }
+        executor.shutdownNow();
         Collections.sort(updates, new Comparator<ModUpdate>() {
             @Override public int compare(ModUpdate left, ModUpdate right) {
                 int name = left.getDisplayName().compareToIgnoreCase(right.getDisplayName());
                 return name != 0 ? name : left.getId().compareTo(right.getId());
             }
         });
+        LOGGER.info("Chamomilo catalogue ready: " + updates.size() + " mods");
         deliver(host, Collections.unmodifiableList(updates));
+    }
+
+    private static void addFailedRows(List<ModUpdate> updates, List<UpdateTarget> targets) {
+        for (UpdateTarget target : targets)
+            updates.add(GitHubReleaseClient.failedRow(target, "Version check failed"));
     }
 
     private static void deliver(Host host, List<ModUpdate> updates) {
@@ -146,6 +160,7 @@ public final class SharedUpdateCoordinator {
     }
 
     private static void reportFailure(Host host, String repository, Throwable failure) {
+        LOGGER.log(Level.WARNING, "Version check failed for " + repository, failure);
         try {
             host.checkFailed(repository, failure);
         } catch (Throwable callbackFailure) {
@@ -214,6 +229,10 @@ public final class SharedUpdateCoordinator {
 
         synchronized void observe(ModEntry<?> entry) {
             UpdateTarget target = targetFrom(entry);
+            if (target == null && entry != null && entry.getProperties() != null
+                    && trim(entry.getProperties().getProperty("updateProvider")).isEmpty())
+                target = ModCatalog.legacyTarget(entry.getName(), entry.getProperties(),
+                        installedVersion(entry, entry.getProperties()));
             if (target != null && !targets.containsKey(target.getId()))
                 targets.put(target.getId(), target);
         }

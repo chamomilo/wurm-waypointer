@@ -54,9 +54,14 @@ jar {
 task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
     doLast {
         def contents = zipTree(jar.archiveFile.get().asFile)
-        ['SharedUpdateCoordinator', 'GitHubReleaseClient', 'ModUpdate', 'UpdateTarget'].each { name ->
+        ['SharedUpdateCoordinator', 'GitHubReleaseClient', 'ModUpdate', 'UpdateTarget', 'ModCatalog'].each { name ->
             if (contents.matching { include "org/chamomilo/wurm/update/${name}.class" }.files.empty)
                 throw new GradleException('Missing shared updater class: ' + name)
+        }
+        ['com/wurmonline/client/resources/ChamomiloResourceUrl.class',
+         'org/chamomilo/wurm/update/update-frame.png'].each { required ->
+            if (contents.matching { include required }.files.empty)
+                throw new GradleException('Missing shared updater resource: ' + required)
         }
         if (contents.matching { include 'com/wurmonline/client/renderer/gui/ChamomiloUpdateWindow.class' }.files.empty)
             throw new GradleException('Missing shared update window')

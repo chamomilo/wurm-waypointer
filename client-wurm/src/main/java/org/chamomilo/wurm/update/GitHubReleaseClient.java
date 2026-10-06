@@ -51,6 +51,14 @@ final class GitHubReleaseClient {
         if (latestVersion == null || installedVersion == null
                 || compareVersions(latestVersion, installedVersion) <= 0) return null;
 
+        return catalogueRow(target, release);
+    }
+
+    static ModUpdate catalogueRow(UpdateTarget target, ReleaseSnapshot release) {
+        String latestVersion = release == null ? null : normalizedVersion(release.getTag());
+        if (latestVersion == null) return failedRow(target, "Release version unavailable");
+        String installedVersion = normalizedVersion(target.getInstalledVersion());
+        boolean newer = installedVersion != null && compareVersions(latestVersion, installedVersion) > 0;
         String expectedAsset = target.getAssetTemplate().replace("{version}", latestVersion);
         String repository = target.getRepository();
         String downloadUrl = latestReleasePage(repository);
@@ -63,7 +71,16 @@ final class GitHubReleaseClient {
             }
         }
         return new ModUpdate(target.getId(), target.getDisplayName(),
-                installedVersion, latestVersion, downloadUrl);
+                target.getInstalledVersion(), latestVersion, downloadUrl, newer,
+                !target.getInstalledVersion().isEmpty() && installedVersion == null
+                        ? "Latest: " + latestVersion + " | Installed version unknown"
+                        : installedVersion != null && compareVersions(latestVersion, installedVersion) < 0
+                        ? "Latest: " + latestVersion + " | Installed version is newer" : "");
+    }
+
+    static ModUpdate failedRow(UpdateTarget target, String status) {
+        return new ModUpdate(target.getId(), target.getDisplayName(), target.getInstalledVersion(),
+                "", latestReleasePage(target.getRepository()), false, status);
     }
 
     static String latestReleasePage(String repository) {
@@ -76,7 +93,7 @@ final class GitHubReleaseClient {
             throw new IllegalArgumentException("Invalid GitHub repository: " + repository);
     }
 
-    private static String normalizedVersion(String value) {
+    static String normalizedVersion(String value) {
         Matcher matcher = VERSION.matcher(value == null ? "" : value.trim());
         if (!matcher.matches()) return null;
         return withoutLeadingZeroes(matcher.group(1)) + "."
@@ -128,9 +145,12 @@ final class GitHubReleaseClient {
 
     private static final class HttpReleaseSource implements ReleaseSource {
         @Override public String read(String repository) throws IOException {
-            HttpURLConnection connection = (HttpURLConnection) new URL(
-                    "https://api.github.com/repos/" + repository + "/releases/latest")
-                    .openConnection();
+            return readPublic("https://api.github.com/repos/" + repository + "/releases/latest");
+        }
+    }
+
+    static String readPublic(String url) throws IOException {
+            HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
             connection.setConnectTimeout(4000);
             connection.setReadTimeout(4000);
             connection.setUseCaches(false);
@@ -157,5 +177,4 @@ final class GitHubReleaseClient {
                 connection.disconnect();
             }
         }
-    }
 }

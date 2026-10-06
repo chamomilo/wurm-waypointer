@@ -54,7 +54,7 @@ jar {
 task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
     doLast {
         def contents = zipTree(jar.archiveFile.get().asFile)
-        ['SharedUpdateCoordinator', 'GitHubReleaseClient', 'ModUpdate', 'UpdateTarget', 'ModCatalog'].each { name ->
+        ['SharedUpdateCoordinator', 'GitHubReleaseClient', 'ModUpdate', 'UpdateTarget', 'ModCatalog', 'SharedUpdateHooks'].each { name ->
             if (contents.matching { include "org/chamomilo/wurm/update/${name}.class" }.files.empty)
                 throw new GradleException('Missing shared updater class: ' + name)
         }
@@ -65,6 +65,8 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
         }
         if (contents.matching { include 'com/wurmonline/client/renderer/gui/ChamomiloUpdateWindow.class' }.files.empty)
             throw new GradleException('Missing shared update window')
+        if (contents.matching { include 'com/wurmonline/client/renderer/gui/ChamomiloUpdateBridge.class' }.files.empty)
+            throw new GradleException('Missing shared update HUD bridge')
         if (contents.matching { include 'com/wurmonline/client/renderer/gui/WaypointerUpdateBridge.class' }.files.empty)
             throw new GradleException('Missing Waypointer update host bridge')
         // The coordinator's Host, registry, release parser and background workers

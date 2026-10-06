@@ -40,7 +40,11 @@ final class ModCatalog {
         new Definition("highres-hud", "HighRes HUD", "Wurm-HighRes-HUD", "highres-hud-{version}.zip",
                 "org.highreshud.client.HighResHudMod"),
         new Definition("highres-startup", "HighRes Startup", "wurm-highres-startup",
-                "highres-startup-{version}.zip", "org.highresstartup.client.HighResStartupMod")
+                "highres-startup-{version}.zip", "org.highresstartup.client.HighResStartupMod"),
+        new Definition("armor-material-colors", "Material Colors", "wurm-material-colors",
+                "armor-material-colors-{version}.zip", "org.armormaterialcolors.client.ArmorMaterialColorsMod"),
+        new Definition("idleanimations", "Idle Animations", "wurm-idle-animations",
+                "idleanimations-{version}.zip", "org.wuidleanimations.client.IdleAnimationsMod")
     };
 
     private ModCatalog() { }

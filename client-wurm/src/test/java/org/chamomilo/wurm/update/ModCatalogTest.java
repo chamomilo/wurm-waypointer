@@ -45,7 +45,7 @@ public class ModCatalogTest {
                 .getBytes(StandardCharsets.UTF_8));
         Files.write(mods.resolve("keybinder.properties"), "classpath=missing.jar\nversion=0.9.1\n".getBytes(StandardCharsets.UTF_8));
         List<UpdateTarget> rows = ModCatalog.snapshot(mods, Collections.<UpdateTarget>emptyList());
-        assertEquals(6, rows.size());
+        assertEquals(8, rows.size());
         assertEquals("0.1.0", target(rows, "highres-hud").getInstalledVersion());
         assertEquals("", target(rows, "keybinder").getInstalledVersion());
     }
@@ -57,7 +57,7 @@ public class ModCatalogTest {
         UpdateTarget privateMod = new UpdateTarget("secret", "Secret", "1.0.0",
                 "chamomilo/secret", "secret-{version}.zip");
         List<UpdateTarget> rows = ModCatalog.snapshot(mods, java.util.Arrays.asList(runtime, privateMod));
-        assertEquals(6, rows.size());
+        assertEquals(8, rows.size());
         assertEquals("1.4.0", target(rows, "wurm-waypointer").getInstalledVersion());
         assertEquals("wurm-waypointer-{version}.zip", target(rows, "wurm-waypointer").getAssetTemplate());
     }
@@ -81,7 +81,7 @@ public class ModCatalogTest {
             public void updatesReady(List<ModUpdate> updates) { delivered.set(updates); }
             public void checkFailed(String repo, Throwable failure) { }
         }, targets, new GitHubReleaseClient(repo -> { throw new IOException("HTTP 403"); }));
-        assertEquals(6, delivered.get().size());
+        assertEquals(8, delivered.get().size());
         for (ModUpdate update : delivered.get()) {
             assertTrue(update.getStatusText().contains("Version check failed"));
             assertEquals("", update.getActionLabel());

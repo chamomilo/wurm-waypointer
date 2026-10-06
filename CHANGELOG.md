@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.2 — 2026-10-06
+
+- Fixed received ore veins and unexcavated rock appearing as Unknown (not received) in the cave mini-map. Receipt is now tracked by absolute tile coordinates rather than the floor-height sentinel shared with unexcavated terrain.
+- Cave coverage resets with the native buffer, rejects reused ring slots and leaves unfinished terrain updates unknown.
+- Unexcavated rock hover reports that floor/ceiling are not formed; floor extras no longer replace the colour of solid ore walls.
+
+## 1.3.1 — 2026-10-05
+
+- Verified Waypointer's shared Chamomilo protocol-1 updater registration, release selection and single-host coordination.
+- Release builds now require every compiled updater class, including nested workers and the Waypointer HUD bridge, and validate exact updater metadata in the source configuration and final ZIP.
+- Fixed the update display name to avoid repeating Wurm in the notification.
+
 ## 1.3.0 — 2026-10-05
 
 - Added a green GROUND / charcoal CAVE mini-map button beside OPEN FULL MAP. Entering or leaving caves selects the corresponding view once; manual overrides last until the next layer transition.

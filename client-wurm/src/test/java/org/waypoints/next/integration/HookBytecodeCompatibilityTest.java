@@ -23,6 +23,7 @@ public class HookBytecodeCompatibilityTest {
         invokeInstaller("hookSelectedServer", pool);
         invokeInstaller("hookDirectConnect", pool);
         invokeInstaller("hookConnectionLifecycle", pool);
+        invokeInstaller("hookCaveTileCoverage", pool);
         invokeInstaller("hookWorldMap", pool);
         invokeInstaller("hookWorldMapWheel", pool);
         invokeInstaller("hookMiniMapChrome", pool);
@@ -40,6 +41,8 @@ public class HookBytecodeCompatibilityTest {
         assertTrue(pool.get("com.wurmonline.client.startup.ServerBrowserDirectConnect")
                 .toBytecode().length > 0);
         assertTrue(pool.get("com.wurmonline.client.comm.SimpleServerConnectionClass")
+                .toBytecode().length > 0);
+        assertTrue(pool.get("com.wurmonline.client.game.CaveDataBuffer")
                 .toBytecode().length > 0);
         assertTrue(pool.get("com.wurmonline.client.renderer.gui.CompassComponent")
                 .toBytecode().length > 0);

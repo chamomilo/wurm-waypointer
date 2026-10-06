@@ -36,6 +36,7 @@ dependencies {
 
 test {
     systemProperty 'wurmClientLibDir', clientLibraryDirectory.absolutePath
+    systemProperty 'waypointerMetadataFile', rootProject.file('mods/wurm-waypointer.properties').absolutePath
 }
 
 // This module jar intentionally excludes :core and is only an input to the

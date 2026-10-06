@@ -2,11 +2,21 @@
 
 ![Wurm Waypointer](docs/wurm-waypointer-banner.png)
 
-**Wurm Waypointer 1.3.0** is a client-side navigation and map mod for Wurm Unlimited, created especially for Sklotopolis.
+**Wurm Waypointer 1.3.2** is a client-side navigation and map mod for Wurm Unlimited, created especially for Sklotopolis.
 
 Its main purpose is to let you create waypoints and navigate to them using a glowing, magic-like navigation pulse. Choose your destination and follow the light!
 
-## New in 1.3.0
+## New in 1.3.2
+
+- Fixed ore veins and unexcavated rock disappearing behind **Unknown (not received)** in the cave mini-map. All received rock and ore types are now shown even before their floor/ceiling are formed.
+- Tile receipt follows the native cave buffer, keeping unreceived and overwritten cells unknown.
+
+## Included from 1.3.1
+
+- Verified the shared Chamomilo protocol-1 updater integration. Release builds now check every packaged updater class and the exact metadata in both the project and the installable ZIP.
+- Fixed the Waypointer update name so notifications do not repeat the word Wurm.
+
+## Included from 1.3.0
 
 - The mini-map has a **GROUND / CAVE** button beside **OPEN FULL MAP**. Entering a cave selects CAVE once; leaving selects GROUND once. You can switch manually until the next layer transition.
 - CAVE starts at **17×17 tiles**. Mouse-wheel zoom reaches **48×48 tiles**; GROUND keeps its separate zoom setting.
@@ -70,7 +80,7 @@ Wurm Waypointer requires a working Wurm Unlimited client modloader.
 
 After installation, the mod should be located at:
 
-`WurmLauncher/mods/wurm-waypointer/wurm-waypointer-1.3.0.jar`
+`WurmLauncher/mods/wurm-waypointer/wurm-waypointer-1.3.1.jar`
 
 When upgrading, keep only the current Waypointer JAR in that folder and check that `mods/wurm-waypointer.properties` points to it. Back up your configuration before extracting an update. Waypoints and custom marks are stored separately in `wurm-waypointer-data` under the client directory.
 
@@ -78,7 +88,16 @@ When upgrading, keep only the current Waypointer JAR in that folder and check th
 
 Use a Java 8 JDK. Copy `local.properties.example` to `local.properties` and set `wurmClientLibDir` to a directory containing your client libraries (`client-patched.jar`, `common.jar`, `javassist.jar`, and `modlauncher.jar`). These proprietary libraries are not included in this repository.
 
-Run `./gradlew test dist` (`gradlew.bat test dist` on Windows). The installable archive is written to `distribution/build/distributions/wurm-waypointer-1.3.0.zip`; the build verifies module boundaries, packaged runtime classes, update metadata and ZIP contents.
+Run `./gradlew test dist` (`gradlew.bat test dist` on Windows). The installable archive is written to `distribution/build/distributions/wurm-waypointer-1.3.1.zip`; the build verifies module boundaries, packaged runtime classes, update metadata and ZIP contents.
+
+## Chamomilo update checks
+
+After the first game HUD is ready, Waypointer participates in one background check
+for all installed Chamomilo mods with protocol-1 update metadata. Whichever mod
+claims the shared coordinator first displays one window listing available stable
+releases. Each Download button opens that mod's ZIP link in your browser; if the
+ZIP is unavailable, it opens the latest release page. Installation is manual.
+The checker uses network timeouts, and failed checks do not interrupt gameplay.
 
 ## Replacing other mods
 

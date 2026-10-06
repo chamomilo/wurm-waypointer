@@ -81,6 +81,8 @@ public final class WurmCaveMapSnapshotTest {
         ((short[]) floors.get(buffer))[offset] = 0;
         ((short[]) ceilings.get(buffer))[offset] = 50;
         ((byte[]) types.get(buffer))[offset] = Tile.TILE_CAVE_WALL_ORE_GOLD.id;
+        WurmCaveTileCoverage.beforeStrip(buffer, 100, 100, 1, 1);
+        WurmCaveTileCoverage.afterStrip(buffer, 100, 100, 1, 1);
         WurmCaveMapSnapshot current = WurmCaveMapSnapshot.capture(buffer, 100, 100, 1024, null);
         assertEquals(76, current.getOriginX());
         assertTrue(current.hoverLines(100, 100).get(0).toLowerCase().contains("gold"));
@@ -91,5 +93,84 @@ public final class WurmCaveMapSnapshotTest {
         assertTrue(far.hoverLines(164, 164).get(0).contains("Unknown"));
         assertNotEquals(current.getRevision(), far.getRevision());
         assertEquals(288, current.image().getWidth());
+    }
+
+    @Test public void receivedUnexcavatedOresAndRockRenderWithoutFloorHeights() throws Exception {
+        CaveDataBuffer buffer = emptyBuffer();
+        setBounds(buffer, 60, 123);
+        Tile[] resources = {Tile.TILE_CAVE_WALL_ORE_IRON, Tile.TILE_CAVE_WALL_ORE_COPPER,
+                Tile.TILE_CAVE_WALL_ORE_TIN, Tile.TILE_CAVE_WALL_ORE_GOLD,
+                Tile.TILE_CAVE_WALL_ORE_SILVER, Tile.TILE_CAVE_WALL_ORE_ZINC,
+                Tile.TILE_CAVE_WALL_ORE_LEAD, Tile.TILE_CAVE_WALL_ORE_ADAMANTINE,
+                Tile.TILE_CAVE_WALL_ORE_GLIMMERSTEEL, Tile.TILE_CAVE_WALL_MARBLE,
+                Tile.TILE_CAVE_WALL_SLATE, Tile.TILE_CAVE_WALL_SANDSTONE,
+                Tile.TILE_CAVE_WALL_ROCKSALT, Tile.TILE_CAVE_WALL};
+        Field types = field("types");
+        for (int i = 0; i < resources.length; i++)
+            ((byte[]) types.get(buffer))[buffer.getOffset(90 + i, 100)] = resources[i].id;
+        // clear() leaves both floor and ceiling at -100, exactly as in the
+        // server's unexcavated vein encoding. Receipt must still reveal the type.
+        WurmCaveTileCoverage.beforeStrip(buffer, 76, 76, 48, 48);
+        WurmCaveTileCoverage.afterStrip(buffer, 76, 76, 48, 48);
+        WurmCaveMapSnapshot snapshot = WurmCaveMapSnapshot.capture(buffer, 100, 100, 1024, null);
+        java.awt.image.BufferedImage image = snapshot.image();
+        for (int i = 0; i < resources.length; i++) {
+            List<String> lines = snapshot.hoverLines(90 + i, 100);
+            assertTrue(lines.get(0), lines.get(0).contains(resources[i].getName()));
+            assertTrue(lines.toString(), lines.toString().contains("not formed"));
+            assertFalse(lines.toString(), lines.toString().contains("Height: 0.0 m"));
+            assertEquals(resources[i].name(), WurmCaveMapSnapshot.color(resources[i]),
+                    image.getRGB((90 + i - 76) * 6 + 2, (100 - 76) * 6 + 3) & 0xffffff);
+        }
+        WurmCaveMapSnapshot edge = WurmCaveMapSnapshot.capture(buffer, 84, 100, 1024, null);
+        assertTrue(edge.hoverLines(60, 100).get(0).contains("Unknown"));
+        WurmCaveTileCoverage.clear(buffer);
+        assertTrue(WurmCaveMapSnapshot.capture(buffer, 100, 100, 1024, null)
+                .hoverLines(100, 100).get(0).contains("Unknown"));
+    }
+
+    @Test public void receivedTunnelAtMinusTenMetresRetainsItsActualGeometry() throws Exception {
+        CaveDataBuffer buffer = emptyBuffer();
+        setBounds(buffer, 37, 100);
+        int offset = buffer.getOffset(100, 100);
+        ((byte[]) field("types").get(buffer))[offset] = Tile.TILE_CAVE.id;
+        ((short[]) field("ceilings").get(buffer))[offset] = -70;
+        WurmCaveTileCoverage.beforeStrip(buffer, 100, 100, 1, 1);
+        WurmCaveTileCoverage.afterStrip(buffer, 100, 100, 1, 1);
+        String text = WurmCaveMapSnapshot.capture(buffer, 100, 100, 1024, null)
+                .hoverLines(100, 100).toString();
+        assertFalse(text, text.contains("Unknown"));
+        assertTrue(text, text.contains("Floor (NW): -10.0 m"));
+        assertTrue(text, text.contains("Height: 3.0 m"));
+    }
+
+    @Test public void solidOreIsNotReplacedByFloorExtras() {
+        WurmCaveMapSnapshot.Cell ore = new WurmCaveMapSnapshot.Cell(
+                Tile.TILE_CAVE_WALL_ORE_GOLD, Tile.TILE_CAVE_FLOOR_REINFORCED, null,
+                (short) -100, (short) -100, (short) 0, false);
+        assertNull(ore.extra);
+        assertEquals(Tile.TILE_CAVE_WALL_ORE_GOLD, ore.effectiveType());
+        assertEquals(WurmCaveMapSnapshot.color(Tile.TILE_CAVE_WALL_ORE_GOLD),
+                WurmCaveMapSnapshot.pixel(ore, 2, 2));
+    }
+
+    private static Field field(String name) throws Exception {
+        Field field = CaveDataBuffer.class.getDeclaredField(name);
+        field.setAccessible(true);
+        return field;
+    }
+
+    private static CaveDataBuffer emptyBuffer() throws Exception {
+        Field unsafeField = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+        unsafeField.setAccessible(true);
+        sun.misc.Unsafe unsafe = (sun.misc.Unsafe) unsafeField.get(null);
+        Constructor<CaveDataBuffer> constructor = CaveDataBuffer.class.getDeclaredConstructor(World.class);
+        constructor.setAccessible(true);
+        return constructor.newInstance((World) unsafe.allocateInstance(World.class));
+    }
+
+    private static void setBounds(CaveDataBuffer buffer, int minimum, int maximum) throws Exception {
+        for (String name : new String[]{"minx", "miny", "maxx", "maxy"})
+            field(name).setShort(buffer, (short) (name.startsWith("min") ? minimum : maximum));
     }
 }

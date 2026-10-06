@@ -6,9 +6,12 @@ import javassist.CtClass;
 import javassist.CtMethod;
 import javassist.CtNewMethod;
 import javassist.NotFoundException;
+import org.chamomilo.wurm.update.SharedUpdateCoordinator;
 import org.gotti.wurmunlimited.modloader.classhooks.HookManager;
 import org.gotti.wurmunlimited.modloader.interfaces.Configurable;
 import org.gotti.wurmunlimited.modloader.interfaces.Initable;
+import org.gotti.wurmunlimited.modloader.interfaces.ModEntry;
+import org.gotti.wurmunlimited.modloader.interfaces.ModListener;
 import org.gotti.wurmunlimited.modloader.interfaces.PreInitable;
 import org.gotti.wurmunlimited.modloader.interfaces.WurmClientMod;
 import org.waypoints.next.integration.CompassHookBridge;
@@ -23,11 +26,11 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public final class WurmWaypointerMod implements WurmClientMod, Configurable, PreInitable, Initable,
-        org.gotti.wurmunlimited.modloader.interfaces.ModListener {
-    public static final String VERSION = "1.3.0";
+        ModListener {
+    public static final String VERSION = "1.3.2";
 
-    @Override public void modInitialized(org.gotti.wurmunlimited.modloader.interfaces.ModEntry<?> entry) {
-        org.chamomilo.wurm.update.SharedUpdateCoordinator.modInitialized(entry);
+    @Override public void modInitialized(ModEntry<?> entry) {
+        SharedUpdateCoordinator.modInitialized(entry);
     }
     private static final Logger LOGGER = Logger.getLogger("WurmWaypointer");
     private static volatile BeamProbeConfiguration configuration =
@@ -76,6 +79,9 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
         });
         hooks.install("connection cleanup", new FailOpenHookInstaller.HookOperation() {
             @Override public void install() throws Exception { hookConnectionLifecycle(pool); }
+        });
+        hooks.install("received cave tile coordinates", new FailOpenHookInstaller.HookOperation() {
+            @Override public void install() throws Exception { hookCaveTileCoverage(pool); }
         });
         hooks.install("fresh world server information",
                 new FailOpenHookInstaller.HookOperation() {
@@ -232,6 +238,16 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
                 .insertBefore("org.waypoints.next.integration.WurmWaypointerRuntime.connectionEnded();");
         connection.getMethod("disconnectAndConnectTo", "(Ljava/lang/String;I)V")
                 .insertBefore("org.waypoints.next.integration.WurmWaypointerRuntime.connectionTransferred($1, $2);");
+    }
+
+    private static void hookCaveTileCoverage(ClassPool pool) throws Exception {
+        CtClass cave = pool.getCtClass("com.wurmonline.client.game.CaveDataBuffer");
+        CtMethod clear = cave.getMethod("clear", "()V");
+        CtMethod strip = cave.getMethod("tileStrip", "(SSSS[[I[[S[[B)V");
+        String coverage = "org.waypoints.next.integration.WurmCaveTileCoverage.";
+        clear.insertBefore(coverage + "clear($0);");
+        strip.insertBefore(coverage + "beforeStrip($0, $1, $2, $3, $4);");
+        strip.insertAfter(coverage + "afterStrip($0, $1, $2, $3, $4);");
     }
 
     private static void hookWorldServerInformation(ClassPool pool) throws Exception {

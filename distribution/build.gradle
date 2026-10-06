@@ -16,6 +16,27 @@ dependencies {
     bundled project(':client-wurm')
 }
 
+def expectedUpdateMetadata = [
+        classname: 'org.waypoints.next.WurmWaypointerMod',
+        classpath: "wurm-waypointer-${project.version}.jar".toString(),
+        version: project.version.toString(),
+        sharedClassLoader: 'true',
+        updateProvider: 'chamomilo',
+        updateCoordinatorProtocol: '1',
+        updateId: 'wurm-waypointer',
+        updateName: 'Waypointer',
+        updateRepo: 'chamomilo/wurm-waypointer',
+        updateAsset: 'wurm-waypointer-{version}.zip'
+]
+
+def verifyUpdateMetadata = { Properties metadata ->
+    expectedUpdateMetadata.each { key, expected ->
+        if (metadata.getProperty(key) != expected) {
+            throw new GradleException("Invalid shared-updater metadata: expected ${key}=${expected}")
+        }
+    }
+}
+
 jar {
     dependsOn ':api:jar', ':core:jar', ':feature-archaeology:jar', ':feature-lootmaps:jar',
             ':feature-map:jar', ':feature-deeds:jar', ':feature-surroundings:jar',
@@ -39,12 +60,24 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
         }
         if (contents.matching { include 'com/wurmonline/client/renderer/gui/ChamomiloUpdateWindow.class' }.files.empty)
             throw new GradleException('Missing shared update window')
+        if (contents.matching { include 'com/wurmonline/client/renderer/gui/WaypointerUpdateBridge.class' }.files.empty)
+            throw new GradleException('Missing Waypointer update host bridge')
+        // The coordinator's Host, registry, release parser and background workers
+        // are nested classes. Checking only their enclosing classes is insufficient.
+        def updaterClasses = zipTree(project(':client-wurm').tasks.jar.archiveFile.get().asFile)
+                .matching {
+                    include 'org/chamomilo/wurm/update/*.class'
+                    include 'com/wurmonline/client/renderer/gui/ChamomiloUpdateWindow*.class'
+                    include 'com/wurmonline/client/renderer/gui/WaypointerUpdateBridge*.class'
+                }
+        updaterClasses.visit { entry ->
+            if (!entry.directory && contents.matching { include entry.relativePath.pathString }.files.empty) {
+                throw new GradleException('Missing shared updater class: ' + entry.relativePath.pathString)
+            }
+        }
         def updateMetadata = new Properties()
         rootProject.file('mods/wurm-waypointer.properties').withInputStream { updateMetadata.load(it) }
-        ['sharedClassLoader', 'updateProvider', 'updateCoordinatorProtocol', 'updateId',
-         'updateName', 'updateRepo', 'updateAsset'].each { key ->
-            if (!updateMetadata.getProperty(key)) throw new GradleException('Missing update metadata: ' + key)
-        }
+        verifyUpdateMetadata(updateMetadata)
         def requiredClasses = [
                 'org/waypoints/api/WaypointerApi.class',
                 'org/waypoints/api/ObjectMarkRequest.class',
@@ -74,6 +107,8 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
                 'org/waypoints/next/integration/WurmLootMapTerrain.class',
                 'org/waypoints/next/integration/WurmSurfaceTileDescription.class',
                 'org/waypoints/next/integration/WurmCaveMapSnapshot.class',
+                'org/waypoints/next/integration/WurmCaveTileCoverage.class',
+                'org/waypoints/next/integration/WurmCaveTileCoverage$Coverage.class',
                 'com/wurmonline/client/resources/textures/WaypointerCaveTexture.class',
                 'org/waypoints/next/surroundings/SurroundingsCatalog.class',
                 'org/waypoints/next/surroundings/SurroundingsClassifier.class',
@@ -279,6 +314,11 @@ task dist(type: Zip, dependsOn: [test, verifyArtifact]) {
                 def entry = entries.nextElement()
                 if (!entry.isDirectory()) actual << entry.name
             }
+            def metadataEntry = archive.getEntry('mods/wurm-waypointer.properties')
+            if (metadataEntry == null) throw new GradleException('ZIP is missing shared-updater metadata')
+            def packagedMetadata = new Properties()
+            archive.getInputStream(metadataEntry).withCloseable { packagedMetadata.load(it) }
+            verifyUpdateMetadata(packagedMetadata)
         } finally {
             archive.close()
         }

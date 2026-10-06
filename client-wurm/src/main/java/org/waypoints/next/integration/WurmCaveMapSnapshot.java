@@ -36,11 +36,11 @@ public final class WurmCaveMapSnapshot {
             int tx = result.originX + x, ty = result.originY + y;
             Cell cell = null;
             try {
-                // getRawFloor checks the native absolute bounds before accessing
-                // its ring-buffer slot. Type/extra getters alone do not suffice.
+                // Unexcavated rock/ore also has floor=-100. Only strip receipt
+                // and the slot's absolute coordinates establish that it is known.
                 if (cave != null && tx >= 0 && ty >= 0
                         && tx < worldSize && ty < worldSize
-                        && cave.getRawFloor(tx, ty) != -100) {
+                        && WurmCaveTileCoverage.isReceived(cave, tx, ty)) {
                     Tile type = cave.getTileType(tx, ty);
                     Tile extra = Tiles.getTile(cave.getExtra(tx, ty));
                     Tile temporary = cave.hasTempType(tx, ty)
@@ -140,7 +140,7 @@ public final class WurmCaveMapSnapshot {
              short ceiling, short water, boolean structure) {
             this.type = type == null ? Tile.TILE_CAVE_WALL : type;
             // Cave extras encode a floor/paving type, not ore quality.
-            this.extra = extra != null && (extra.isReinforcedFloor()
+            this.extra = !this.type.isSolidCave() && extra != null && (extra.isReinforcedFloor()
                     || extra.isRoad() || extra.isReinforcedCave()) ? extra : null;
             this.temporary = temporary;
             this.floor = floor; this.ceiling = ceiling;
@@ -166,9 +166,13 @@ public final class WurmCaveMapSnapshot {
                 lines.add(effective.isSolidCave() ? "Reinforced wall" : "Reinforced floor");
             if (type.name().contains("PART_")) lines.add("Partially clad wall");
             if (type == Tile.TILE_CAVE_EXIT) lines.add("Cave entrance / exit");
-            lines.add(String.format(Locale.ROOT,
-                    "Floor (NW): %.1f m | Ceiling: %.1f m | Height: %.1f m",
-                    floor / 10.0d, ceiling / 10.0d, (ceiling - floor) / 10.0d));
+            if (type.isSolidCave() && floor == -100 && ceiling == -100) {
+                lines.add("Floor / ceiling: not formed (solid rock)");
+            } else {
+                lines.add(String.format(Locale.ROOT,
+                        "Floor (NW): %.1f m | Ceiling: %.1f m | Height: %.1f m",
+                        floor / 10.0d, ceiling / 10.0d, (ceiling - floor) / 10.0d));
+            }
             if (!type.isSolidCave() && water > floor)
                 lines.add(String.format(Locale.ROOT, "Water depth: %.1f m",
                         (water - floor) / 10.0d));

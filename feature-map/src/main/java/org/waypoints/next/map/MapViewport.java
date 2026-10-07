@@ -125,6 +125,9 @@ public final class MapViewport {
     public double getImageWidth() { return mapWidth * pixelsPerTile; }
     public double getImageHeight() { return mapHeight * pixelsPerTile; }
     public double getPixelsPerTile() { return pixelsPerTile; }
+    public boolean isMaximumZoom() {
+        return pixelsPerTile >= Math.max(fitScale(), MAXIMUM_PIXELS_PER_TILE);
+    }
     public double getCenterX() { return centerX; }
     public double getCenterY() { return centerY; }
     public int getMapWidth() { return mapWidth; }

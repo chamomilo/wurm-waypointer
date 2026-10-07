@@ -26,6 +26,12 @@ public final class MiniMapWindowBridge {
 
     public static synchronized boolean isEnabled() { return enabled; }
 
+    public static synchronized int getZoomFactor() { return SETTINGS.getZoomFactor(); }
+    public static synchronized void cycleZoomFactor() { SETTINGS.cycleZoomFactor(); }
+    public static synchronized double fullMapWheelSteps(int wheelDelta) {
+        return SETTINGS.fullMapWheelSteps(wheelDelta);
+    }
+
     public static synchronized boolean areDeedsVisible() {
         initializeSettings();
         return SETTINGS.areDeedsVisible();
@@ -164,6 +170,7 @@ public final class MiniMapWindowBridge {
             throws ReflectiveOperationException {
         if (hud != null && window != null
                 && hud.getComponents().contains(window)) {
+            window.prepareDetach();
             remove(hud, window);
         }
     }

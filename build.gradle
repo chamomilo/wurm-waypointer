@@ -17,6 +17,11 @@ if (configuredLibraryDirectory == null || configuredLibraryDirectory.toString().
 ext.waypointerVersion = findProperty('waypointerVersion') ?: '1.0.0'
 ext.wurmClientLibDir = configuredLibraryDirectory == null
         ? null : file(configuredLibraryDirectory.toString())
+// JavaFX is needed only by the native HUD probe when using a Java 8 JDK that
+// does not bundle it. Keep the proprietary runtime location machine-local.
+def configuredJavaFxJar = findProperty('wurmJavaFxJar') ?:
+        localProperties.getProperty('wurmJavaFxJar') ?: System.getenv('WURM_JAVAFX_JAR')
+ext.wurmJavaFxJar = configuredJavaFxJar == null ? null : file(configuredJavaFxJar.toString())
 
 allprojects {
     group = 'org.waypoints.next'

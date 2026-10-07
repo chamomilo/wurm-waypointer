@@ -122,7 +122,12 @@ final class ModCatalog {
                     || name.isEmpty() || name.length() > 80 || !asset.matches("[A-Za-z0-9_.{}-]+\\.zip")
                     || !asset.contains("{version}") || !mainClass.matches("[A-Za-z0-9_.$]+")) continue;
             if (publicRepositories != null && !publicRepositories.contains(repo)) continue;
-            result.put(repo, new Definition(id, name, repo.substring("chamomilo/".length()), asset, mainClass));
+            String description = properties.getProperty(id + ".description", descriptionFor(repo)).trim();
+            if (description.isEmpty() || description.length() > 240
+                    || description.indexOf('\n') >= 0 || description.indexOf('\r') >= 0)
+                description = descriptionFor(repo);
+            result.put(repo, new Definition(id, name, repo.substring("chamomilo/".length()),
+                    asset, mainClass, description));
         }
         return new ArrayList<Definition>(result.values());
     }
@@ -174,7 +179,8 @@ final class ModCatalog {
                         && GitHubReleaseClient.normalizedVersion(catalogued.getInstalledVersion()) != null
                         ? catalogued.getInstalledVersion() : target.getInstalledVersion();
                 result.put(target.getRepository(), new UpdateTarget(catalogued.getId(),
-                        catalogued.getDisplayName(), version, catalogued.getRepository(), catalogued.getAssetTemplate()));
+                        catalogued.getDisplayName(), version, catalogued.getRepository(),
+                        catalogued.getAssetTemplate(), catalogued.getDescription()));
             }
         }
         return new ArrayList<UpdateTarget>(result.values());
@@ -217,12 +223,40 @@ final class ModCatalog {
         return "unknown";
     }
 
+    static String descriptionFor(String repository) {
+        if ("chamomilo/wurm-keybinder".equalsIgnoreCase(repository))
+            return "Manage keybinds, action chains and your action queue.";
+        if ("chamomilo/wurm-waypointer".equalsIgnoreCase(repository))
+            return "Navigate with a minimap, waypoints and shared map markers.";
+        if ("chamomilo/WU-3rd-person-view".equalsIgnoreCase(repository))
+            return "Play with an adjustable third-person camera.";
+        if ("chamomilo/wurm-high-res-icons".equalsIgnoreCase(repository))
+            return "Replace item and tool icons with high-resolution artwork.";
+        if ("chamomilo/Wurm-HighRes-HUD".equalsIgnoreCase(repository))
+            return "Give the in-game interface sharper high-resolution textures.";
+        if ("chamomilo/wurm-highres-startup".equalsIgnoreCase(repository))
+            return "Refresh the startup and login screens with high-resolution artwork.";
+        if ("chamomilo/wurm-material-colors".equalsIgnoreCase(repository))
+            return "Show equipment materials through distinct colours and finishes.";
+        if ("chamomilo/wurm-idle-animations".equalsIgnoreCase(repository))
+            return "Add idle character animations while standing still.";
+        if ("chamomilo/Wurm-avatar-2.0".equalsIgnoreCase(repository))
+            return "Customize your character's body, appearance and animations.";
+        return "A Wurm client mod; visit its project page for features and instructions.";
+    }
+
     static final class Definition {
-        final String id, name, repository, asset, mainClass;
+        final String id, name, repository, asset, mainClass, description;
         Definition(String id, String name, String repo, String asset, String mainClass) {
+            this(id, name, repo, asset, mainClass, descriptionFor("chamomilo/" + repo));
+        }
+        Definition(String id, String name, String repo, String asset, String mainClass, String description) {
             this.id = id; this.name = name; this.repository = "chamomilo/" + repo;
             this.asset = asset; this.mainClass = mainClass;
+            this.description = description;
         }
-        UpdateTarget target(String version) { return new UpdateTarget(id, name, version, repository, asset); }
+        UpdateTarget target(String version) {
+            return new UpdateTarget(id, name, version, repository, asset, description);
+        }
     }
 }

@@ -9,6 +9,15 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public final class ChainedCartTerrainRoutePlannerTest {
+    @Test public void truncatedJoinedRouteDoesNotClaimToReachDestination() {
+        CartTerrainRoutePlanner.Terrain terrain = new CartTerrainRoutePlanner.Terrain() {
+            @Override public GroundRouteTrace.Point sample(int x, int y) { return point(x, y, 0); }
+        };
+        ChainedCartTerrainRoutePlanner.Plan route = ChainedCartTerrainRoutePlanner.plan(
+                planner(), terrain, 0, 5, 4, 5, 8, 2);
+        assertEquals(2, route.getPoints().size());
+        assertFalse(route.isReachedFinalTarget());
+    }
     @Test public void continuesPastBlockedSyntheticLegGoal() {
         CartTerrainRoutePlanner planner = planner();
         CartTerrainRoutePlanner.Terrain terrain =

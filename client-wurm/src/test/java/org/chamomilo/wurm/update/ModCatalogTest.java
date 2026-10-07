@@ -63,14 +63,14 @@ public class ModCatalogTest {
     }
 
     @Test public void currentAbsentAndNewerDevelopmentVersionsHaveCorrectButtons() {
-        assertEquals("UPDATE", row("0.9.1", "v0.10.0").getActionLabel());
-        assertEquals("INSTALL", row("", "v0.10.0").getActionLabel());
-        assertEquals("", row("0.10.0", "v0.10.0").getActionLabel());
-        assertEquals("", row("0.11.0", "v0.10.0").getActionLabel());
+        assertEquals("DOWNLOAD", row("0.9.1", "v0.10.0").getActionLabel());
+        assertEquals("DOWNLOAD", row("", "v0.10.0").getActionLabel());
+        assertEquals("LATEST", row("0.10.0", "v0.10.0").getActionLabel());
+        assertEquals("LATEST", row("0.11.0", "v0.10.0").getActionLabel());
         assertTrue(row("0.11.0", "v0.10.0").getStatusText().contains("Installed version is newer"));
         assertTrue(row("unknown", "v0.10.0").getStatusText().contains("version unknown"));
         assertFalse(row("", "v0.10.0").isInstalled());
-        assertEquals("", row("0.9.1", "nightly").getActionLabel());
+        assertEquals("UNAVAILABLE", row("0.9.1", "nightly").getActionLabel());
     }
 
     @Test public void allFailedChecksStillDeliverEveryCatalogueRowToTheWindowHost() throws Exception {
@@ -84,7 +84,8 @@ public class ModCatalogTest {
         assertEquals(8, delivered.get().size());
         for (ModUpdate update : delivered.get()) {
             assertTrue(update.getStatusText().contains("Version check failed"));
-            assertEquals("", update.getActionLabel());
+            assertEquals("DOWNLOAD", update.getActionLabel());
+            assertTrue(update.getDownloadUrl().endsWith("/releases/latest"));
         }
     }
 
@@ -98,8 +99,8 @@ public class ModCatalogTest {
             public void checkFailed(String repo, Throwable failure) { fail("Unexpected check error"); }
         }, targets, new GitHubReleaseClient(repo -> "{\"tag_name\":\"v0.10.0\"}"));
         assertEquals(2, delivered.get().size());
-        assertEquals("", delivered.get().get(0).getActionLabel());
-        assertEquals("INSTALL", delivered.get().get(1).getActionLabel());
+        assertEquals("LATEST", delivered.get().get(0).getActionLabel());
+        assertEquals("DOWNLOAD", delivered.get().get(1).getActionLabel());
     }
 
     private static ModUpdate row(String installed, String tag) {

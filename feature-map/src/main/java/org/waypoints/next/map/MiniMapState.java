@@ -7,6 +7,7 @@ public final class MiniMapState {
     public static final int DEFAULT_VISIBLE_TILES = 80;
     public static final int CAVE_MINIMUM_VISIBLE_TILES = 17;
     public static final int CAVE_MAXIMUM_VISIBLE_TILES = 48;
+    public static final int MAXIMUM_TOPOGRAPHIC_INTERVAL_METRES = 99;
 
     private int visibleTiles;
     private boolean deedsVisible;
@@ -15,6 +16,8 @@ public final class MiniMapState {
     private boolean caveView;
     private int caveVisibleTiles = CAVE_MINIMUM_VISIBLE_TILES;
     private Boolean observedCaveLayer;
+    private int topographicIntervalMetres;
+    private final MapZoomFactor zoomFactor = new MapZoomFactor();
 
     public MiniMapState() {
         this(DEFAULT_VISIBLE_TILES, true, true, true);
@@ -39,6 +42,37 @@ public final class MiniMapState {
     }
 
     public int getVisibleTiles() { return caveView ? caveVisibleTiles : visibleTiles; }
+
+    public boolean areTileBordersVisible() {
+        return getVisibleTiles() == (caveView
+                ? CAVE_MINIMUM_VISIBLE_TILES : MINIMUM_VISIBLE_TILES);
+    }
+
+    public int getTopographicIntervalMetres() { return topographicIntervalMetres; }
+
+    public int getZoomFactor() { return zoomFactor.getMultiplier(); }
+    public int cycleZoomFactor() { return zoomFactor.cycle(); }
+    public double fullMapWheelSteps(int wheelDelta) { return zoomFactor.fullMapWheelSteps(wheelDelta); }
+    public int miniMapWheelTiles(int wheelDelta) { return zoomFactor.miniMapWheelTiles(wheelDelta, caveView); }
+
+    public int setTopographicIntervalMetres(int value) {
+        topographicIntervalMetres = Math.max(0, Math.min(MAXIMUM_TOPOGRAPHIC_INTERVAL_METRES, value));
+        return topographicIntervalMetres;
+    }
+
+    public int changeTopographicInterval(int delta) {
+        return setTopographicIntervalMetres(topographicIntervalMetres + delta);
+    }
+
+    /** Empty input temporarily disables contours while the user edits the field. */
+    public boolean setTopographicInput(String value) {
+        if (value == null || value.length() > 2) return false;
+        for (int i = 0; i < value.length(); i++) {
+            if (value.charAt(i) < '0' || value.charAt(i) > '9') return false;
+        }
+        setTopographicIntervalMetres(value.isEmpty() ? 0 : Integer.parseInt(value));
+        return true;
+    }
 
     public boolean isCaveView() { return caveView; }
 

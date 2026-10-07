@@ -2,6 +2,7 @@ package com.wurmonline.client.renderer.gui;
 
 import com.wurmonline.client.resources.WaypointerFileResourceUrl;
 import com.wurmonline.client.resources.textures.ResourceTexture;
+import com.wurmonline.client.resources.textures.Texture;
 import com.wurmonline.client.resources.textures.ResourceTextureLoader;
 import com.wurmonline.client.resources.textures.WaypointerTextureFilters;
 import com.wurmonline.client.renderer.Matrix;
@@ -68,6 +69,7 @@ public final class ServerMapWindowBridge {
     private static final int LAYER_BUTTON_COUNT = 3;
     private static final int MINI_MAP_BUTTON_WIDTH = 88;
     private static final int NAV_LINE_BUTTON_WIDTH = 88;
+    private static final int ZOOM_FACTOR_BUTTON_WIDTH = 128;
     private static final MapOverlayVisibility.Layer[] LAYER_BUTTONS = {
             MapOverlayVisibility.Layer.DEEDS,
             MapOverlayVisibility.Layer.HIGHWAYS,
@@ -247,6 +249,8 @@ public final class ServerMapWindowBridge {
                                  MapViewport viewport,
                                  ServerMapSnapshot snapshot,
                                  boolean showDeeds,
+                                 boolean showTileBorders,
+                                 Texture contours,
                                  int left, int top, int size) {
         try {
             if (map == null || queue == null || viewport == null
@@ -270,6 +274,9 @@ public final class ServerMapWindowBridge {
                 map.fillRect(queue, MAP_WATER_RED, MAP_WATER_GREEN,
                         MAP_WATER_BLUE, 1.0f, left, top, size, size);
                 drawSurface(queue, surface.texture, viewport,
+                        left, top, size, size);
+                drawTopographicContours(queue, contours, left, top, size);
+                if (showTileBorders) drawTileBorders(map, queue, viewport,
                         left, top, size, size);
                 if (MiniMapWindowBridge.areRoadsVisible()) {
                     drawHighways(queue, viewport, left, top, size, size,
@@ -296,9 +303,14 @@ public final class ServerMapWindowBridge {
     }
 
     static void renderCaveMiniMapOverlays(WurmComponent map, Queue queue,
-                                         MapViewport viewport, int left, int top, int size) {
+                                         MapViewport viewport, boolean showTileBorders,
+                                         Texture contours,
+                                         int left, int top, int size) {
+        drawTopographicContours(queue, contours, left, top, size);
+        if (showTileBorders) drawTileBorders(map, queue, viewport,
+                left, top, size, size);
         if (MiniMapWindowBridge.isNavigationLineVisible())
-            drawNavigationLine(queue, viewport, left, top, size, size);
+            drawNavigationLine(queue, viewport, left, top, size, size, true);
         drawMiniMapWaypoints(map, queue, viewport, left, top, size,
                 WurmWaypointerRuntime.serverMapWaypoints(),
                 WurmWaypointerRuntime.currentServerIdentity(),
@@ -309,6 +321,8 @@ public final class ServerMapWindowBridge {
     private static void drawOverlays(WorldMap map, Queue queue, State state,
                                      ServerMapSnapshot snapshot,
                                      int left, int top) {
+        if (state.viewport.isMaximumZoom()) drawTileBorders(map, queue,
+                state.viewport, left, top, CONTENT_WIDTH, CONTENT_HEIGHT);
         // Once the validated surface has rendered, an optional overlay
         // failure must not return control to vanilla ClusterMap: it would
         // paint its own map on top and hide the working server surface.
@@ -352,6 +366,12 @@ public final class ServerMapWindowBridge {
     public static boolean leftPressed(WorldMap map, int mouseX, int mouseY) {
         State state = activeState(map);
         if (state == null || !insideContent(map, mouseX, mouseY)) return false;
+        if (insideZoomFactorButton(map, mouseX, mouseY)) {
+            state.zoomFactorButtonPressed = true;
+            state.dragging = false;
+            updateHover(map, state, mouseX, mouseY);
+            return true;
+        }
         if (insideCenterButton(map, mouseX, mouseY)) {
             state.centerButtonPressed = true;
             state.dragging = false;
@@ -402,6 +422,10 @@ public final class ServerMapWindowBridge {
     public static boolean mouseDragged(WorldMap map, int mouseX, int mouseY) {
         State state = activeState(map);
         if (state == null) return false;
+        if (state.zoomFactorButtonPressed) {
+            updateHover(map, state, mouseX, mouseY);
+            return true;
+        }
         if (state.centerButtonPressed) {
             updateHover(map, state, mouseX, mouseY);
             return true;
@@ -443,6 +467,12 @@ public final class ServerMapWindowBridge {
     public static boolean leftReleased(WorldMap map, int mouseX, int mouseY) {
         State state = activeState(map);
         if (state == null) return false;
+        if (state.zoomFactorButtonPressed) {
+            state.zoomFactorButtonPressed = false;
+            if (insideZoomFactorButton(map, mouseX, mouseY)) MiniMapWindowBridge.cycleZoomFactor();
+            updateHover(map, state, mouseX, mouseY);
+            return true;
+        }
         if (state.centerButtonPressed) {
             state.centerButtonPressed = false;
             if (insideCenterButton(map, mouseX, mouseY)) {
@@ -510,6 +540,7 @@ public final class ServerMapWindowBridge {
     public static boolean rightPressed(WorldMap map, int mouseX, int mouseY) {
         State state = activeState(map);
         if (state == null || !insideContent(map, mouseX, mouseY)) return false;
+        if (insideZoomFactorButton(map, mouseX, mouseY)) return true;
         if (insideCenterButton(map, mouseX, mouseY)) return true;
         if (insideNavigationLineButton(map, mouseX, mouseY)) return true;
         if (insideMiniMapButton(map, mouseX, mouseY)) return true;
@@ -533,10 +564,9 @@ public final class ServerMapWindowBridge {
                 || insideCloseButton(map, mouseX, mouseY)
                 || insideMiniMapButton(map, mouseX, mouseY)
                 || insideNavigationLineButton(map, mouseX, mouseY)
+                || insideZoomFactorButton(map, mouseX, mouseY)
                 || insideCenterButton(map, mouseX, mouseY)) return true;
-        double steps = -wheelDelta / 3.0d;
-        if (steps == 0.0d) steps = wheelDelta < 0 ? 1.0d : -1.0d;
-        steps = Math.max(-4.0d, Math.min(4.0d, steps));
+        double steps = MiniMapWindowBridge.fullMapWheelSteps(wheelDelta);
         state.viewport.zoomAt(mouseX - map.x - CONTENT_OFFSET_X,
                 mouseY - map.y - CONTENT_OFFSET_Y, steps);
         updateHover(map, state, mouseX, mouseY);
@@ -964,6 +994,7 @@ public final class ServerMapWindowBridge {
             drawLayerButtons(map, queue, state, left, top);
             drawMiniMapButton(map, queue, state, left, top);
             drawCenterButton(map, queue, state, left, top);
+            drawZoomFactorButton(map, queue, state, left, top);
             drawNavigationLineButton(map, queue, state, left, top);
             drawSearchButton(map, queue, state, left, top);
             drawCloseButton(map, queue, state, left, top);
@@ -1287,15 +1318,23 @@ public final class ServerMapWindowBridge {
                                            MapViewport viewport,
                                            int left, int top,
                                            int width, int height) {
+        drawNavigationLine(queue, viewport, left, top, width, height, false);
+    }
+
+    private static void drawNavigationLine(Queue queue, MapViewport viewport,
+                                           int left, int top, int width, int height,
+                                           boolean cave) {
         NavigationTarget active = activeNavigationTarget();
         if (active == null || active.getCoordinate() == null) return;
         GroundNavigationRouteEffect.RouteSnapshot route =
-                WurmWaypointerRuntime.currentNavigationRoute();
+                cave ? WurmWaypointerRuntime.currentCaveNavigationRoute()
+                        : WurmWaypointerRuntime.currentNavigationRoute();
         if (route == null || route.getPointCount() < 2) return;
         MarkerStyle style = active.getMarkerStyle();
         float red = style == null ? 1.0f : style.getRed();
         float green = style == null ? 0.25f : style.getGreen();
         float blue = style == null ? 0.20f : style.getBlue();
+        float grey = red * 0.2126f + green * 0.7152f + blue * 0.0722f;
         MapPoint emitted = viewport.mapToScreen(
                 route.getTileX(0) + 0.5d,
                 route.getTileY(0) + 0.5d);
@@ -1303,10 +1342,18 @@ public final class ServerMapWindowBridge {
             MapPoint next = viewport.mapToScreen(
                     route.getTileX(index) + 0.5d,
                     route.getTileY(index) + 0.5d);
+            if (cave && !navigationSegmentOnLayer(route, index, -1)) {
+                emitted = next;
+                continue;
+            }
             double dx = next.getX() - emitted.getX();
             double dy = next.getY() - emitted.getY();
             boolean last = index == route.getPointCount() - 1;
-            if (!last && dx * dx + dy * dy < 0.75d * 0.75d) continue;
+            boolean layerBoundary = route.getLayer(index - 1) != route.getLayer(index)
+                    || (!last && route.getLayer(index) != route.getLayer(index + 1));
+            if (!last && !layerBoundary && dx * dx + dy * dy < 0.75d * 0.75d) continue;
+            boolean underground = !cave && (route.getLayer(index - 1) < 0
+                    || route.getLayer(index) < 0);
             float[] clipped = clipLine(
                     left + (float) emitted.getX(),
                     top + (float) emitted.getY(),
@@ -1317,10 +1364,17 @@ public final class ServerMapWindowBridge {
                 line(queue, clipped[0], clipped[1], clipped[2], clipped[3],
                         5.0f, 0.0f, 0.0f, 0.0f, 0.72f);
                 line(queue, clipped[0], clipped[1], clipped[2], clipped[3],
-                        3.0f, red, green, blue, 0.98f);
+                        3.0f, underground ? (red + grey) * 0.5f : red,
+                        underground ? (green + grey) * 0.5f : green,
+                        underground ? (blue + grey) * 0.5f : blue, 0.98f);
             }
             emitted = next;
         }
+    }
+
+    static boolean navigationSegmentOnLayer(GroundNavigationRouteEffect.RouteSnapshot route,
+                                             int endIndex, int layer) {
+        return route.getLayer(endIndex - 1) == layer && route.getLayer(endIndex) == layer;
     }
 
     private static NavigationTarget activeNavigationTarget() {
@@ -1463,6 +1517,37 @@ public final class ServerMapWindowBridge {
                 x - 1, y + 4, 3, 3);
     }
 
+    private static void drawTopographicContours(Queue queue, Texture contours,
+                                                 int left, int top, int size) {
+        if (contours == null) return;
+        Renderer.texturedQuadAlphaBlend(queue, contours, 1, 1, 1, 1,
+                left, top, size, size, 0, 0, 1, 1);
+    }
+
+    private static void drawTileBorders(WurmComponent map, Queue queue,
+                                        MapViewport viewport, int left, int top,
+                                        int width, int height) {
+        MapPoint first = viewport.screenToMap(0, 0);
+        MapPoint last = viewport.screenToMap(width, height);
+        int gridLeft = Math.max(left, left + (int) Math.round(viewport.getImageLeft()));
+        int gridTop = Math.max(top, top + (int) Math.round(viewport.getImageTop()));
+        int gridRight = Math.min(left + width, left + (int) Math.round(
+                viewport.getImageLeft() + viewport.getImageWidth()));
+        int gridBottom = Math.min(top + height, top + (int) Math.round(
+                viewport.getImageTop() + viewport.getImageHeight()));
+        if (gridRight <= gridLeft || gridBottom <= gridTop) return;
+        for (int tileX = Math.max(0, (int) Math.ceil(first.getX()));
+                tileX <= Math.min(viewport.getMapWidth(), (int) Math.floor(last.getX())); tileX++) {
+            int x = left + (int) Math.round(viewport.mapToScreen(tileX, 0).getX());
+            map.fillRect(queue, 0, 0, 0, 0.37f, x, gridTop, 1, gridBottom - gridTop);
+        }
+        for (int tileY = Math.max(0, (int) Math.ceil(first.getY()));
+                tileY <= Math.min(viewport.getMapHeight(), (int) Math.floor(last.getY())); tileY++) {
+            int y = top + (int) Math.round(viewport.mapToScreen(0, tileY).getY());
+            map.fillRect(queue, 0, 0, 0, 0.37f, gridLeft, y, gridRight - gridLeft, 1);
+        }
+    }
+
     private static void drawPlayer(WorldMap map, Queue queue,
                                    MapViewport viewport, int left, int top) {
         drawPlayer(map, queue, viewport, left, top,
@@ -1479,10 +1564,17 @@ public final class ServerMapWindowBridge {
         int y = top + (int) Math.round(point.getY());
         if (x < left || y < top || x >= left + width
                 || y >= top + height) return;
-        map.fillRect(queue, 0.0f, 0.0f, 0.0f, 0.9f, x - 7, y - 2, 15, 5);
-        map.fillRect(queue, 0.0f, 0.0f, 0.0f, 0.9f, x - 2, y - 7, 5, 15);
-        map.fillRect(queue, 1.0f, 1.0f, 1.0f, 1.0f, x - 6, y - 1, 13, 3);
-        map.fillRect(queue, 1.0f, 1.0f, 1.0f, 1.0f, x - 1, y - 6, 3, 13);
+        float[] arrow = PlayerArrowGeometry.points(x, y,
+                WurmWaypointerRuntime.currentPlayerHeadingDegrees());
+        for (int pass = 0; pass < 2; pass++) {
+            float colour = pass == 0 ? 0.0f : 1.0f;
+            float thickness = pass == 0 ? PlayerArrowGeometry.OUTLINE_WIDTH_PIXELS
+                    : PlayerArrowGeometry.STROKE_WIDTH_PIXELS;
+            for (int end = 1; end < 4; end++) {
+                line(queue, arrow[end * 2], arrow[end * 2 + 1], arrow[0], arrow[1],
+                        thickness, colour, colour, colour, pass == 0 ? 0.9f : 1.0f);
+            }
+        }
     }
 
     private static void drawStatus(WorldMap map, Queue queue, State state,
@@ -1494,7 +1586,9 @@ public final class ServerMapWindowBridge {
                 ? "X=" + state.hoverTileX + " Y=" + state.hoverTileY
                         + "  Tile: " + hoveredTileDescription(state) + "  "
                 : "";
-        String action = state.navigationLineButtonHover
+        String action = state.zoomFactorButtonHover
+                ? "Click: cycle shared map and mini-map wheel speed (1X / 2X / 4X)"
+                : state.navigationLineButtonHover
                 ? "Click: turn active navigation line "
                         + (MiniMapWindowBridge.isNavigationLineVisible()
                         ? "off" : "on")
@@ -1554,6 +1648,30 @@ public final class ServerMapWindowBridge {
         int left = navigationLineButtonLeft(map.x + CONTENT_OFFSET_X) - LAYER_BUTTON_GAP - 72;
         int top = map.y + CONTENT_OFFSET_Y + SEARCH_BUTTON_TOP;
         return x >= left && x < left + 72 && y >= top && y < top + LAYER_BUTTON_HEIGHT;
+    }
+
+    private static boolean insideZoomFactorButton(WorldMap map, int x, int y) {
+        int left = zoomFactorButtonLeft(map.x + CONTENT_OFFSET_X);
+        int top = map.y + CONTENT_OFFSET_Y + SEARCH_BUTTON_TOP;
+        return x >= left && x < left + ZOOM_FACTOR_BUTTON_WIDTH
+                && y >= top && y < top + LAYER_BUTTON_HEIGHT;
+    }
+
+    private static int zoomFactorButtonLeft(int contentLeft) {
+        return navigationLineButtonLeft(contentLeft) - LAYER_BUTTON_GAP - 72
+                - LAYER_BUTTON_GAP - ZOOM_FACTOR_BUTTON_WIDTH;
+    }
+
+    private static void drawZoomFactorButton(WorldMap map, Queue queue, State state, int left, int top) {
+        int x = zoomFactorButtonLeft(left), y = top + SEARCH_BUTTON_TOP;
+        float edge = state.zoomFactorButtonPressed && state.zoomFactorButtonHover ? 1
+                : state.zoomFactorButtonHover ? 0.96f : 0.72f;
+        map.fillRect(queue, edge, edge * 0.79f, edge * 0.42f, 0.95f,
+                x, y, ZOOM_FACTOR_BUTTON_WIDTH, LAYER_BUTTON_HEIGHT);
+        map.fillRect(queue, 0.10f, 0.055f, 0.02f, 0.96f,
+                x + 2, y + 2, ZOOM_FACTOR_BUTTON_WIDTH - 4, LAYER_BUTTON_HEIGHT - 4);
+        text(queue, "Zoom speed: " + MiniMapWindowBridge.getZoomFactor() + "X",
+                x + 8, y + 21, 1, 0.92f, 0.72f, 1, left, top);
     }
 
     private static void drawCenterButton(WorldMap map, Queue queue, State state, int left, int top) {
@@ -1909,6 +2027,7 @@ public final class ServerMapWindowBridge {
 
     private static void updateHover(WorldMap map, State state,
                                     int mouseX, int mouseY) {
+        state.zoomFactorButtonHover = insideZoomFactorButton(map, mouseX, mouseY);
         state.centerButtonHover = insideCenterButton(map, mouseX, mouseY);
         state.searchButtonHover = insideSearchButton(map, mouseX, mouseY);
         state.closeButtonHover = insideCloseButton(map, mouseX, mouseY);
@@ -1917,7 +2036,7 @@ public final class ServerMapWindowBridge {
         state.navigationLineButtonHover = insideNavigationLineButton(
                 map, mouseX, mouseY);
         state.hoveredLayerButton = layerButtonAt(map, mouseX, mouseY);
-        if (state.centerButtonHover || state.searchButtonHover || state.closeButtonHover
+        if (state.zoomFactorButtonHover || state.centerButtonHover || state.searchButtonHover || state.closeButtonHover
                 || state.miniMapButtonHover
                 || state.navigationLineButtonHover
                 || state.hoveredLayerButton != null) {
@@ -2288,6 +2407,8 @@ public final class ServerMapWindowBridge {
         private int lastY;
         private boolean centerButtonPressed;
         private boolean centerButtonHover;
+        private boolean zoomFactorButtonPressed;
+        private boolean zoomFactorButtonHover;
         private boolean hoverInside;
         private int hoverTileX;
         private int hoverTileY;

@@ -91,15 +91,92 @@ public final class GroundNavigationRouteEffectTerrainTest {
 
         GroundNavigationRouteEffect.RouteSnapshot route =
                 GroundNavigationRouteEffect.completeMapRoute(
-                        0, 4, complete, 23, 6,
-                        Collections.<GroundRouteTrace.Point>emptyList());
+                        complete, Collections.singletonList(mapRoad(0, 4)),
+                        java.util.Arrays.asList(mapRoad(20, 4), mapRoad(21, 5),
+                                mapRoad(22, 6), mapRoad(23, 6)));
 
         assertEquals(0, route.getTileX(0));
         assertEquals(4, route.getTileY(0));
         assertTrue(contains(route, 10, 4));
         assertTrue(contains(route, 20, 4));
+        for (int i = 0; i < route.getPointCount(); i++) {
+            if (route.getTileX(i) >= 4 && route.getTileX(i) <= 16)
+                assertEquals(-1, route.getLayer(i));
+            if (route.getTileX(i) >= 17) assertEquals(0, route.getLayer(i));
+        }
         assertEquals(23, route.getTileX(route.getPointCount() - 1));
         assertEquals(6, route.getTileY(route.getPointCount() - 1));
+    }
+
+    @Test public void mapDoesNotInventTargetConnectorAcrossUnreceivedTerrain() {
+        HighwayTileIndex index = HighwayTileIndex.parse(
+                "[{\"startX\":0,\"startY\":4,\"endX\":20,\"endY\":4,\"type\":2}]", 32, 32);
+        HighwayRoutePlanner.Plan complete = new HighwayRoutePlanner().plan(0, 4, 20, 4, index);
+        GroundNavigationRouteEffect.RouteSnapshot route = GroundNavigationRouteEffect.completeMapRoute(
+                complete, Collections.singletonList(mapRoad(0, 4)),
+                Collections.singletonList(mapRoad(20, 4)));
+        assertEquals(20, route.getTileX(route.getPointCount() - 1));
+        assertEquals(4, route.getTileY(route.getPointCount() - 1));
+    }
+
+    @Test public void mapDoesNotReplaceIncompleteApproachWithStraightLine() {
+        HighwayTileIndex index = HighwayTileIndex.parse(
+                "[{\"startX\":10,\"startY\":4,\"endX\":20,\"endY\":4,\"type\":2}]", 32, 32);
+        HighwayRoutePlanner.Plan complete = new HighwayRoutePlanner().plan(10, 4, 20, 4, index);
+        GroundNavigationRouteEffect.RouteSnapshot route = GroundNavigationRouteEffect.completeMapRoute(
+                complete, java.util.Arrays.asList(mapRoad(0, 4), mapRoad(1, 4)),
+                Collections.<GroundRouteTrace.Point>emptyList());
+        assertEquals(2, route.getPointCount());
+        assertEquals(1, route.getTileX(1));
+    }
+
+    @Test public void mapJoinsWhereApproachActuallyMeetsTrunkAfterBranchRemoval() {
+        HighwayTileIndex index = HighwayTileIndex.parse(
+                "[{\"startX\":0,\"startY\":4,\"endX\":20,\"endY\":4,\"type\":2}]", 32, 32);
+        HighwayRoutePlanner.Plan complete = new HighwayRoutePlanner().plan(0, 4, 20, 4, index);
+        GroundNavigationRouteEffect.RouteSnapshot route = GroundNavigationRouteEffect.completeMapRoute(
+                complete, java.util.Arrays.asList(mapRoad(5, 5), mapRoad(5, 4)),
+                Collections.<GroundRouteTrace.Point>emptyList());
+        assertEquals(5, route.getTileX(0));
+        assertFalse(contains(route, 0, 4));
+        assertEquals(20, route.getTileX(route.getPointCount() - 1));
+    }
+
+    @Test public void fullMapIncludesCaveApproachAndSurfaceContinuationFromItsExit() {
+        HighwayTileIndex index = HighwayTileIndex.parse(
+                "[{\"startX\":0,\"startY\":4,\"endX\":20,\"endY\":4,\"type\":2}]", 32, 32);
+        HighwayRoutePlanner.Plan plan = new HighwayRoutePlanner().plan(0, 4, 20, 4, index);
+        GroundNavigationRouteEffect.RouteSnapshot surface = GroundNavigationRouteEffect.completeMapRoute(
+                plan, Collections.singletonList(mapRoad(0, 4)),
+                Collections.<GroundRouteTrace.Point>emptyList());
+        GroundNavigationRouteEffect.RouteSnapshot whole = GroundNavigationRouteEffect.prependMapRoute(
+                java.util.Arrays.asList(cavePoint(0, 5), cavePoint(0, 4)), surface);
+        assertEquals(surface.getPointCount() + 2, whole.getPointCount());
+        assertEquals(5, whole.getTileY(0));
+        assertEquals(-1, whole.getLayer(0));
+        assertEquals(-1, whole.getLayer(1));
+        assertEquals(0, whole.getLayer(2));
+        assertEquals(20, whole.getTileX(whole.getPointCount() - 1));
+    }
+
+    @Test public void caveApproachDoesNotAttachSurfaceRouteFromADifferentExit() {
+        GroundNavigationRouteEffect.RouteSnapshot otherExit = GroundNavigationRouteEffect.completeMapRoute(
+                null, java.util.Arrays.asList(mapRoad(8, 4), mapRoad(9, 4)),
+                Collections.<GroundRouteTrace.Point>emptyList());
+        GroundNavigationRouteEffect.RouteSnapshot whole = GroundNavigationRouteEffect.prependMapRoute(
+                java.util.Arrays.asList(cavePoint(0, 5), cavePoint(0, 4)), otherExit);
+        assertEquals(2, whole.getPointCount());
+        assertEquals(0, whole.getTileX(1));
+    }
+
+    private static GroundRouteTrace.Point cavePoint(int x, int y) {
+        return new GroundRouteTrace.Point(x, y, -5, GroundRouteTrace.HeightSource.CAVE,
+                0, GroundRouteTrace.WaterSource.CAVE);
+    }
+
+    private static GroundRouteTrace.Point mapRoad(int x, int y) {
+        return new GroundRouteTrace.Point(x, y, 0, GroundRouteTrace.HeightSource.NEAR,
+                0, GroundRouteTrace.WaterSource.NEAR, HighwayTileIndex.Kind.ROAD, false, 0, true);
     }
 
     @Test public void crossingUsesRoadOnSurfaceAndTunnelUnderground() {

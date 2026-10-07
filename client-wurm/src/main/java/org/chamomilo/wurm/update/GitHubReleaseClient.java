@@ -75,12 +75,14 @@ final class GitHubReleaseClient {
                 !target.getInstalledVersion().isEmpty() && installedVersion == null
                         ? "Latest: " + latestVersion + " | Installed version unknown"
                         : installedVersion != null && compareVersions(latestVersion, installedVersion) < 0
-                        ? "Latest: " + latestVersion + " | Installed version is newer" : "");
+                        ? "Installed version is newer" : "",
+                "https://github.com/" + repository, target.getDescription());
     }
 
     static ModUpdate failedRow(UpdateTarget target, String status) {
         return new ModUpdate(target.getId(), target.getDisplayName(), target.getInstalledVersion(),
-                "", latestReleasePage(target.getRepository()), false, status);
+                "", latestReleasePage(target.getRepository()), false, status,
+                "https://github.com/" + target.getRepository(), target.getDescription());
     }
 
     static String latestReleasePage(String repository) {
@@ -101,7 +103,7 @@ final class GitHubReleaseClient {
                 + withoutLeadingZeroes(matcher.group(3));
     }
 
-    private static int compareVersions(String left, String right) {
+    static int compareVersions(String left, String right) {
         String[] a = left.split("\\.");
         String[] b = right.split("\\.");
         for (int index = 0; index < 3; index++) {

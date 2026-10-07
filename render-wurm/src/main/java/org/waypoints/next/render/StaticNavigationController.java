@@ -92,6 +92,8 @@ public final class StaticNavigationController {
     private EffectRender renderer;
     private EffectRender navigatorEffectOwner;
     private GroundNavigationRouteEffect navigatorEffect;
+    private final com.wurmonline.client.renderer.effects.NavigationMapRouteCache navigatorMapCache =
+            new com.wurmonline.client.renderer.effects.NavigationMapRouteCache();
     private NavigationTarget navigatorEffectTarget;
     private NavigationRouteDiagnosticLog navigatorDiagnosticLog;
     private NavigationRenderFrame frame;
@@ -459,8 +461,12 @@ public final class StaticNavigationController {
     public synchronized GroundNavigationRouteEffect.RouteSnapshot
     currentNavigatorMapRoute() {
         GroundNavigationRouteEffect current = navigatorEffect;
-        return current == null || !current.isAlive()
-                ? null : current.getMapRouteSnapshot();
+        NavigationTarget active = navigation.snapshot().getActiveNavigator();
+        return navigatorMapCache.update(active == null ? null : active.getKey(),
+                active == null ? null : active.getCoordinate(),
+                current == null || !current.isAlive()
+                        || !sameNavigatorTarget(navigatorEffectTarget, active)
+                        ? null : current.getMapRouteSnapshot());
     }
 
     public synchronized void rendererCleared(Object clearedRenderer) {
@@ -483,6 +489,7 @@ public final class StaticNavigationController {
         hud = null;
         renderer = null;
         frame = null;
+        navigatorMapCache.clear();
         navigationContext = null;
         highwaySource.deactivate();
         serverKey = "";
@@ -730,6 +737,10 @@ public final class StaticNavigationController {
 
     private void clearNavigatorEffect() {
         GroundNavigationRouteEffect effect = navigatorEffect;
+        if (effect != null && navigatorEffectTarget != null) {
+            navigatorMapCache.update(navigatorEffectTarget.getKey(),
+                    navigatorEffectTarget.getCoordinate(), effect.getMapRouteSnapshot());
+        }
         EffectRender owner = navigatorEffectOwner;
         NavigationRouteDiagnosticLog routeLog = navigatorDiagnosticLog;
         navigatorEffect = null;
@@ -756,6 +767,10 @@ public final class StaticNavigationController {
     }
 
     private void invalidateNavigatorAfterExternalClear() {
+        if (navigatorEffect != null && navigatorEffectTarget != null) {
+            navigatorMapCache.update(navigatorEffectTarget.getKey(),
+                    navigatorEffectTarget.getCoordinate(), navigatorEffect.getMapRouteSnapshot());
+        }
         NavigationRouteDiagnosticLog routeLog = navigatorDiagnosticLog;
         navigatorEffect = null;
         navigatorEffectOwner = null;

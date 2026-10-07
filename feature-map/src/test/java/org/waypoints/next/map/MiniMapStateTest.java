@@ -7,6 +7,42 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public final class MiniMapStateTest {
+    @Test public void topographicIntervalSupportsButtonsAndTwoDigitInput() {
+        MiniMapState state = new MiniMapState();
+        assertEquals(0, state.getTopographicIntervalMetres());
+        assertEquals(0, state.changeTopographicInterval(-1));
+        assertEquals(1, state.changeTopographicInterval(1));
+        assertTrue(state.setTopographicInput("25"));
+        assertEquals(25, state.getTopographicIntervalMetres());
+        assertFalse(state.setTopographicInput("-1"));
+        assertFalse(state.setTopographicInput("2x"));
+        assertFalse(state.setTopographicInput("100"));
+        assertEquals(25, state.getTopographicIntervalMetres());
+        state.selectMapView(true);
+        assertEquals(25, state.getTopographicIntervalMetres());
+        assertTrue(state.setTopographicInput("99"));
+        assertEquals(99, state.changeTopographicInterval(1));
+        assertTrue(state.setTopographicInput("0"));
+        assertEquals(0, state.getTopographicIntervalMetres());
+        assertTrue(state.setTopographicInput(""));
+    }
+
+    @Test public void tileBordersDisappearOnTheFirstZoomOutInBothLayers() {
+        MiniMapState state = new MiniMapState();
+        assertFalse(state.areTileBordersVisible());
+        for (boolean cave : new boolean[] {false, true}) {
+            state.selectMapView(cave);
+            state.zoomIn(1000);
+            assertTrue(state.areTileBordersVisible());
+            state.zoomOut(1);
+            assertFalse(state.areTileBordersVisible());
+            state.zoomOut(1000);
+            assertFalse(state.areTileBordersVisible());
+            state.zoomIn(1000);
+            assertTrue(state.areTileBordersVisible());
+        }
+    }
+
     @Test public void defaultsToEightyTilesWithSharedLayersVisible() {
         MiniMapState state = new MiniMapState();
         assertEquals(80, state.getVisibleTiles());

@@ -17,7 +17,7 @@ import java.util.PriorityQueue;
  * segments remain atomic, so they can only be entered at published portals.</p>
  */
 public final class HighwayRoutePlanner {
-    public static final String ALGORITHM_VERSION = "highway-graph-a-star-v10";
+    public static final String ALGORITHM_VERSION = "highway-graph-a-star-v11";
     private static final float HIGHWAY_TIME_PER_TILE = 1.0f / 3.0f;
     private static final float CONFIRMED_SPECIAL_MAXIMUM_PROJECTION_TILES =
             1.5f;
@@ -422,11 +422,8 @@ public final class HighwayRoutePlanner {
         }
         int bestGoal = -1;
         Candidate bestGoalAccess = null;
-        DirectChoice directChoice = startAccessLayer.allows(
-                HighwayTileIndex.Kind.ROAD)
-                && goalAccessLayer.allows(HighwayTileIndex.Kind.ROAD)
-                ? directRoadChoice(index, startX, startY, targetX, targetY,
-                graphLayer) : null;
+        DirectChoice directChoice = directSegmentChoice(index, startX, startY,
+                targetX, targetY, graphLayer, startAccessLayer, goalAccessLayer);
         float bestTotal = directChoice == null
                 ? Float.POSITIVE_INFINITY : directChoice.cost;
         int expanded = 0;
@@ -618,62 +615,51 @@ public final class HighwayRoutePlanner {
                 }
             }
         }
-        for (HighwayTileIndex.Segment segment : index.getSegments()) {
-            if (!layer.allows(segment.getKind())) continue;
-            if (segment.getKind() == HighwayTileIndex.Kind.ROAD) continue;
-            NodeLayer nodeLayer = nodeLayer(segment.getKind());
-            int startNode = compiledNodeByCoordinate.get(Long.valueOf(
-                    graphKey(segment.getStartX(), segment.getStartY(),
-                            nodeLayer))).intValue();
-            int endNode = compiledNodeByCoordinate.get(Long.valueOf(
-                    graphKey(segment.getEndX(), segment.getEndY(),
-                            nodeLayer))).intValue();
-            {
-                int[] access = projection(segment, x, y);
+        for (int startNode = 0; startNode < compiledNodes.size(); startNode++) {
+            Node start = compiledNodes.get(startNode);
+            for (Edge edge : start.edges) {
+                if (edge.layerTransition || edge.to <= startNode
+                        || !special(edge.kind) || !layer.allows(edge.kind)) continue;
+                int endNode = edge.to;
+                Node end = compiledNodes.get(endNode);
+                HighwayTileIndex.Kind kind = edge.kind;
+                int[] access = projection(start.x, start.y, end.x, end.y, x, y);
                 HighwayTileIndex.Tile occupied = index.get(x, y);
                 if (!tunnelMustTouchSurfaceRoad
-                        && layer.allowsOccupiedSpecial(segment.getKind())
-                        && (occupied.hasKind(segment.getKind())
+                        && layer.allowsOccupiedSpecial(kind)
+                        && (occupied.hasKind(kind)
                         || layer.allowsConfirmedAdjacentProjection(
-                        segment.getKind()))
+                        kind))
                         && distance(x, y, access[0], access[1])
                         <= CONFIRMED_SPECIAL_MAXIMUM_PROJECTION_TILES) {
                     float ontoSegment = distance(x, y, access[0], access[1]);
                     candidates.add(new Candidate(startNode, ontoSegment
                             + distance(access[0], access[1],
-                            segment.getStartX(), segment.getStartY())
+                            start.x, start.y)
                             * HIGHWAY_TIME_PER_TILE,
                             access[0], access[1], x, y,
-                            segment.getKind()));
+                            kind));
                     candidates.add(new Candidate(endNode, ontoSegment
                             + distance(access[0], access[1],
-                            segment.getEndX(), segment.getEndY())
+                            end.x, end.y)
                             * HIGHWAY_TIME_PER_TILE,
                             access[0], access[1], x, y,
-                            segment.getKind()));
+                            kind));
                     continue;
                 }
                 if (allowsDirectSpecialAccess(index, startNode,
-                        segment.getStartX(), segment.getStartY(),
-                        segment.getKind(), layer)
+                        start.x, start.y, kind, layer)
                         && (!tunnelMustTouchSurfaceRoad
-                        || touchesSurfaceRoad(index, segment.getStartX(),
-                        segment.getStartY()))) {
+                        || touchesSurfaceRoad(index, start.x, start.y))) {
                     candidates.add(new Candidate(startNode, distance(x, y,
-                            segment.getStartX(), segment.getStartY()),
-                            segment.getStartX(), segment.getStartY(),
-                            segment.getKind()));
+                            start.x, start.y), start.x, start.y, kind));
                 }
                 if (allowsDirectSpecialAccess(index, endNode,
-                        segment.getEndX(), segment.getEndY(),
-                        segment.getKind(), layer)
+                        end.x, end.y, kind, layer)
                         && (!tunnelMustTouchSurfaceRoad
-                        || touchesSurfaceRoad(index, segment.getEndX(),
-                        segment.getEndY()))) {
+                        || touchesSurfaceRoad(index, end.x, end.y))) {
                     candidates.add(new Candidate(endNode, distance(x, y,
-                            segment.getEndX(), segment.getEndY()),
-                            segment.getEndX(), segment.getEndY(),
-                            segment.getKind()));
+                            end.x, end.y), end.x, end.y, kind));
                 }
             }
         }
@@ -731,6 +717,41 @@ public final class HighwayRoutePlanner {
         return best;
     }
 
+    private static DirectChoice directSegmentChoice(HighwayTileIndex index,
+                                                     int startX, int startY,
+                                                     int targetX, int targetY,
+                                                     NetworkLayer graphLayer,
+                                                     NetworkLayer startLayer,
+                                                     NetworkLayer goalLayer) {
+        DirectChoice best = startLayer.allows(HighwayTileIndex.Kind.ROAD)
+                && goalLayer.allows(HighwayTileIndex.Kind.ROAD)
+                ? directRoadChoice(index, startX, startY, targetX, targetY, graphLayer) : null;
+        for (HighwayTileIndex.Segment segment : index.getSegments()) {
+            HighwayTileIndex.Kind kind = segment.getKind();
+            if (!special(kind) || !graphLayer.allows(kind)
+                    || !startLayer.allowsOccupiedSpecial(kind)
+                    || !goalLayer.allowsOccupiedSpecial(kind)
+                    || !index.get(startX, startY).hasKind(kind)
+                    || !index.get(targetX, targetY).hasKind(kind)) continue;
+            int[] entry = projection(segment, startX, startY);
+            int[] exit = projection(segment, targetX, targetY);
+            float access = distance(startX, startY, entry[0], entry[1]);
+            float leave = distance(targetX, targetY, exit[0], exit[1]);
+            if (access > CONFIRMED_SPECIAL_MAXIMUM_PROJECTION_TILES
+                    || leave > CONFIRMED_SPECIAL_MAXIMUM_PROJECTION_TILES) continue;
+            float cost = (access + leave + distance(entry[0], entry[1], exit[0], exit[1]))
+                    * HIGHWAY_TIME_PER_TILE;
+            if (best != null && cost >= best.cost) continue;
+            List<TileStep> steps = new ArrayList<TileStep>();
+            appendRaster(steps, new Node(startX, startY), new Node(entry[0], entry[1]), kind);
+            appendRaster(steps, new Node(entry[0], entry[1]), new Node(exit[0], exit[1]), kind);
+            appendRaster(steps, new Node(exit[0], exit[1]), new Node(targetX, targetY), kind);
+            applyAuthoritativePortals(steps, index);
+            best = new DirectChoice(steps, cost);
+        }
+        return best;
+    }
+
     private static int[] projection(HighwayTileIndex.Segment segment,
                                     int x, int y) {
         return projection(segment.getStartX(), segment.getStartY(),
@@ -777,17 +798,12 @@ public final class HighwayRoutePlanner {
                 connectRoadThroughJunctions(segment, nodes,
                         nodeByCoordinate, roadCrossings);
             } else {
-                int from = nodeByCoordinate.get(Long.valueOf(graphKey(
-                        segment.getStartX(), segment.getStartY(),
-                        nodeLayer(segment.getKind())))).intValue();
-                int to = nodeByCoordinate.get(Long.valueOf(graphKey(
-                        segment.getEndX(), segment.getEndY(),
-                        nodeLayer(segment.getKind())))).intValue();
-                nodes.get(from).edges.add(new Edge(to, segment));
-                nodes.get(to).edges.add(new Edge(from, segment));
+                connectRoadThroughJunctions(segment, nodes,
+                        nodeByCoordinate, Collections.<Long>emptySet());
             }
         }
         connectAdjacentPublishedEndpoints(nodes, nodeByCoordinate);
+        connectSecondLaneJunctions(nodes, nodeByCoordinate);
         connectShortBridgePlatformGaps(index.getSegments(), nodes,
                 nodeByCoordinate);
         connectTunnelEntrances(index, nodes, nodeByCoordinate);
@@ -989,29 +1005,84 @@ public final class HighwayRoutePlanner {
             java.util.Set<Long> roadCrossings) {
         List<Long> raster = rasterCoordinates(segment);
         int previousNode = -1;
+        HighwayTileIndex.Kind kind = segment.getKind();
+        NodeLayer layer = nodeLayer(kind);
         for (int i = 0; i < raster.size(); i++) {
             Long coordinate = raster.get(i);
             Integer existing = nodeByCoordinate.get(Long.valueOf(graphKey(
                     (int) (coordinate.longValue() >> 32),
-                    (int) coordinate.longValue(), NodeLayer.SURFACE)));
+                    (int) coordinate.longValue(), layer)));
             boolean endpoint = i == 0 || i == raster.size() - 1;
             boolean publishedBranch = existing != null
-                    && nodes.get(existing.intValue()).publishedEndpoint;
+                    && nodes.get(existing.intValue()).publishedEndpoint
+                    && nodes.get(existing.intValue()).hasEndpointKind(kind);
             if (!endpoint && !publishedBranch
-                    && !roadCrossings.contains(coordinate)) continue;
+                    && !roadCrossings.contains(coordinate)
+                    && !hasSecondLaneEndpoint(coordinate, segment, nodes,
+                    nodeByCoordinate)) continue;
             int x = (int) (coordinate.longValue() >> 32);
             int y = (int) coordinate.longValue();
             int currentNode = node(nodes, nodeByCoordinate, x, y,
-                    NodeLayer.SURFACE);
-            nodes.get(currentNode).addEndpointKind(HighwayTileIndex.Kind.ROAD);
+                    layer);
+            nodes.get(currentNode).addEndpointKind(kind);
             if (previousNode >= 0 && previousNode != currentNode) {
                 Node from = nodes.get(previousNode);
                 Node to = nodes.get(currentNode);
                 float length = distance(from.x, from.y, to.x, to.y);
                 connect(from, previousNode, to, currentNode,
-                        HighwayTileIndex.Kind.ROAD, length);
+                        kind, length);
             }
             previousNode = currentNode;
+        }
+    }
+
+    private static boolean hasSecondLaneEndpoint(Long coordinate,
+                                                  HighwayTileIndex.Segment segment,
+                                                  List<Node> nodes,
+                                                  Map<Long, Integer> byCoordinate) {
+        int x = (int) (coordinate.longValue() >> 32);
+        int y = (int) coordinate.longValue();
+        HighwayTileIndex.Kind kind = segment.getKind();
+        for (int[] offset : new int[][] {{-1,0}, {1,0}, {0,-1}, {0,1}}) {
+            int adjacentX = x + offset[0];
+            int adjacentY = y + offset[1];
+            if ((adjacentX == segment.getStartX() && adjacentY == segment.getStartY())
+                    || (adjacentX == segment.getEndX() && adjacentY == segment.getEndY())) continue;
+            Integer adjacent = byCoordinate.get(Long.valueOf(graphKey(
+                    adjacentX, adjacentY, nodeLayer(kind))));
+            if (adjacent == null) continue;
+            Node node = nodes.get(adjacent.intValue());
+            if (node.publishedEndpoint && node.hasEndpointKind(kind)) return true;
+        }
+        return false;
+    }
+
+    /** Join an inclusive endpoint to the adjacent lane at an interior split. */
+    private static void connectSecondLaneJunctions(List<Node> nodes,
+                                                   Map<Long, Integer> byCoordinate) {
+        for (int from = 0; from < nodes.size(); from++) {
+            Node source = nodes.get(from);
+            if (!source.publishedEndpoint) continue;
+            for (int[] offset : new int[][] {{-1,0}, {1,0}, {0,-1}, {0,1}}) {
+                Integer adjacent = byCoordinate.get(Long.valueOf(graphKey(
+                        source.x + offset[0], source.y + offset[1], source.layer)));
+                if (adjacent == null) continue;
+                Node target = nodes.get(adjacent.intValue());
+                if (target.publishedEndpoint) continue; // Joined by the endpoint pass.
+                for (HighwayTileIndex.Kind kind : new HighwayTileIndex.Kind[] {
+                        HighwayTileIndex.Kind.ROAD, HighwayTileIndex.Kind.BRIDGE,
+                        HighwayTileIndex.Kind.TUNNEL}) {
+                    if (source.hasEndpointKind(kind) && target.hasEndpointKind(kind)) {
+                        boolean connected = false;
+                        for (Edge edge : source.edges) {
+                            if (edge.to == adjacent.intValue() && edge.kind == kind
+                                    && !edge.layerTransition) connected = true;
+                        }
+                        if (connected) continue;
+                        connect(source, from, target, adjacent.intValue(), kind, 1.0f);
+                    }
+                }
+            }
         }
     }
 

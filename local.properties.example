@@ -2,3 +2,7 @@
 # The directory must contain client-patched.jar, common.jar, javassist.jar,
 # and modlauncher.jar. WURM_CLIENT_LIBS is also supported.
 wurmClientLibDir=C:/path/to/wurm/client/libs
+
+# For a Java 8 JDK without JavaFX, uncomment and point to your existing Wurm
+# runtime/lib/ext/jfxrt.jar. -PwurmJavaFxJar and WURM_JAVAFX_JAR also work.
+# wurmJavaFxJar=C:/path/to/Wurm Unlimited/runtime/lib/ext/jfxrt.jar

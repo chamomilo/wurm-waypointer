@@ -1259,8 +1259,19 @@ public final class WurmWaypointerRuntime {
         }
     }
 
+    public static float currentPlayerHeadingDegrees() {
+        World world = hud == null ? null : hud.getWorld();
+        float heading = world == null ? 0.0f : world.getPlayerRotX();
+        return Float.isNaN(heading) || Float.isInfinite(heading) ? 0.0f : heading;
+    }
+
     public static WurmCaveMapSnapshot currentCaveMap() {
         return WurmCaveMapSnapshot.capture(hud == null ? null : hud.getWorld());
+    }
+
+    public static float[] miniMapSurfaceHeights(int originX, int originY, int columns, int rows) {
+        return WurmTopographicTerrain.surfaceHeights(hud == null ? null : hud.getWorld(),
+                originX, originY, columns, rows);
     }
 
     /** Reuses the game's own loaded-structure tooltip, including any state it exposes. */
@@ -1284,6 +1295,14 @@ public final class WurmWaypointerRuntime {
         catch (Throwable failure) {
             LOGGER.log(Level.FINE, "Navigator route snapshot failed open",
                     failure);
+            return null;
+        }
+    }
+
+    public static GroundNavigationRouteEffect.RouteSnapshot currentCaveNavigationRoute() {
+        try { return STATIC_NAVIGATION.currentNavigatorRoute(); }
+        catch (Throwable failure) {
+            LOGGER.log(Level.FINE, "Cave navigator route snapshot failed open", failure);
             return null;
         }
     }

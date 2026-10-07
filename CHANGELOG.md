@@ -1,5 +1,58 @@
 # Changelog
 
+## 1.5.3 — 2026-10-07
+
+- Replace the old updater UI and remove its Waypointer-specific host. Embed the current Avatar 2.0 shared registry, including card descriptions, project links, DOWNLOAD/LATEST actions, five-pixel frame and matching button artwork.
+- Register Mod updates in Main menu, with persistent Don't show on next start preference, close/reopen support and mouse-wheel access on short screens.
+- Align the runtime version, mod descriptor and distribution at 1.5.3 so the updater compares the actual installed release.
+- Verify the packaged preference class/button artwork, reject the removed updater host, and exercise native layout, menu lifecycle and startup preference during release builds.
+
+## 1.5.2 — 2026-10-07
+
+- Use two short orange edge lines on the right and bottom for cave reinforcement, and two short pink lines on the top and left for cave structures. Leave each tile's corners clear so the marks stay separate and the map remains readable.
+
+## 1.5.1 — 2026-10-07
+
+- Move Topographic view into hover text and make its controls the same height as GROUND/CAVE and FULL MAP. Remove the overlapping mini-map metre scale.
+- Centre the compact footer row with equal eight-pixel gaps and clear margins around both decorative metal corner plates.
+- Restore thin orange reinforcement and pink structure borders in CAVE at every zoom level; keep ordinary tile grid lines limited to maximum zoom. Tiles with both statuses retain both colours.
+- Render contours as one cached transparent overlay instead of thousands of HUD primitives, preventing dense one-metre contours from exhausting Wurm's queue and hiding the frame, controls and markers.
+- Generate contours across the complete received grid without a global segment cutoff; rebuild the overlay after interval, centre, zoom and layer changes.
+
+## 1.5.0 — 2026-10-07
+
+- Add a framed Topographic view mini-map control with a two-digit height interval, immediate -/+ adjustment and manual input. Intervals are 1–99 metres; 0 disables contours. Surface contours use received terrain heights, CAVE contours use received floor heights.
+- Shorten OPEN FULL MAP to FULL MAP and move it right beside GROUND/CAVE to make room for the topographic controls.
+- Add a full-map Zoom speed button cycling 1X, 2X and 4X; one shared factor multiplies the existing wheel steps on the full map and both mini-map layers.
+- Keep the player heading arrow and its outline at the original maximum full-map zoom size, independent of zoom on the full map and both GROUND and CAVE mini-map layers.
+- Show tile borders only at maximum zoom on the full map and both mini-map layers; hide them on the first zoom-out step. Remove baked cave borders and keep reinforcement as an interior marker.
+- Render underground iron ore dark red and copper ore green.
+
+## 1.4.3 — 2026-10-07
+
+- Restore underground portions of the full NAV line on surface maps with 50% colour desaturation.
+- Include received cave approaches before the surface continuation from the same selected exit; reject disconnected continuations.
+- Preserve underground-only map routes during effect replacement. Keep CAVE mini-map lines at normal colour.
+- Replace the player cross with a live rotating heading arrow on the full map and both mini-map layers, sized to one map tile.
+
+## 1.4.2 — 2026-10-07
+
+- Join terrain approaches at the highway point actually reached, without requiring a redundant trip to the initially selected entry.
+- Preserve sampled highway prefixes and published map continuations when distant terrain is unavailable; do not attach disconnected target connectors.
+- Fall back to distant terrain when a near-terrain tile lacks usable corners.
+- Plan a surface continuation from the chosen received cave exit while keeping underground mini-map navigation separate.
+- Keep the last built surface line while replacing effects or waiting for cave exit data, scoped to the exact server, waypoint and target coordinate.
+- Preserve route layer metadata and exclude underground segments from surface-map lines.
+- Add bounded, deduplicated highway-attempt diagnostics identifying entry failures, missing terrain and blocked assembled routes.
+
+## 1.4.1 — 2026-10-06
+
+- Fixed highway branches joining the second lane in the middle of a road, bridge or tunnel. Occupied bridge/tunnel access now uses the split graph, and nearby positions on the same span can change lanes without travelling to an endpoint.
+- Removed closed excursions created when terrain legs overlap each other or the published highway route. Surface, bridge and cave positions remain distinct.
+- Retained the usable highway route when its final terrain connector is incomplete, instead of discarding it and rebuilding the whole journey off road. Partial routes no longer claim to reach a target after the point budget truncates them.
+- Underground navigation to a surface target now selects a reachable received cave exit, including exits behind the player, and considers the surface continuation. Cave navigation and the cave map share absolute tile receipt tracking so reused 64-tile ring slots cannot invent floors or exits.
+- Full-map cross-layer NAV lines now join the actual approach and checked target connector; they no longer fill missing approaches or tails with unchecked straight lines.
+
 ## 1.3.2 — 2026-10-06
 
 - Fixed received ore veins and unexcavated rock appearing as Unknown (not received) in the cave mini-map. Receipt is now tracked by absolute tile coordinates rather than the floor-height sentinel shared with unexcavated terrain.

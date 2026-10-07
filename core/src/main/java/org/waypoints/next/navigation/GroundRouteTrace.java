@@ -12,7 +12,7 @@ import java.util.List;
  */
 public final class GroundRouteTrace {
     public static final String ALGORITHM_VERSION =
-            "hierarchical-highway-cart-a-star-v16";
+            "hierarchical-highway-cart-a-star-v18";
     public static final float TILE_SIZE_METRES = 4.0f;
 
     public enum HeightSource {

@@ -7,6 +7,7 @@ import javassist.CtMethod;
 import javassist.CtNewMethod;
 import javassist.NotFoundException;
 import org.chamomilo.wurm.update.SharedUpdateCoordinator;
+import org.chamomilo.wurm.update.SharedUpdateHooks;
 import org.gotti.wurmunlimited.modloader.classhooks.HookManager;
 import org.gotti.wurmunlimited.modloader.interfaces.Configurable;
 import org.gotti.wurmunlimited.modloader.interfaces.Initable;
@@ -27,7 +28,7 @@ import java.util.logging.Logger;
 
 public final class WurmWaypointerMod implements WurmClientMod, Configurable, PreInitable, Initable,
         ModListener {
-    public static final String VERSION = "1.4.0";
+    public static final String VERSION = "1.5.3";
 
     @Override public void modInitialized(ModEntry<?> entry) {
         SharedUpdateCoordinator.modInitialized(entry);
@@ -159,7 +160,7 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
 
     @Override
     public void init() {
-        com.wurmonline.client.renderer.gui.WaypointerUpdateBridge.claimHost();
+        SharedUpdateHooks.registerHost("wurm-waypointer");
         LOGGER.info("Wurm Waypointer " + VERSION + " initialized; "
                 + configuration.diagnosticSummary() + "; "
                 + waypointConfiguration.diagnosticSummary());
@@ -200,7 +201,7 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
                 () -> (proxy, method, args) -> {
                     Object result = method.invoke(proxy, args);
                     WurmWaypointerRuntime.hudReady((HeadsUpDisplay) proxy);
-                    com.wurmonline.client.renderer.gui.WaypointerUpdateBridge.tick((HeadsUpDisplay) proxy);
+                    com.wurmonline.client.renderer.gui.ChamomiloUpdateBridge.hudReady((HeadsUpDisplay) proxy);
                     return result;
                 });
         HookManager.getInstance().registerHook(
@@ -208,7 +209,7 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
                 () -> (proxy, method, args) -> {
                     Object result = method.invoke(proxy, args);
                     WurmWaypointerRuntime.hudTick((HeadsUpDisplay) proxy);
-                    com.wurmonline.client.renderer.gui.WaypointerUpdateBridge.tick((HeadsUpDisplay) proxy);
+                    com.wurmonline.client.renderer.gui.ChamomiloUpdateBridge.tick((HeadsUpDisplay) proxy);
                     return result;
                 });
         HookManager.getInstance().registerHook(

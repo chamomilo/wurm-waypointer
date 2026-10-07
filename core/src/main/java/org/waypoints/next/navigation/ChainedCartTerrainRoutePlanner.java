@@ -88,7 +88,8 @@ public final class ChainedCartTerrainRoutePlanner {
             rejectedCorner += leg.getRejectedCornerEdges();
             append(points, leg.getPoints(), maximumPoints);
             if (leg.isReachedFinalTarget()) {
-                reached = true;
+                GroundRouteTrace.Point end = points.get(points.size() - 1);
+                reached = end.getTileX() == targetX && end.getTileY() == targetY;
                 break;
             }
             if (leg.getPoints().isEmpty()) break;
@@ -107,7 +108,7 @@ public final class ChainedCartTerrainRoutePlanner {
             currentY = nextY;
         }
 
-        return new Plan(points, reached, attemptedLegs, expanded,
+        return new Plan(NavigationRouteAssembly.withoutLoops(points), reached, attemptedLegs, expanded,
                 rejectedSlope, rejectedWater, rejectedUnknown,
                 rejectedCorner);
     }

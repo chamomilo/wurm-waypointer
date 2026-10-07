@@ -45,3 +45,16 @@ test {
 jar {
     archiveFileName = "wurm-waypointer-client-wurm-internal-${project.version}.jar"
 }
+
+// Exercise the production layout, menu lifecycle and preference with the pinned
+// native client, replacing GPU drawing and online checks in an isolated process.
+task verifyUpdaterUi(type: JavaExec, dependsOn: ['classes', 'testClasses']) {
+    classpath = sourceSets.test.runtimeClasspath
+    if (rootProject.ext.wurmJavaFxJar != null) {
+        classpath += files(rootProject.ext.wurmJavaFxJar)
+    }
+    main = 'org.chamomilo.wurm.update.UpdaterUiProbe'
+    args file('src/main/resources/org/chamomilo/wurm/update/update-frame.png').absolutePath,
+            file("${buildDir}/updater-preview.png").absolutePath,
+            file('src/main/resources/org/chamomilo/wurm/update/update-button.png').absolutePath
+}

@@ -7,6 +7,42 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public final class HighwayRoutePlannerTest {
+    @Test public void occupiedSpecialHighwayCanChangeLaneWithoutVisitingEitherEnd() {
+        for (int type : new int[] {1, 0}) {
+            HighwayTileIndex index = HighwayTileIndex.parse(
+                    "[{\"startX\":0,\"startY\":8,\"endX\":16,\"endY\":8,\"type\":" + type + "}]", 32, 32);
+            HighwayRoutePlanner.Plan plan = new HighwayRoutePlanner().planIncludingNecessaryDetours(
+                    4, 7, 6, 8, index, type == 1 ? HighwayRoutePlanner.NetworkLayer.TUNNEL
+                            : HighwayRoutePlanner.NetworkLayer.BRIDGE);
+            assertEquals(4, plan.getEntryX());
+            assertEquals(7, plan.getEntryY());
+            assertEquals(6, plan.getExitX());
+            assertEquals(8, plan.getExitY());
+            for (HighwayRoutePlanner.TileStep step : plan.getHighwaySteps()) {
+                assertTrue("must stay between the occupied positions", step.getTileX() >= 4 && step.getTileX() <= 6);
+                assertFalse("lane change is not a surface portal", step.isPortal());
+            }
+        }
+    }
+    @Test public void secondLaneBranchConnectsInTheMiddleOnEveryHighwayLayer() {
+        for (int type : new int[] {2, 1, 0}) {
+            HighwayTileIndex index = HighwayTileIndex.parse("["
+                    + "{\"startX\":0,\"startY\":8,\"endX\":16,\"endY\":8,\"type\":" + type + "},"
+                    + "{\"startX\":8,\"startY\":7,\"endX\":8,\"endY\":0,\"type\":" + type + "}]", 32, 32);
+            HighwayRoutePlanner.NetworkLayer layer = type == 1
+                    ? HighwayRoutePlanner.NetworkLayer.TUNNEL : type == 0
+                    ? HighwayRoutePlanner.NetworkLayer.BRIDGE
+                    : HighwayRoutePlanner.NetworkLayer.SURFACE;
+            HighwayRoutePlanner.Plan plan = new HighwayRoutePlanner()
+                    .planIncludingNecessaryDetours(4, 8, 8, 0, index, layer);
+            assertTrue("type=" + type, plan.usesHighway());
+            assertEquals("must start on occupied trunk, type=" + type, 4, plan.getEntryX());
+            assertEquals(8, plan.getEntryY());
+            assertEquals(8, plan.getExitX());
+            assertEquals(0, plan.getExitY());
+            assertTrue("must turn here instead of driving to trunk end", plan.getEstimatedTimeTiles() < 4.1f);
+        }
+    }
     @Test public void connectorJoinsSplitTrunkWithoutVisitingDeadEnd() {
         HighwayTileIndex index = HighwayTileIndex.parse(
                 "[{\"startX\":10,\"startY\":50,\"endX\":110,\"endY\":50,\"type\":2},"

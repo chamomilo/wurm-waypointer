@@ -54,12 +54,13 @@ jar {
 task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
     doLast {
         def contents = zipTree(jar.archiveFile.get().asFile)
-        ['SharedUpdateCoordinator', 'GitHubReleaseClient', 'ModUpdate', 'UpdateTarget', 'ModCatalog', 'SharedUpdateHooks'].each { name ->
+        ['SharedUpdateCoordinator', 'GitHubReleaseClient', 'ModUpdate', 'UpdateTarget', 'ModCatalog', 'SharedUpdateHooks', 'UpdatePreferences'].each { name ->
             if (contents.matching { include "org/chamomilo/wurm/update/${name}.class" }.files.empty)
                 throw new GradleException('Missing shared updater class: ' + name)
         }
         ['com/wurmonline/client/resources/ChamomiloResourceUrl.class',
-         'org/chamomilo/wurm/update/update-frame.png'].each { required ->
+         'org/chamomilo/wurm/update/update-frame.png',
+         'org/chamomilo/wurm/update/update-button.png'].each { required ->
             if (contents.matching { include required }.files.empty)
                 throw new GradleException('Missing shared updater resource: ' + required)
         }
@@ -67,15 +68,13 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
             throw new GradleException('Missing shared update window')
         if (contents.matching { include 'com/wurmonline/client/renderer/gui/ChamomiloUpdateBridge.class' }.files.empty)
             throw new GradleException('Missing shared update HUD bridge')
-        if (contents.matching { include 'com/wurmonline/client/renderer/gui/WaypointerUpdateBridge.class' }.files.empty)
-            throw new GradleException('Missing Waypointer update host bridge')
         // The coordinator's Host, registry, release parser and background workers
         // are nested classes. Checking only their enclosing classes is insufficient.
         def updaterClasses = zipTree(project(':client-wurm').tasks.jar.archiveFile.get().asFile)
                 .matching {
                     include 'org/chamomilo/wurm/update/*.class'
                     include 'com/wurmonline/client/renderer/gui/ChamomiloUpdateWindow*.class'
-                    include 'com/wurmonline/client/renderer/gui/WaypointerUpdateBridge*.class'
+                    include 'com/wurmonline/client/renderer/gui/ChamomiloUpdateBridge*.class'
                 }
         updaterClasses.visit { entry ->
             if (!entry.directory && contents.matching { include entry.relativePath.pathString }.files.empty) {
@@ -91,6 +90,13 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
                 'org/waypoints/api/WurmObjectSnapshot.class',
                 'org/waypoints/next/WurmWaypointerMod.class',
                 'org/waypoints/next/integration/WurmWaypointerRuntime.class',
+                'com/wurmonline/client/renderer/gui/PlayerArrowGeometry.class',
+                'com/wurmonline/client/renderer/gui/MiniMapControlsLayout.class',
+                'com/wurmonline/client/renderer/gui/MiniMapContourImage.class',
+                'org/waypoints/next/map/TopographicContours.class',
+                'org/waypoints/next/map/MapZoomFactor.class',
+                'org/waypoints/next/map/TopographicContours$Segment.class',
+                'org/waypoints/next/integration/WurmTopographicTerrain.class',
                 'org/waypoints/next/integration/VanillaLandmarkRuntime.class',
                 'org/waypoints/next/integration/LootMapRuntime.class',
                 'org/waypoints/next/integration/ArchaeologyRuntime.class',
@@ -115,7 +121,12 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
                 'org/waypoints/next/integration/WurmSurfaceTileDescription.class',
                 'org/waypoints/next/integration/WurmCaveMapSnapshot.class',
                 'org/waypoints/next/integration/WurmCaveTileCoverage.class',
-                'org/waypoints/next/integration/WurmCaveTileCoverage$Coverage.class',
+                'org/waypoints/next/navigation/CaveTileCoverage.class',
+                'org/waypoints/next/navigation/CaveTileCoverage$Coverage.class',
+                'org/waypoints/next/navigation/CaveExitRoutePlanner.class',
+                'org/waypoints/next/navigation/CaveExitRoutePlanner$Exit.class',
+                'org/waypoints/next/navigation/NavigationRouteAssembly.class',
+                'com/wurmonline/client/renderer/effects/NavigationMapRouteCache.class',
                 'com/wurmonline/client/resources/textures/WaypointerCaveTexture.class',
                 'org/waypoints/next/surroundings/SurroundingsCatalog.class',
                 'org/waypoints/next/surroundings/SurroundingsClassifier.class',
@@ -264,6 +275,7 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
             include 'com/wurmonline/client/renderer/gui/WaypointComponent.class'
             include 'com/wurmonline/client/renderer/gui/WindowWaypointManager.class'
             include 'com/wurmonline/client/renderer/gui/WindowNewWaypoint.class'
+            include 'com/wurmonline/client/renderer/gui/WaypointerUpdateBridge*.class'
         }.files
         if (!forbidden.empty) {
             throw new GradleException('Legacy Waypoints runtime classes entered the artifact: ' + forbidden)
@@ -271,7 +283,7 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
     }
 }
 
-task dist(type: Zip, dependsOn: [test, verifyArtifact]) {
+task dist(type: Zip, dependsOn: [test, verifyArtifact, ':client-wurm:verifyUpdaterUi']) {
     archiveFileName = "wurm-waypointer-${project.version}.zip"
     destinationDirectory = file("${buildDir}/distributions")
 

@@ -62,6 +62,14 @@ public final class WurmCaveMapSnapshot {
     public int getOriginY() { return originY; }
     public long getRevision() { return revision; }
 
+    public float floorHeightMetres(int tileX, int tileY) {
+        int x = tileX - originX, y = tileY - originY;
+        Cell cell = x < 0 || y < 0 || x >= SIZE || y >= SIZE ? null : cells[x + y * SIZE];
+        // Receipt and terrain type distinguish a real -10 m floor from the
+        // same raw sentinel in unknown or unexcavated rock.
+        return cell == null || cell.type.isSolidCave() ? Float.NaN : cell.floor / 10.0f;
+    }
+
     public List<String> hoverLines(int tileX, int tileY) {
         List<String> lines = new ArrayList<String>();
         int x = tileX - originX, y = tileY - originY;
@@ -92,22 +100,24 @@ public final class WurmCaveMapSnapshot {
         Tile type = cell.effectiveType();
         int color = color(type);
         if (!type.isSolidCave() && cell.water > cell.floor) color = 0x2475ba;
-        // An outline distinguishes tile boundaries; three pale resources also
-        // have different motifs, independently of the hue.
-        if (x == 0 || y == 0) return shade(color, 0.63d);
+        // Keep the status marks separate and short, leaving every corner clear:
+        // reinforcement uses right/bottom, structures use top/left.
+        boolean reinforced = type.isReinforcedCave() || type.isReinforcedFloor();
+        boolean horizontalSegment = x > 0 && x < CELL_PIXELS - 1;
+        boolean verticalSegment = y > 0 && y < CELL_PIXELS - 1;
+        if (reinforced && (x == CELL_PIXELS - 1 && verticalSegment
+                || y == CELL_PIXELS - 1 && horizontalSegment)) return 0xdda24a;
+        if (cell.structure && (y == 0 && horizontalSegment
+                || x == 0 && verticalSegment)) return 0xb690e4;
         if (type == Tile.TILE_CAVE_WALL_ORE_ZINC && x == 3 && y == 3) return 0x243c5d;
         if (type == Tile.TILE_CAVE_WALL_ORE_SILVER && x == 3) return 0xe8f0ff;
         if (type == Tile.TILE_CAVE_WALL_MARBLE && x == y) return 0x8d775a;
-        if (type.isReinforcedCave() || type.isReinforcedFloor()) {
-            if (x == 5 || y == 5) return 0xdda24a;
-        }
-        if (cell.structure && x >= 3 && y >= 3) return 0xb690e4;
         return color;
     }
 
     static int color(Tile tile) {
-        if (tile == Tile.TILE_CAVE_WALL_ORE_IRON) return 0xc46b3d;
-        if (tile == Tile.TILE_CAVE_WALL_ORE_COPPER) return 0xed883a;
+        if (tile == Tile.TILE_CAVE_WALL_ORE_IRON) return 0x8b1f24;
+        if (tile == Tile.TILE_CAVE_WALL_ORE_COPPER) return 0x3c9a58;
         if (tile == Tile.TILE_CAVE_WALL_ORE_TIN) return 0xb9c6a4;
         if (tile == Tile.TILE_CAVE_WALL_ORE_GOLD) return 0xffd33d;
         if (tile == Tile.TILE_CAVE_WALL_ORE_SILVER) return 0x8995a9;
@@ -124,12 +134,6 @@ public final class WurmCaveMapSnapshot {
         if (tile.isSolidCave()) return 0x494347;
         if (tile.isRoad()) return 0x9aa2a1;
         return 0xcac0ac;
-    }
-
-    private static int shade(int rgb, double factor) {
-        return ((int) (((rgb >> 16) & 255) * factor) << 16)
-                | ((int) (((rgb >> 8) & 255) * factor) << 8)
-                | (int) ((rgb & 255) * factor);
     }
 
     static final class Cell {

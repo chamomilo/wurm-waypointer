@@ -3,10 +3,22 @@ package org.waypoints.next.map;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public final class MapViewportTest {
     private static final double EPSILON = 0.000001d;
+
+    @Test public void maximumZoomEndsOnEvenTheSmallestZoomOut() {
+        MapViewport viewport = new MapViewport(4096, 4096, 920, 620, 2000, 2000);
+        assertFalse(viewport.isMaximumZoom());
+        viewport.zoomAt(460, 310, 100);
+        assertTrue(viewport.isMaximumZoom());
+        viewport.zoomAt(460, 310, -0.01);
+        assertFalse(viewport.isMaximumZoom());
+        viewport.zoomAt(460, 310, 100);
+        assertTrue(viewport.isMaximumZoom());
+    }
 
     @Test public void fitPreservesSquareMapAspectInsideWideWurmWindow() {
         MapViewport viewport = new MapViewport(2048, 2048,

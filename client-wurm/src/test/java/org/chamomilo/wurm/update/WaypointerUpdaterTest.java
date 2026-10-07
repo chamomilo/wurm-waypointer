@@ -15,6 +15,8 @@ import static org.junit.Assert.*;
 public final class WaypointerUpdaterTest {
     @Test public void installedWaypointerRegistersWithItsRuntimeVersion() throws Exception {
         Properties metadata = metadata();
+        assertEquals("Runtime version must match the packaged descriptor",
+                metadata.getProperty("version"), WurmWaypointerMod.VERSION);
         metadata.setProperty("version", "0.0.0");
         WurmWaypointerMod mod = new WurmWaypointerMod();
         assertTrue(mod instanceof ModListener);

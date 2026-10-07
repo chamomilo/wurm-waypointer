@@ -5,6 +5,7 @@ import com.wurmonline.client.renderer.backend.Queue;
 import com.wurmonline.client.renderer.gui.text.TextFont;
 import com.wurmonline.client.renderer.gui.text.WaypointerMiniMapFonts;
 import com.wurmonline.client.resources.textures.ResourceTexture;
+import com.wurmonline.client.resources.textures.Texture;
 import com.wurmonline.client.resources.textures.WaypointerCaveTexture;
 import org.waypoints.next.integration.WurmCaveMapSnapshot;
 import org.waypoints.next.map.MapPoint;
@@ -16,13 +17,14 @@ import org.waypoints.next.map.ServerMapProfile;
 import org.waypoints.next.map.ServerMapSnapshot;
 
 /** Square player-centred map field hosted by {@link MiniMapWindow}. */
-class MiniMapCanvas extends FlexComponent {
+class MiniMapCanvas extends FlexComponent implements InputFieldListener {
     private static final int FRAME_INSET = 22;
-    private static final int OPEN_BUTTON_WIDTH = 120;
-    private static final int OPEN_BUTTON_HEIGHT = 20;
-    private static final int MODE_BUTTON_WIDTH = 68;
-    private static final int BUTTON_GAP = 5;
-    private static final int WHEEL_ZOOM_TILES = 8;
+    private static final int OPEN_BUTTON_WIDTH = MiniMapControlsLayout.OPEN_BUTTON_WIDTH;
+    private static final int OPEN_BUTTON_HEIGHT = MiniMapControlsLayout.BUTTON_HEIGHT;
+    private static final int MODE_BUTTON_WIDTH = MiniMapControlsLayout.MODE_BUTTON_WIDTH;
+    private static final int TOPOGRAPHIC_BLOCK_WIDTH = MiniMapControlsLayout.TOPOGRAPHIC_BLOCK_WIDTH;
+    private static final int TOPOGRAPHIC_BUTTON_WIDTH = MiniMapControlsLayout.TOPOGRAPHIC_BUTTON_WIDTH;
+    private static final int TOPOGRAPHIC_FIELD_WIDTH = MiniMapControlsLayout.TOPOGRAPHIC_FIELD_WIDTH;
     private final MiniMapState settings;
     private final TextFont titleText = WaypointerMiniMapFonts.healthbarTitle();
     private String viewportProfileId = "";
@@ -43,11 +45,33 @@ class MiniMapCanvas extends FlexComponent {
     private int lastDragX;
     private int lastDragY;
     private String titleLabel = "Mini Map";
+    private final WurmInputField topographicInput;
+    private String lastTopographicInput;
+    private boolean topographicEditing;
+    private int topographicPressed = -1;
+    private int topographicHover = -1;
+    private final WaypointerCaveTexture topographicTexture = new WaypointerCaveTexture();
+    private int topographicInterval = -1, topographicOriginX, topographicOriginY;
+    private int topographicColumns, topographicRows;
+    private boolean topographicCave;
+    private String topographicProfileId = "";
+    private long topographicRevision, nextTopographicRefresh;
+    private int topographicPixels;
+    private double topographicCenterX, topographicCenterY, topographicScale;
 
     MiniMapCanvas(MiniMapState settings, int size) {
         super("wurm-waypointer.mini-map.canvas");
         this.settings = settings;
         setInitialSize(size, size, false);
+        topographicInput = new WurmInputField("waypointer.mini-map.topographic", this, 1, 2);
+        topographicInput.parent = this;
+        topographicInput.simpleInput = true;
+        topographicInput.prompt = "";
+        topographicInput.setBackgroundColor(0.10f, 0.06f, 0.035f);
+        topographicInput.setPenColor(1.0f, 0.92f, 0.72f);
+        topographicInput.setInitialSize(TOPOGRAPHIC_FIELD_WIDTH - 2,
+                OPEN_BUTTON_HEIGHT - 2, false);
+        normalizeTopographicInput();
     }
 
     void settingsChanged() {
@@ -56,7 +80,10 @@ class MiniMapCanvas extends FlexComponent {
     }
 
     void disposeCaveMap() {
+        prepareDetach();
         caveTexture.dispose();
+        topographicTexture.dispose();
+        topographicInterval = -1;
         caveMap = null;
         textureInitialized = false;
     }
@@ -67,8 +94,8 @@ class MiniMapCanvas extends FlexComponent {
 
     boolean mouseWheeledAt(int mouseX, int mouseY, int wheelDelta) {
         if (!contains(mouseX, mouseY) || wheelDelta == 0) return false;
-        int steps = Math.max(1, Math.abs(wheelDelta) / 3)
-                * (settings.isCaveView() ? 4 : WHEEL_ZOOM_TILES);
+        if (insideControls(mouseX, mouseY)) return true;
+        int steps = settings.miniMapWheelTiles(wheelDelta);
         if (wheelDelta < 0) settings.zoomIn(steps);
         else settings.zoomOut(steps);
         settingsChanged();
@@ -85,7 +112,14 @@ class MiniMapCanvas extends FlexComponent {
                 OPEN_BUTTON_WIDTH, OPEN_BUTTON_HEIGHT);
         modeHover = inside(mouseX, mouseY, modeButtonLeft(fullLeft, fullSize),
                 openButtonTop(fullTop, fullSize), MODE_BUTTON_WIDTH, OPEN_BUTTON_HEIGHT);
+        topographicHover = topographicZoneAt(mouseX, mouseY);
         if (pickData == null) return;
+        if (insideTopographicBlock(mouseX, mouseY)) {
+            pickData.addText("Topographic view: " + settings.getTopographicIntervalMetres()
+                    + " m | 0: off | - / +: change height interval | click number: edit");
+            if (settings.isCaveView()) pickData.addText("Contours follow received cave floor heights.");
+            return;
+        }
         if (openMapHover) {
             pickData.addText("Open the full map");
             return;
@@ -123,6 +157,17 @@ class MiniMapCanvas extends FlexComponent {
 
     @Override protected void leftPressed(int mouseX, int mouseY,
                                          int clickCount) {
+        layoutTopographicInput();
+        topographicPressed = topographicZoneAt(mouseX, mouseY);
+        if (insideTopographicBlock(mouseX, mouseY)) {
+            leftPressedInside = openMapPressed = modePressed = draggingTitle = false;
+            if (topographicPressed == 1) {
+                focusTopographicInput();
+                topographicInput.leftPressed(mouseX, mouseY, clickCount);
+            } else prepareDetach();
+            return;
+        }
+        prepareDetach();
         int fullSize = fullSize();
         int fullLeft = fullLeft(fullSize);
         int fullTop = fullTop(fullSize);
@@ -144,6 +189,10 @@ class MiniMapCanvas extends FlexComponent {
     }
 
     @Override protected void mouseDragged(int mouseX, int mouseY) {
+        if (topographicPressed == 1) {
+            topographicInput.mouseDragged(mouseX, mouseY);
+            return;
+        }
         if (!draggingTitle) return;
         int nextX = x + mouseX - lastDragX;
         int nextY = y + mouseY - lastDragY;
@@ -160,6 +209,19 @@ class MiniMapCanvas extends FlexComponent {
     }
 
     @Override protected void leftReleased(int mouseX, int mouseY) {
+        if (topographicPressed >= 0) {
+            int pressed = topographicPressed;
+            topographicPressed = -1;
+            if (pressed == 1) topographicInput.leftReleased(mouseX, mouseY);
+            else if (pressed == topographicZoneAt(mouseX, mouseY)
+                    && (pressed == 0 ? settings.getTopographicIntervalMetres() > 0
+                    : settings.getTopographicIntervalMetres() < MiniMapState.MAXIMUM_TOPOGRAPHIC_INTERVAL_METRES)) {
+                settings.changeTopographicInterval(pressed == 0 ? -1 : 1);
+                normalizeTopographicInput();
+                nextTopographicRefresh = 0;
+            }
+            return;
+        }
         int fullSize = fullSize();
         int mapSize = mapSize(fullSize);
         int mapLeft = mapLeft(fullSize);
@@ -199,6 +261,7 @@ class MiniMapCanvas extends FlexComponent {
     }
 
     @Override void rightPressed(int mouseX, int mouseY, int clickCount) {
+        if (insideControls(mouseX, mouseY)) return;
         int fullSize = fullSize();
         int mapSize = mapSize(fullSize);
         int mapLeft = mapLeft(fullSize);
@@ -211,6 +274,7 @@ class MiniMapCanvas extends FlexComponent {
     }
 
     @Override protected void mouseExited() {
+        topographicHover = topographicPressed = -1;
         openMapHover = false;
         modeHover = false;
         modePressed = false;
@@ -251,7 +315,9 @@ class MiniMapCanvas extends FlexComponent {
             active.centerOn(WurmWaypointerRuntime.currentPlayerTileX() + 0.5d,
                     WurmWaypointerRuntime.currentPlayerTileY() + 0.5d);
             if (!ServerMapWindowBridge.renderMiniMap(this, queue, active,
-                    snapshot, settings.areDeedsVisible(), left, top, size)) {
+                    snapshot, settings.areDeedsVisible(), settings.areTileBordersVisible(),
+                    topographicOverlay(active, size, null),
+                    left, top, size)) {
                 status(queue, "Map loading...", left, top);
             }
         }
@@ -287,7 +353,9 @@ class MiniMapCanvas extends FlexComponent {
                     (float) ((corner.getY() - caveMap.getOriginY()) / WurmCaveMapSnapshot.SIZE),
                     (float) (settings.getVisibleTiles() / (double) WurmCaveMapSnapshot.SIZE),
                     (float) (settings.getVisibleTiles() / (double) WurmCaveMapSnapshot.SIZE));
-            ServerMapWindowBridge.renderCaveMiniMapOverlays(this, queue, active, left, top, size);
+            ServerMapWindowBridge.renderCaveMiniMapOverlays(this, queue, active,
+                    settings.areTileBordersVisible(), topographicOverlay(active, size, caveMap),
+                    left, top, size);
         } finally {
             HeadsUpDisplay.scissor.popClip();
         }
@@ -415,16 +483,20 @@ class MiniMapCanvas extends FlexComponent {
         return fullLeft + (fullSize - nameplateWidth(fullSize)) / 2;
     }
 
-    private static int openButtonLeft(int fullLeft, int fullSize) {
-        return fullLeft + (fullSize - OPEN_BUTTON_WIDTH) / 2;
+    static int openButtonLeft(int fullLeft, int fullSize) {
+        return MiniMapControlsLayout.openButtonLeft(fullLeft, fullSize);
     }
 
-    private static int modeButtonLeft(int fullLeft, int fullSize) {
-        return openButtonLeft(fullLeft, fullSize) + OPEN_BUTTON_WIDTH + BUTTON_GAP;
+    static int modeButtonLeft(int fullLeft, int fullSize) {
+        return MiniMapControlsLayout.modeButtonLeft(fullLeft, fullSize);
+    }
+
+    static int topographicBlockLeft(int fullLeft, int fullSize) {
+        return MiniMapControlsLayout.topographicBlockLeft(fullLeft, fullSize);
     }
 
     private static int openButtonTop(int fullTop, int fullSize) {
-        return fullTop + fullSize - OPEN_BUTTON_HEIGHT - 8;
+        return MiniMapControlsLayout.buttonTop(fullTop, fullSize);
     }
 
     private void drawFrameControls(Queue queue, int fullLeft, int fullTop,
@@ -442,7 +514,7 @@ class MiniMapCanvas extends FlexComponent {
                 OPEN_BUTTON_WIDTH - 6, OPEN_BUTTON_HEIGHT - 6);
 
         TextFont font = TextFont.getFixedSizeText();
-        String button = "OPEN FULL MAP";
+        String button = "FULL MAP";
         int buttonTextX = buttonLeft
                 + (OPEN_BUTTON_WIDTH - font.getWidth(button)) / 2;
         int baseline = buttonTop + 15;
@@ -463,13 +535,153 @@ class MiniMapCanvas extends FlexComponent {
         font.moveTo(modeLeft + (MODE_BUTTON_WIDTH - font.getWidth(modeText)) / 2, baseline);
         font.paint(queue, modeText, 1, 1, 1, 1);
 
-        String scale = "VIEW: " + settings.getVisibleTiles() * 4 + " m";
-        int scaleX = fullLeft + 18;
-        int scaleY = fullTop + fullSize - 7;
-        font.moveTo(scaleX + 1, scaleY + 1);
-        font.paint(queue, scale, 0.02f, 0.01f, 0.005f, 1.0f);
-        font.moveTo(scaleX, scaleY);
-        font.paint(queue, scale, 0.91f, 0.80f, 0.59f, 1.0f);
+        drawTopographicControls(queue, fullLeft, fullSize, buttonTop, font);
+    }
+
+    private void drawTopographicControls(Queue queue, int fullLeft, int fullSize, int buttonTop, TextFont font) {
+        int blockLeft = topographicBlockLeft(fullLeft, fullSize);
+        fillRect(queue, 0.66f, 0.46f, 0.24f, 0.94f,
+                blockLeft, buttonTop, TOPOGRAPHIC_BLOCK_WIDTH, OPEN_BUTTON_HEIGHT);
+        fillRect(queue, 0.08f, 0.05f, 0.03f, 0.98f,
+                blockLeft + 1, buttonTop + 1, TOPOGRAPHIC_BLOCK_WIDTH - 2, OPEN_BUTTON_HEIGHT - 2);
+        for (int zone : new int[] {0, 2}) {
+            int zoneLeft = topographicZoneLeft(zone);
+            boolean enabled = zone == 0 ? settings.getTopographicIntervalMetres() > 0
+                    : settings.getTopographicIntervalMetres() < MiniMapState.MAXIMUM_TOPOGRAPHIC_INTERVAL_METRES;
+            float brightness = !enabled ? 0.28f : topographicPressed == zone ? 1.0f
+                    : topographicHover == zone ? 0.92f : 0.66f;
+            fillRect(queue, brightness, brightness * 0.70f, brightness * 0.36f, 1,
+                    zoneLeft, buttonTop, TOPOGRAPHIC_BUTTON_WIDTH, OPEN_BUTTON_HEIGHT);
+            fillRect(queue, 0.10f, 0.06f, 0.035f, 1, zoneLeft + 1, buttonTop + 1,
+                    TOPOGRAPHIC_BUTTON_WIDTH - 2, OPEN_BUTTON_HEIGHT - 2);
+            String symbol = zone == 0 ? "-" : "+";
+            font.moveTo(zoneLeft + (TOPOGRAPHIC_BUTTON_WIDTH - font.getWidth(symbol)) / 2,
+                    buttonTop + 15);
+            font.paint(queue, symbol, enabled ? 1 : 0.4f, enabled ? 0.92f : 0.36f,
+                    enabled ? 0.72f : 0.28f, 1);
+        }
+        int fieldLeft = topographicZoneLeft(1);
+        float edge = topographicInput.hasKbFocus ? 1 : 0.66f;
+        fillRect(queue, edge, edge * 0.70f, edge * 0.36f, 1,
+                fieldLeft, buttonTop, TOPOGRAPHIC_FIELD_WIDTH, OPEN_BUTTON_HEIGHT);
+        layoutTopographicInput();
+        topographicInput.render(queue, 1);
+    }
+
+    private int topographicZoneLeft(int zone) {
+        int size = fullSize();
+        return MiniMapControlsLayout.topographicZoneLeft(fullLeft(size), size, zone);
+    }
+
+    private int topographicZoneAt(int mouseX, int mouseY) {
+        int top = openButtonTop(fullTop(fullSize()), fullSize());
+        for (int zone = 0; zone < 3; zone++) {
+            if (inside(mouseX, mouseY, topographicZoneLeft(zone), top,
+                    zone == 1 ? TOPOGRAPHIC_FIELD_WIDTH : TOPOGRAPHIC_BUTTON_WIDTH, OPEN_BUTTON_HEIGHT))
+                return zone;
+        }
+        return -1;
+    }
+
+    private boolean insideTopographicBlock(int mouseX, int mouseY) {
+        int size = fullSize();
+        return inside(mouseX, mouseY, topographicBlockLeft(fullLeft(size), size),
+                openButtonTop(fullTop(size), size), TOPOGRAPHIC_BLOCK_WIDTH, OPEN_BUTTON_HEIGHT);
+    }
+
+    private boolean insideControls(int mouseX, int mouseY) {
+        int size = fullSize(), left = fullLeft(size), top = openButtonTop(fullTop(size), size);
+        return insideTopographicBlock(mouseX, mouseY)
+                || inside(mouseX, mouseY, openButtonLeft(left, size), top, OPEN_BUTTON_WIDTH, OPEN_BUTTON_HEIGHT)
+                || inside(mouseX, mouseY, modeButtonLeft(left, size), top, MODE_BUTTON_WIDTH, OPEN_BUTTON_HEIGHT);
+    }
+
+    private void layoutTopographicInput() {
+        int fieldX = topographicZoneLeft(1) + 1;
+        int fieldY = openButtonTop(fullTop(fullSize()), fullSize()) + 1;
+        if (topographicInput.x != fieldX || topographicInput.y != fieldY)
+            topographicInput.setLocation(fieldX, fieldY, TOPOGRAPHIC_FIELD_WIDTH - 2, OPEN_BUTTON_HEIGHT - 2);
+    }
+
+    private void normalizeTopographicInput() {
+        lastTopographicInput = Integer.toString(settings.getTopographicIntervalMetres());
+        topographicInput.setTextMoveToEnd(lastTopographicInput);
+    }
+
+    private void focusTopographicInput() {
+        if (hud == null) return;
+        hud.stopTyping();
+        topographicEditing = true;
+        hud.setActiveWindow(this);
+        hud.startTyping();
+    }
+
+    void prepareDetach() {
+        if (topographicInput.hasKbFocus && hud != null) hud.stopTyping();
+        topographicEditing = false;
+        normalizeTopographicInput();
+    }
+
+    @Override boolean hasInputField() { return topographicEditing; }
+    @Override WurmInputField getInputField() { return topographicEditing ? topographicInput : null; }
+    @Override public void handleInput(String input) { prepareDetach(); }
+    @Override public void handleEscape(WurmInputField field) { prepareDetach(); }
+
+    @Override public void handleInputChanged(WurmInputField field, String input) {
+        if (settings.setTopographicInput(input)) {
+            lastTopographicInput = input;
+            nextTopographicRefresh = 0;
+        } else field.setText(lastTopographicInput);
+    }
+
+    @Override public void gameTick() {
+        topographicInput.gameTick();
+        if (topographicEditing && !topographicInput.hasKbFocus) {
+            topographicEditing = false;
+            normalizeTopographicInput();
+        }
+    }
+
+    private Texture topographicOverlay(MapViewport active, int size, WurmCaveMapSnapshot cave) {
+        int interval = settings.getTopographicIntervalMetres();
+        if (interval == 0) {
+            if (topographicInterval != 0) topographicTexture.dispose();
+            topographicInterval = 0;
+            return null;
+        }
+        MapPoint first = active.screenToMap(0, 0), last = active.screenToMap(size, size);
+        int originX = (int) Math.floor(first.getX()), originY = (int) Math.floor(first.getY());
+        int columns = (int) Math.ceil(last.getX()) - originX + 1;
+        int rows = (int) Math.ceil(last.getY()) - originY + 1;
+        boolean caveView = cave != null;
+        long revision = caveView ? cave.getRevision() : 0, now = System.nanoTime();
+        if (interval != topographicInterval || caveView != topographicCave
+                || !viewportProfileId.equals(topographicProfileId)
+                || originX != topographicOriginX || originY != topographicOriginY
+                || columns != topographicColumns || rows != topographicRows
+                || size != topographicPixels || active.getCenterX() != topographicCenterX
+                || active.getCenterY() != topographicCenterY || active.getPixelsPerTile() != topographicScale
+                || revision != topographicRevision || now >= nextTopographicRefresh) {
+            float[] heights;
+            if (caveView) {
+                heights = new float[columns * rows];
+                for (int y = 0; y < rows; y++) for (int x = 0; x < columns; x++)
+                    heights[x + y * columns] = cave.floorHeightMetres(originX + x, originY + y);
+            } else heights = WurmWaypointerRuntime.miniMapSurfaceHeights(originX, originY, columns, rows);
+            topographicTexture.update(MiniMapContourImage.render(active, size,
+                    originX, originY, columns, rows, heights, interval));
+            topographicInterval = interval;
+            topographicCave = caveView;
+            topographicProfileId = viewportProfileId;
+            topographicOriginX = originX; topographicOriginY = originY;
+            topographicColumns = columns; topographicRows = rows;
+            topographicRevision = revision;
+            topographicPixels = size;
+            topographicCenterX = active.getCenterX(); topographicCenterY = active.getCenterY();
+            topographicScale = active.getPixelsPerTile();
+            nextTopographicRefresh = now + 500_000_000L;
+        }
+        return topographicTexture.get();
     }
 
 }

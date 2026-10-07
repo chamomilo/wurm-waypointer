@@ -1,6 +1,7 @@
 package org.waypoints.next.render;
 
 import org.waypoints.next.navigation.GroundRouteTrace;
+import org.waypoints.next.navigation.HighwayRoutePlanner;
 
 import java.io.BufferedWriter;
 import java.io.Closeable;
@@ -38,6 +39,7 @@ public final class NavigationRouteDiagnosticLog implements Closeable {
     private int sequence;
     private long bytesWritten;
     private boolean closed;
+    private String lastHighwayAttempt;
     private volatile boolean acceptingRouteRecords = true;
 
     public NavigationRouteDiagnosticLog(Path directory, Instant startedAt,
@@ -136,6 +138,48 @@ public final class NavigationRouteDiagnosticLog implements Closeable {
     }
 
     public Path getFile() { return file; }
+
+    public synchronized void highwayAttempt(String strategy, String reason,
+            HighwayRoutePlanner.Plan plan, boolean entryReached,
+            GroundRouteTrace.Point entryEnd, int sampledPoints,
+            HighwayRoutePlanner.TileStep missing, GroundRouteTrace validation) {
+        if (closed || !acceptingRouteRecords) return;
+        GroundRouteTrace.Point blocked = null;
+        if (validation != null) {
+            int index = validation.getBlockingPointIndex();
+            if (index < 0 && validation.getBlockingSegmentIndex() >= 0)
+                index = validation.getBlockingSegmentIndex() + 1;
+            if (index >= 0) blocked = validation.getPoints().get(index);
+        }
+        String details = "\"strategy\":\"" + json(strategy) + "\",\"reason\":\""
+                + json(reason) + "\",\"entry\":[" + plan.getEntryX() + "," + plan.getEntryY()
+                + "],\"exit\":[" + plan.getExitX() + "," + plan.getExitY()
+                + "],\"entryReached\":" + entryReached + ",\"entryEnd\":" + coordinate(entryEnd)
+                + ",\"sampledHighwayPoints\":" + sampledPoints
+                + ",\"plannedHighwayPoints\":" + plan.getHighwaySteps().size()
+                + ",\"firstMissingTerrain\":" + (missing == null ? "null"
+                : "[" + missing.getTileX() + "," + missing.getTileY() + "]")
+                + ",\"blockedAt\":" + coordinate(blocked);
+        if (details.equals(lastHighwayAttempt)) return;
+        lastHighwayAttempt = details;
+        final Instant at = Instant.now();
+        final String record = "{\"schemaVersion\":" + SCHEMA_VERSION
+                + ",\"event\":\"highway_attempt\",\"sessionId\":\"" + sessionId
+                + "\",\"at\":\"" + at + "\"," + details + "}";
+        worker.execute(new Runnable() {
+            @Override public void run() {
+                if (!acceptingRouteRecords) return;
+                try { writeRouteLine(record, at); }
+                catch (IOException failure) {
+                    logger.log(Level.WARNING, "Unable to record highway attempt", failure);
+                }
+            }
+        });
+    }
+
+    private static String coordinate(GroundRouteTrace.Point point) {
+        return point == null ? "null" : "[" + point.getTileX() + "," + point.getTileY() + "]";
+    }
 
     @Override public void close() throws IOException {
         close("route_stopped");

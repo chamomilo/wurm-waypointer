@@ -17,6 +17,51 @@ public final class WurmCaveMapSnapshotTest {
                 (short) 30, (short) 70, (short) 0, false);
     }
 
+    @Test public void caveTextureHasNoBakedTileBorders() {
+        for (Tile tile : new Tile[] {Tile.TILE_CAVE, Tile.TILE_CAVE_WALL,
+                Tile.TILE_CAVE_WALL_ORE_GOLD}) {
+            for (int offset = 0; offset < 6; offset++) {
+                assertEquals(WurmCaveMapSnapshot.color(tile),
+                        WurmCaveMapSnapshot.pixel(cell(tile), offset, 0));
+                assertEquals(WurmCaveMapSnapshot.color(tile),
+                        WurmCaveMapSnapshot.pixel(cell(tile), 0, offset));
+                assertEquals(WurmCaveMapSnapshot.color(tile),
+                        WurmCaveMapSnapshot.pixel(cell(tile), offset, 5));
+                assertEquals(WurmCaveMapSnapshot.color(tile),
+                        WurmCaveMapSnapshot.pixel(cell(tile), 5, offset));
+            }
+        }
+    }
+
+    @Test public void reinforcementAndStructuresUseTwoShortEdgesWithClearCorners() {
+        for (Tile tile : new Tile[] {Tile.TILE_CAVE_WALL_REINFORCED, Tile.TILE_CAVE_FLOOR_REINFORCED}) {
+            assertCellPattern(cell(tile),
+                    "......", ".....O", ".....O", ".....O", ".....O", ".OOOO.");
+        }
+        WurmCaveMapSnapshot.Cell structure = new WurmCaveMapSnapshot.Cell(Tile.TILE_CAVE,
+                null, null, (short) 30, (short) 70, (short) 0, true);
+        assertCellPattern(structure,
+                ".PPPP.", "P.....", "P.....", "P.....", "P.....", "......");
+    }
+
+    @Test public void structureOnReinforcementShowsBothBorderColours() {
+        WurmCaveMapSnapshot.Cell both = new WurmCaveMapSnapshot.Cell(Tile.TILE_CAVE,
+                Tile.TILE_CAVE_FLOOR_REINFORCED, null,
+                (short) 30, (short) 70, (short) 0, true);
+        assertCellPattern(both,
+                ".PPPP.", "P....O", "P....O", "P....O", "P....O", ".OOOO.");
+    }
+
+    private static void assertCellPattern(WurmCaveMapSnapshot.Cell cell, String... rows) {
+        for (int y = 0; y < rows.length; y++) for (int x = 0; x < rows[y].length(); x++) {
+            char mark = rows[y].charAt(x);
+            int expected = mark == 'O' ? 0xdda24a : mark == 'P' ? 0xb690e4
+                    : WurmCaveMapSnapshot.color(cell.effectiveType());
+            assertEquals("Status mark at " + x + "," + y, expected,
+                    WurmCaveMapSnapshot.pixel(cell, x, y));
+        }
+    }
+
     @Test public void paleResourcesHaveSeparateColoursAndPatterns() {
         Set<Integer> colours = new HashSet<Integer>();
         Set<String> patterns = new HashSet<String>();
@@ -152,6 +197,21 @@ public final class WurmCaveMapSnapshotTest {
         assertEquals(Tile.TILE_CAVE_WALL_ORE_GOLD, ore.effectiveType());
         assertEquals(WurmCaveMapSnapshot.color(Tile.TILE_CAVE_WALL_ORE_GOLD),
                 WurmCaveMapSnapshot.pixel(ore, 2, 2));
+    }
+
+    @Test public void topographicFloorUsesReceivedFloorsIncludingMinusTenMetres() throws Exception {
+        CaveDataBuffer buffer = emptyBuffer();
+        setBounds(buffer, 60, 123);
+        ((byte[]) field("types").get(buffer))[buffer.getOffset(100, 100)] = Tile.TILE_CAVE.id;
+        ((short[]) field("floors").get(buffer))[buffer.getOffset(100, 100)] = -100;
+        ((byte[]) field("types").get(buffer))[buffer.getOffset(101, 100)] = Tile.TILE_CAVE_WALL_ORE_IRON.id;
+        WurmCaveTileCoverage.beforeStrip(buffer, 100, 100, 2, 1);
+        WurmCaveTileCoverage.afterStrip(buffer, 100, 100, 2, 1);
+        WurmCaveMapSnapshot snapshot = WurmCaveMapSnapshot.capture(buffer, 100, 100, 1024, null);
+        assertEquals(-10, snapshot.floorHeightMetres(100, 100), 0.00001);
+        assertTrue(Float.isNaN(snapshot.floorHeightMetres(101, 100)));
+        assertTrue(Float.isNaN(snapshot.floorHeightMetres(102, 100)));
+        assertTrue(Float.isNaN(snapshot.floorHeightMetres(500, 500)));
     }
 
     private static Field field(String name) throws Exception {

@@ -14,12 +14,15 @@ import com.wurmonline.client.renderer.structures.BridgePartData;
 import com.wurmonline.client.util.GLHelper;
 import com.wurmonline.mesh.Tiles;
 import org.waypoints.next.navigation.CartTerrainRoutePlanner;
+import org.waypoints.next.navigation.CaveExitRoutePlanner;
+import org.waypoints.next.navigation.CaveTileCoverage;
 import org.waypoints.next.navigation.ChainedCartTerrainRoutePlanner;
 import org.waypoints.next.navigation.GroundRouteTrace;
 import org.waypoints.next.navigation.HighwayIndexSource;
 import org.waypoints.next.navigation.HighwayRoutePlanner;
 import org.waypoints.next.navigation.HighwayTileIndex;
 import org.waypoints.next.navigation.NavigationRouteStatistics;
+import org.waypoints.next.navigation.NavigationRouteAssembly;
 import org.waypoints.next.navigation.NavigationRouteVisualStyle;
 import org.waypoints.next.render.WaypointWorldBlend;
 import org.waypoints.next.render.WaypointWorldTexture;
@@ -90,6 +93,7 @@ public final class GroundNavigationRouteEffect extends Effect
     private final NavigationRouteDiagnosticLog diagnosticLog;
     private final CartTerrainRoutePlanner planner;
     private final CartTerrainRoutePlanner connectorPlanner;
+    private final CartTerrainRoutePlanner caveExitPlanner;
     private final HighwayRoutePlanner highwayPlanner = new HighwayRoutePlanner();
     private final HighwayIndexSource highwaySource;
     private final ExecutorService planningWorker;
@@ -166,6 +170,8 @@ public final class GroundNavigationRouteEffect extends Effect
                 CONNECTOR_MAXIMUM_LEG_TILES, CONNECTOR_DETOUR_MARGIN_TILES,
                 CONNECTOR_MAXIMUM_EXPANDED_NODES, MAX_POINTS,
                 maximumSlopeDirt, maximumWaterDepthMetres);
+        this.caveExitPlanner = new CartTerrainRoutePlanner(mapWidth, mapHeight,
+                64, 32, 10000, MAX_POINTS, maximumSlopeDirt, maximumWaterDepthMetres);
         this.planningWorker = Executors.newSingleThreadExecutor(
                 new ThreadFactory() {
                     @Override public Thread newThread(Runnable runnable) {
@@ -699,7 +705,7 @@ public final class GroundNavigationRouteEffect extends Effect
                         PlannedRoute throughTunnel = tunnelRoute(startX,
                                 startY, directTunnel, highways, travelLayer);
                         if (throughTunnel != null) return throughTunnel
-                                .withMapRoute(completeMapRoute(startX, startY,
+                                .withMapRoute(completeMapRouteWithTerrain(startX, startY,
                                         directTunnel, targetTileX,
                                         targetTileY, throughTunnel.points));
                     }
@@ -714,7 +720,7 @@ public final class GroundNavigationRouteEffect extends Effect
                     PlannedRoute toSelectedExit = tunnelRoute(startX, startY,
                             selectedTunnel, highways, travelLayer);
                     if (toSelectedExit != null) return toSelectedExit
-                            .withMapRoute(completeMapRoute(startX, startY,
+                            .withMapRoute(completeMapRouteWithTerrain(startX, startY,
                                     layered, targetTileX, targetTileY,
                                     toSelectedExit.points));
                 }
@@ -724,13 +730,23 @@ public final class GroundNavigationRouteEffect extends Effect
                 if (exitTunnel.usesHighway()) {
                     PlannedRoute toSurface = tunnelRoute(startX, startY,
                             exitTunnel, highways, travelLayer);
-                    if (toSurface != null) return toSurface;
+                    if (toSurface != null) {
+                        if (targetLayer >= 0 && !toSurface.points.isEmpty()) {
+                            GroundRouteTrace.Point portal = toSurface.points.get(toSurface.points.size() - 1);
+                            PlannedRoute surface = planRoute(portal.getTileX(), portal.getTileY(),
+                                    highways, TravelLayer.SURFACE);
+                            return toSurface.withMapRoute(prependMapRoute(toSurface.points,
+                                    surface.mapRoute == null ? RouteSnapshot.from(surface.points)
+                                            : surface.mapRoute));
+                        }
+                        return toSurface;
+                    }
                 }
+                if (targetLayer >= 0) return caveExitRoute(startX, startY, highways);
                 return unavailableTunnelRoute(startX, startY, highways,
                         travelLayer);
             }
-            // No published tunnel covers this cave tile. Retain the cave-only
-            // terrain fallback, but never consult the surface Highway graph.
+            if (targetLayer >= 0) return caveExitRoute(startX, startY, highways);
             return localRoute(startX, startY, highways, travelLayer);
         }
         if (travelLayer == TravelLayer.BRIDGE) {
@@ -798,6 +814,10 @@ public final class GroundNavigationRouteEffect extends Effect
                         : "necessary_surface_multilayer_to_tunnel_portal",
                 travelLayer, surface.getExitX(), surface.getExitY(), false);
         if (approach == null) return null;
+        if (approach.points.isEmpty()) return approach;
+        GroundRouteTrace.Point approachEnd = approach.points.get(approach.points.size() - 1);
+        if (approachEnd.getTileX() != surface.getExitX()
+                || approachEnd.getTileY() != surface.getExitY()) return approach;
         HighwayRoutePlanner.TileStep tunnel = firstStepOfKind(complete,
                 HighwayTileIndex.Kind.TUNNEL);
         if (tunnel == null) return null;
@@ -807,69 +827,120 @@ public final class GroundNavigationRouteEffect extends Effect
         return preview.withCompleteStatistics(
                 NavigationRouteStatistics.calculateCompleteHighwayPlan(
                         complete, startX, startY, targetTileX, targetTileY))
-                .withMapRoute(completeMapRoute(startX, startY, complete,
+                .withMapRoute(completeMapRouteWithTerrain(startX, startY, complete,
                         targetTileX, targetTileY, preview.points));
     }
 
-    /** Builds the complete cross-layer polyline without requiring unloaded terrain. */
-    static RouteSnapshot completeMapRoute(
-            int startX, int startY, HighwayRoutePlanner.Plan complete,
-            int targetX, int targetY,
-            List<GroundRouteTrace.Point> exactVisiblePrefix) {
-        if (complete == null || complete.getHighwaySteps().isEmpty()) {
-            return RouteSnapshot.from(exactVisiblePrefix);
-        }
-        List<int[]> coordinates = new ArrayList<int[]>();
-        HighwayRoutePlanner.TileStep first = complete.getHighwaySteps().get(0);
-        boolean joined = false;
-        if (exactVisiblePrefix != null) {
-            for (GroundRouteTrace.Point point : exactVisiblePrefix) {
-                appendCoordinate(coordinates, point.getTileX(), point.getTileY());
-                if (point.getTileX() == first.getTileX()
-                        && point.getTileY() == first.getTileY()) {
-                    joined = true;
-                    break;
+    private PlannedRoute caveExitRoute(int startX, int startY,
+                                       HighwayTileIndex highways) {
+        CaveDataBuffer cave = world.getCaveBuffer();
+        List<CaveExitRoutePlanner.Exit> exits = new ArrayList<CaveExitRoutePlanner.Exit>();
+        if (cave != null) {
+            for (int x = startX - 63; x <= startX + 63; x++) {
+                for (int y = startY - 63; y <= startY + 63; y++) {
+                    if (!CaveTileCoverage.hasFloorCorners(cave, x, y)
+                            || !cave.isValid(tileCentre(x), tileCentre(y))
+                            || cave.getTileType(x, y) != Tiles.Tile.TILE_CAVE_EXIT
+                            || sampleTerrain(x, y, highways, TravelLayer.TUNNEL) == null) continue;
+                    HighwayRoutePlanner.Plan surface = highwayPlanner.plan(x, y,
+                            targetTileX, targetTileY, highways, HighwayRoutePlanner.NetworkLayer.SURFACE);
+                    float surfaceCost = surface.usesHighway() ? surface.getEstimatedTimeTiles()
+                            : (float) Math.hypot(targetTileX - x, targetTileY - y);
+                    exits.add(new CaveExitRoutePlanner.Exit(x, y, surfaceCost));
                 }
             }
         }
-        if (!joined) {
-            coordinates.clear();
-            appendRasterCoordinates(coordinates, startX, startY,
-                    first.getTileX(), first.getTileY());
+        CartTerrainRoutePlanner.Plan exit = CaveExitRoutePlanner.plan(caveExitPlanner,
+                terrain(highways, TravelLayer.TUNNEL), startX, startY, exits);
+        if (exit == null) return unavailableLayerTransitionRoute(startX, startY,
+                highways, TravelLayer.TUNNEL, "cave_exit_not_received_or_unreachable");
+        GroundRouteTrace.Point selectedExit = exit.getPoints().get(exit.getPoints().size() - 1);
+        PlannedRoute surface = planRoute(selectedExit.getTileX(), selectedExit.getTileY(),
+                highways, TravelLayer.SURFACE);
+        return new PlannedRoute(exit.getPoints(), false, "received_cave_exit_with_surface_continuation",
+                exit.getExpandedNodes(), exit.getRejectedSlopeEdges(), exit.getRejectedWaterEdges(),
+                exit.getRejectedUnknownEdges(), exit.getRejectedCornerEdges())
+                .withMapRoute(prependMapRoute(exit.getPoints(),
+                        surface.mapRoute == null ? RouteSnapshot.from(surface.points) : surface.mapRoute));
+    }
+
+    static RouteSnapshot prependMapRoute(List<GroundRouteTrace.Point> prefix,
+                                         RouteSnapshot continuation) {
+        RouteSnapshot first = RouteSnapshot.from(prefix);
+        if (first.count == 0) return continuation;
+        if (continuation == null || continuation.count == 0) return first;
+        int last = first.count - 1;
+        // Only a continuation from the selected exit belongs to this cave path.
+        if (first.tileX[last] != continuation.tileX[0]
+                || first.tileY[last] != continuation.tileY[0]) return first;
+        int tailStart = first.layer[last] == continuation.layer[0] ? 1 : 0;
+        int count = Math.min(MAX_MAP_POINTS, first.count + continuation.count - tailStart);
+        RouteSnapshot result = new RouteSnapshot(new int[count], new int[count],
+                new float[count], new int[count], count);
+        for (int i = 0; i < count; i++) {
+            RouteSnapshot source = i < first.count ? first : continuation;
+            int index = i < first.count ? i : i - first.count + tailStart;
+            result.tileX[i] = source.tileX[index];
+            result.tileY[i] = source.tileY[index];
+            result.height[i] = source.height[index];
+            result.signature[i] = source.signature[index];
+            result.layer[i] = source.layer[index];
         }
+        return result;
+    }
+
+    /** Builds the complete cross-layer polyline without requiring unloaded terrain. */
+    private RouteSnapshot completeMapRouteWithTerrain(
+            int startX, int startY, HighwayRoutePlanner.Plan complete,
+            int targetX, int targetY, List<GroundRouteTrace.Point> exactVisiblePrefix) {
+        if (complete == null || complete.getHighwaySteps().isEmpty()) {
+            return RouteSnapshot.from(exactVisiblePrefix);
+        }
+        HighwayRoutePlanner.TileStep last = complete.getHighwaySteps().get(
+                complete.getHighwaySteps().size() - 1);
+        TravelLayer tailLayer = targetLayer < 0 ? TravelLayer.TUNNEL : TravelLayer.SURFACE;
+        PlannedRoute tail = terrainRoute(last.getTileX(), last.getTileY(),
+                targetX, targetY, connectorPlanner, "map_target_connector",
+                highwaySource == null ? HighwayTileIndex.empty() : highwaySource.current(), tailLayer);
+        return completeMapRoute(complete, exactVisiblePrefix, tail.points);
+    }
+
+    static RouteSnapshot completeMapRoute(HighwayRoutePlanner.Plan complete,
+                                          List<GroundRouteTrace.Point> exactVisiblePrefix,
+                                          List<GroundRouteTrace.Point> targetConnector) {
+        if (complete == null || complete.getHighwaySteps().isEmpty()) {
+            return RouteSnapshot.from(exactVisiblePrefix);
+        }
+        List<GroundRouteTrace.Point> published = new ArrayList<GroundRouteTrace.Point>();
+        java.util.Map<Long, Integer> byPosition = new java.util.HashMap<Long, Integer>();
         for (HighwayRoutePlanner.TileStep step : complete.getHighwaySteps()) {
-            appendCoordinate(coordinates, step.getTileX(), step.getTileY());
+            GroundRouteTrace.Point point = new GroundRouteTrace.Point(step.getTileX(),
+                    step.getTileY(), 0, GroundRouteTrace.HeightSource.HIGHWAY_INTERPOLATED,
+                    0, GroundRouteTrace.WaterSource.HIGHWAY_ASSUMED_CLEAR,
+                    step.getKind(), step.isPortal(), 0, true);
+            byPosition.put(Long.valueOf(NavigationRouteAssembly.positionKey(point)),
+                    Integer.valueOf(published.size()));
+            published.add(point);
         }
-        int[] last = coordinates.get(coordinates.size() - 1);
-        appendRasterCoordinates(coordinates, last[0], last[1], targetX, targetY);
-        return RouteSnapshot.fromCoordinates(coordinates);
-    }
-
-    private static void appendRasterCoordinates(List<int[]> target,
-                                                int startX, int startY,
-                                                int targetX, int targetY) {
-        int x = startX;
-        int y = startY;
-        int dx = Math.abs(targetX - x);
-        int dy = Math.abs(targetY - y);
-        int stepX = x < targetX ? 1 : -1;
-        int stepY = y < targetY ? 1 : -1;
-        int error = dx - dy;
-        while (true) {
-            appendCoordinate(target, x, y);
-            if (x == targetX && y == targetY) return;
-            int doubled = error * 2;
-            if (doubled > -dy) { error -= dy; x += stepX; }
-            if (doubled < dx) { error += dx; y += stepY; }
+        int prefixJoin = -1;
+        int graphJoin = -1;
+        for (int i = 0; i < exactVisiblePrefix.size(); i++) {
+            Integer graph = byPosition.get(Long.valueOf(NavigationRouteAssembly.positionKey(
+                    exactVisiblePrefix.get(i))));
+            if (graph != null && graph.intValue() >= graphJoin) {
+                prefixJoin = i;
+                graphJoin = graph.intValue();
+            }
         }
-    }
-
-    private static void appendCoordinate(List<int[]> target, int x, int y) {
-        if (!target.isEmpty()) {
-            int[] last = target.get(target.size() - 1);
-            if (last[0] == x && last[1] == y) return;
-        }
-        if (target.size() < MAX_MAP_POINTS) target.add(new int[]{x, y});
+        // An incomplete approach is not a licence to draw a straight line through water.
+        if (prefixJoin < 0) return RouteSnapshot.from(exactVisiblePrefix);
+        List<GroundRouteTrace.Point> combined = new ArrayList<GroundRouteTrace.Point>(
+                exactVisiblePrefix.subList(0, prefixJoin + 1));
+        combined.addAll(published.subList(graphJoin + 1, published.size()));
+        if (!targetConnector.isEmpty() && NavigationRouteAssembly.positionKey(
+                targetConnector.get(0)) == NavigationRouteAssembly.positionKey(
+                published.get(published.size() - 1))) combined.addAll(targetConnector);
+        return RouteSnapshot.from(NavigationRouteAssembly.withoutLoops(combined), MAX_MAP_POINTS);
     }
 
     private PlannedRoute bridgeStage(int startX, int startY,
@@ -928,6 +999,7 @@ public final class GroundNavigationRouteEffect extends Effect
         List<GroundRouteTrace.Point> combined =
                 new ArrayList<GroundRouteTrace.Point>(network.points);
         append(combined, exit.points);
+        combined = NavigationRouteAssembly.withoutLoops(combined);
         GroundRouteTrace validation = GroundRouteTrace.analyse(
                 targetTileX, targetTileY, targetLayer, combined.size(), true,
                 maximumSlopeDirt, maximumWaterDepthMetres, combined);
@@ -1351,17 +1423,19 @@ public final class GroundNavigationRouteEffect extends Effect
         PlannedRoute exit = terrainRoute(highway.getExitX(),
                 highway.getExitY(), routeTargetX, routeTargetY,
                 connectorPlanner, "highway_exit", highways, travelLayer);
-        if (!entry.reachedFinalTarget || !exit.reachedFinalTarget) return null;
-
-        List<GroundRouteTrace.Point> combined =
-                new ArrayList<GroundRouteTrace.Point>();
-        append(combined, entry.points);
         List<GroundRouteTrace.Point> highwayPoints =
                 sampleHighway(highway.getHighwaySteps(), highways,
                         travelLayer);
-        if (highwayPoints.isEmpty()) return null;
-        append(combined, highwayPoints);
-        if (combined.size() < MAX_POINTS) append(combined, exit.points);
+        List<GroundRouteTrace.Point> combined = NavigationRouteAssembly.joinHighway(
+                entry.points, highwayPoints, exit.points);
+        if (combined.isEmpty()) {
+            diagnoseHighwayAttempt(strategy, "approach_does_not_join_sampled_highway",
+                    highway, entry, highwayPoints, null);
+            return null;
+        }
+        boolean completeNetwork = highwayPoints.size() == highway.getHighwaySteps().size();
+        if (combined.size() > MAX_POINTS) combined = new ArrayList<GroundRouteTrace.Point>(
+                combined.subList(0, MAX_POINTS));
         boolean reached = !combined.isEmpty()
                 && combined.get(combined.size() - 1).getTileX() == routeTargetX
                 && combined.get(combined.size() - 1).getTileY() == routeTargetY;
@@ -1369,15 +1443,37 @@ public final class GroundNavigationRouteEffect extends Effect
                 routeTargetX, routeTargetY, numericLayer(travelLayer),
                 combined.size(),
                 reached, maximumSlopeDirt, maximumWaterDepthMetres, combined);
-        if (validation.getResult() == GroundRouteTrace.Result.BLOCKED) return null;
+        if (validation.getResult() == GroundRouteTrace.Result.BLOCKED) {
+            diagnoseHighwayAttempt(strategy, "assembled_route_blocked", highway,
+                    entry, highwayPoints, validation);
+            return null;
+        }
+        diagnoseHighwayAttempt(strategy, completeNetwork ? "accepted" : "partial_network_terrain",
+                highway, entry, highwayPoints, validation);
         return new PlannedRoute(combined, routeTargetIsFinal && reached,
-                strategy,
+                !completeNetwork ? strategy + "_partial_network"
+                        : exit.reachedFinalTarget ? strategy : strategy + "_partial_exit",
                 highway.getExpandedNodes() + entry.expandedNodes
                         + exit.expandedNodes,
                 entry.rejectedSlopeEdges + exit.rejectedSlopeEdges,
                 entry.rejectedWaterEdges + exit.rejectedWaterEdges,
                 entry.rejectedUnknownEdges + exit.rejectedUnknownEdges,
-                entry.rejectedCornerEdges + exit.rejectedCornerEdges);
+                entry.rejectedCornerEdges + exit.rejectedCornerEdges)
+                .withMapRoute(completeMapRoute(highway, combined,
+                        completeNetwork ? exit.points : java.util.Collections.<GroundRouteTrace.Point>emptyList()));
+    }
+
+    private void diagnoseHighwayAttempt(String strategy, String reason,
+                                         HighwayRoutePlanner.Plan highway, PlannedRoute entry,
+                                         List<GroundRouteTrace.Point> sampled,
+                                         GroundRouteTrace validation) {
+        if (diagnosticLog == null) return;
+        GroundRouteTrace.Point end = entry.points.isEmpty() ? null
+                : entry.points.get(entry.points.size() - 1);
+        HighwayRoutePlanner.TileStep missing = sampled.size() < highway.getHighwaySteps().size()
+                ? highway.getHighwaySteps().get(sampled.size()) : null;
+        diagnosticLog.highwayAttempt(strategy, reason, highway,
+                entry.reachedFinalTarget, end, sampled.size(), missing, validation);
     }
 
     private List<GroundRouteTrace.Point> sampleHighway(
@@ -1413,7 +1509,7 @@ public final class GroundNavigationRouteEffect extends Effect
                 point = sampleTerrain(step.getTileX(), step.getTileY(),
                         highways, travelLayer);
             }
-            if (point == null) return new ArrayList<GroundRouteTrace.Point>();
+            if (point == null) break;
             points.add(point.withHighway(step.getKind(), step.isPortal()));
             lastKnownHeight = point.getGroundHeightMetres();
         }
@@ -1738,8 +1834,7 @@ public final class GroundNavigationRouteEffect extends Effect
         float worldY = tileCentre(tileY);
         if (travelLayer == TravelLayer.TUNNEL) {
             CaveDataBuffer cave = world.getCaveBuffer();
-            if (cave == null || !insideLocalTerrainWindow(tileX, tileY,
-                    world.getPlayerPosX(), world.getPlayerPosY())
+            if (cave == null || !CaveTileCoverage.hasFloorCorners(cave, tileX, tileY)
                     || !cave.isValid(worldX, worldY)) return null;
             TileGeometry geometry = caveGeometry(cave, tileX, tileY);
             if (geometry == null) return null;
@@ -1761,11 +1856,10 @@ public final class GroundNavigationRouteEffect extends Effect
                 world.getPlayerPosX(), world.getPlayerPosY())
                 && near.isValid(worldX, worldY)) {
             TileGeometry geometry = nearGeometry(near, tileX, tileY);
-            if (geometry == null) return null;
             float ground = near.getInterpolatedHeight(worldX, worldY);
-            if (!finite(ground)) return null;
-            float waterLevel = near.getWaterHeight(tileX, tileY) / 10.0f;
-            return applyPublishedHighway(new GroundRouteTrace.Point(tileX, tileY, ground,
+            if (geometry != null && finite(ground)) {
+                float waterLevel = near.getWaterHeight(tileX, tileY) / 10.0f;
+                return applyPublishedHighway(new GroundRouteTrace.Point(tileX, tileY, ground,
                     GroundRouteTrace.HeightSource.NEAR,
                     Math.max(0.0f, waterLevel - geometry.minimumHeight),
                     GroundRouteTrace.WaterSource.NEAR,
@@ -1774,6 +1868,7 @@ public final class GroundNavigationRouteEffect extends Effect
                             : HighwayTileIndex.Kind.NONE,
                     false, geometry.maximumSlopeDirt), tileX, tileY,
                     highways, travelLayer);
+            }
         }
         DistantTerrainDataBuffer distant = world.getDistantTerrainBuffer();
         if (distant == null || !distant.isValid(worldX, worldY)) return null;
@@ -1980,6 +2075,7 @@ public final class GroundNavigationRouteEffect extends Effect
         private final int[] tileY;
         private final float[] height;
         private final int[] signature;
+        private final int[] layer;
         private final int count;
 
         private RouteSnapshot(int[] tileX, int[] tileY, float[] height,
@@ -1988,14 +2084,19 @@ public final class GroundNavigationRouteEffect extends Effect
             this.tileY = tileY;
             this.height = height;
             this.signature = signature;
+            this.layer = new int[count];
             this.count = count;
         }
 
         private static RouteSnapshot empty() { return EMPTY; }
 
         private static RouteSnapshot from(List<GroundRouteTrace.Point> points) {
+            return from(points, MAX_POINTS);
+        }
+
+        private static RouteSnapshot from(List<GroundRouteTrace.Point> points, int maximumPoints) {
             if (points == null || points.isEmpty()) return EMPTY;
-            int count = Math.min(MAX_POINTS, points.size());
+            int count = Math.min(maximumPoints, points.size());
             int[] x = new int[count];
             int[] y = new int[count];
             float[] height = new float[count];
@@ -2024,23 +2125,13 @@ public final class GroundNavigationRouteEffect extends Effect
                         + (point.isHighwayPortal() ? 1 : 0);
                 signature[i] = pointSignature;
             }
-            return new RouteSnapshot(x, y, height, signature, count);
-        }
-
-        private static RouteSnapshot fromCoordinates(List<int[]> points) {
-            if (points == null || points.isEmpty()) return EMPTY;
-            int count = Math.min(MAX_MAP_POINTS, points.size());
-            int[] x = new int[count];
-            int[] y = new int[count];
-            float[] height = new float[count];
-            int[] signature = new int[count];
+            RouteSnapshot snapshot = new RouteSnapshot(x, y, height, signature, count);
             for (int i = 0; i < count; i++) {
-                int[] point = points.get(i);
-                x[i] = point[0];
-                y[i] = point[1];
-                signature[i] = 31 * (31 + x[i]) + y[i];
+                GroundRouteTrace.Point point = points.get(i);
+                snapshot.layer[i] = point.getHeightSource() == GroundRouteTrace.HeightSource.CAVE
+                        || point.getHighwayKind() == HighwayTileIndex.Kind.TUNNEL ? -1 : 0;
             }
-            return new RouteSnapshot(x, y, height, signature, count);
+            return snapshot;
         }
 
         public int getPointCount() { return count; }
@@ -2048,6 +2139,15 @@ public final class GroundNavigationRouteEffect extends Effect
         public int getTileX(int index) { return tileX[checked(index)]; }
 
         public int getTileY(int index) { return tileY[checked(index)]; }
+
+        public int getLayer(int index) { return layer[checked(index)]; }
+
+        public boolean hasLayerSegment(int wantedLayer) {
+            for (int i = 1; i < count; i++) {
+                if (layer[i - 1] == wantedLayer && layer[i] == wantedLayer) return true;
+            }
+            return false;
+        }
 
         private int checked(int index) {
             if (index < 0 || index >= count) {

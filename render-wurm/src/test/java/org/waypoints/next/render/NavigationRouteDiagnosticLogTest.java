@@ -4,6 +4,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.waypoints.next.navigation.GroundRouteTrace;
+import org.waypoints.next.navigation.HighwayRoutePlanner;
+import org.waypoints.next.navigation.HighwayTileIndex;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -18,6 +20,24 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public final class NavigationRouteDiagnosticLogTest {
+    @Test public void recordsMissingHighwayTerrainAndSuppressesIdenticalAttempts() throws Exception {
+        NavigationRouteDiagnosticLog log = new NavigationRouteDiagnosticLog(
+                temporary.getRoot().toPath(), Instant.parse("2026-10-07T12:00:00Z"),
+                "server-key", UUID.randomUUID(), "Gate Of Heaven", 20, 4, 0,
+                40.0f, 0.7f, Logger.getLogger("highway-attempt-test"));
+        HighwayTileIndex index = HighwayTileIndex.parse(
+                "[{\"startX\":0,\"startY\":4,\"endX\":20,\"endY\":4,\"type\":2}]", 32, 32);
+        HighwayRoutePlanner.Plan plan = new HighwayRoutePlanner().plan(0, 4, 20, 4, index);
+        for (int i = 0; i < 2; i++) log.highwayAttempt("highway_graph", "partial_network_terrain",
+                plan, true, point(0, 4, 1, 0), 10, plan.getHighwaySteps().get(10), null);
+        log.close("test_complete");
+        List<String> lines = Files.readAllLines(log.getFile(), StandardCharsets.UTF_8);
+        assertEquals(3, lines.size());
+        assertTrue(lines.get(1).contains("\"event\":\"highway_attempt\""));
+        assertTrue(lines.get(1).contains("\"firstMissingTerrain\":[10,4]"));
+        assertTrue(lines.get(1).contains("\"plannedHighwayPoints\":21"));
+    }
+
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
 
     @Test public void writesPointsSlopesWaterAndBlockingDecisionAsJsonl()

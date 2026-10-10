@@ -54,7 +54,7 @@ public final class WaypointManagerPanelProbe {
                     }
                 });
         WaypointerHubWindow hub = new WaypointerHubWindow(controller);
-        hub.setSize(1480, 700); hub.setPosition(10, 10); hub.gameTick();
+        hub.setSize(1120, 480); hub.setPosition(10, 10); hub.gameTick();
         Map<?,?> panels = (Map<?,?>)field(hub, "panels");
         WaypointManagerWindow manager = (WaypointManagerWindow)panels.get(WaypointerSection.ALL_WAYPOINTS);
         WurmArrayPanel<?> table = (WurmArrayPanel<?>)field(manager, "table");
@@ -65,7 +65,9 @@ public final class WaypointManagerPanelProbe {
         }
         WurmArrayPanel<?> header=(WurmArrayPanel<?>)field(manager,"tableHeader");
         int headingY=header.y;
-        scroll.scrollTo(0, 38 * 15 + 7); int offset = scroll.yo;
+        int rowPitch=table.components.get(2).y-table.components.get(0).y;
+        check(rowPitch==32,"Dense manager rows have 28 px controls and a 4 px gap");
+        scroll.scrollTo(0, rowPitch * 15 + 7); int offset = scroll.yo;
         TableHeaderProbe.verifyFixed(header,scroll,headingY);
         List<?> rows = new ArrayList<Object>(table.components);
         for (int iteration = 0; iteration < 4; iteration++) {
@@ -95,7 +97,7 @@ public final class WaypointManagerPanelProbe {
         manager.buttonClicked(delete);
         List<UUID> after = (List<UUID>)field(manager, "filteredIds");
         check(after.size() == 69 && !after.contains(removed), "Deleted row disappears immediately");
-        check(after.get(14).equals(top) && scroll.yo == offset - 38, "Deletion before viewport retains visible UUID and intra-row offset");
+        check(after.get(14).equals(top) && scroll.yo == offset - rowPitch, "Deletion before viewport retains visible UUID and intra-row offset");
         TableHeaderProbe.verifyFixed((WurmArrayPanel<?>)field(manager,"tableHeader"),scroll,headingY);
         catalog.live(ManagedKind.ANIMAL, removedKey, "Brown cow", "Manage cow",
                 new WaypointCoordinate(150, 100, 2d, WaypointLayer.SURFACE), now.plusSeconds(10));
@@ -143,10 +145,10 @@ public final class WaypointManagerPanelProbe {
     }
     private static void verifySharedFont(WButton button){
         boolean tableAction=button.parent instanceof WaypointerTableActionCell;
-        check(button.height==(tableAction?28:32),"Manager action has the intended height: "+button.getLabel()+" height="+button.height);
+        check(button.height==(tableAction?24:28),"Manager action has the intended height: "+button.getLabel()+" height="+button.height);
         if(tableAction)HubLayoutProbe.verifyTableAction(button);
         check(((ChamomiloUiV1Button)button).density()==UiDensity.HIGH,"High density actions");
-        check(WaypointerButtonGroup.fontPixels(button.text)==WaypointerButtonGroup.fontPixels(button.textBold)&&WaypointerButtonGroup.fontPixels(button.text)>=18,
+        check(WaypointerButtonGroup.fontPixels(button.text)==WaypointerButtonGroup.fontPixels(button.textBold)&&WaypointerButtonGroup.fontPixels(button.text)>=16,
                 "All manager rows use readable shared regular/bold captions: "+button.getLabel());
         check(WaypointerButtonGroup.id(button.text).startsWith("all-waypoints."),"Every action belongs to a recorded manager group");
         check(button.text.getAscent()==button.textBold.getAscent(),"Both weights share the group baseline");

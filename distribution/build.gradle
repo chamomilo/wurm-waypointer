@@ -115,6 +115,7 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries', ':client-w
                 'org/waypoints/next/integration/TrackedTargetStore.class',
                 'org/waypoints/next/integration/HubSettings.class',
                 'org/waypoints/next/tracking/TrackingCatalog.class',
+                'org/waypoints/next/tracking/AnimalWaypointRace.class',
                 'org/waypoints/next/tracking/ManagedBmlParser.class',
                 'org/waypoints/next/tracking/BearingRegion.class',
                 'org/waypoints/next/i18n/Messages.class',
@@ -294,6 +295,7 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries', ':client-w
             }
         }
         def forbidden = contents.matching {
+            include 'org/waypoints/next/integration/ClientFriendsAdapter*.class'
             include 'org/waypoints/next/map/sklotopolis-wordmark.png'
             include 'org/waypoints/next/map/mini-map-frame.png'
             include 'org/waypoints/next/map/mini-map-background.png'
@@ -312,22 +314,39 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries', ':client-w
     }
 }
 
-task dist(type: Zip, dependsOn: [test, verifyArtifact, ':client-wurm:verifyChamomiloUpdater', ':client-wurm:verifyWaypointerUi']) {
+def textDocumentationDirectory = file("${buildDir}/text-documentation")
+def packagedDocuments = [
+        'README.md', 'THIRD_PARTY_NOTICES.txt', 'CHANGELOG.txt', 'EXTERNAL_MOD_API.txt',
+        'docs/WAYPOINTER_HUB.txt', 'docs/RENDER_DIAGNOSTICS.txt'
+]
+task prepareTextDocumentation {
+    inputs.files(packagedDocuments.collect { rootProject.file(it) })
+    outputs.dir(textDocumentationDirectory)
+    outputs.file(rootProject.file('README.txt'))
+    doLast {
+        packagedDocuments.each { relative ->
+            String plain = rootProject.file(relative).getText('UTF-8')
+                    .replaceAll(/!\[[^\]]*\]\([^\n)]*\)/, '')
+                    .replaceAll(/(?m)^#{1,6}\s+/, '')
+                    .replaceAll(/(?m)^\s*```[^\r\n]*\r?\n/, '')
+                    .replaceAll(/\[([^\]]+)\]\(([^)]+)\)/, '$1 ($2)')
+                    .replace('**', '').replace('`', '')
+            def target = new File(textDocumentationDirectory, relative.replaceAll(/\.md$/, '.txt'))
+            target.parentFile.mkdirs()
+            target.setText(plain, 'UTF-8')
+            if (relative == 'README.md') rootProject.file('README.txt').setText(plain, 'UTF-8')
+        }
+    }
+}
+
+task dist(type: Zip, dependsOn: [test, verifyArtifact, prepareTextDocumentation, ':client-wurm:verifyChamomiloUpdater', ':client-wurm:verifyWaypointerUi']) {
     archiveFileName = "wurm-waypointer-${project.version}.zip"
     destinationDirectory = file("${buildDir}/distributions")
 
     into('mods/wurm-waypointer') {
         from jar
-        from rootProject.file('README.md')
-        from rootProject.file('THIRD_PARTY_NOTICES.md')
+        from textDocumentationDirectory
         from rootProject.file('LICENSE')
-        into('docs') {
-            from rootProject.file('docs/wurm-waypointer-banner.png')
-            from rootProject.file('docs/UPDATER_BUTTONS.md')
-            from rootProject.file('docs/WAYPOINTER_HUB.md')
-            from rootProject.file('docs/RENDER_DIAGNOSTICS.md')
-            from rootProject.file('docs/button-groups.json')
-        }
         into('assets/gallery') {
             from(rootProject.file(
                     'client-wurm/src/main/resources/org/waypoints/next/map/gallery')) {
@@ -376,14 +395,13 @@ task dist(type: Zip, dependsOn: [test, verifyArtifact, ':client-wurm:verifyChamo
         def expected = [
                 'mods/wurm-waypointer.properties',
                 'mods/wurm-waypointer.config',
-                'mods/wurm-waypointer/README.md',
-                'mods/wurm-waypointer/THIRD_PARTY_NOTICES.md',
+                'mods/wurm-waypointer/README.txt',
+                'mods/wurm-waypointer/THIRD_PARTY_NOTICES.txt',
                 'mods/wurm-waypointer/LICENSE',
-                'mods/wurm-waypointer/docs/wurm-waypointer-banner.png',
-                'mods/wurm-waypointer/docs/UPDATER_BUTTONS.md',
-                'mods/wurm-waypointer/docs/WAYPOINTER_HUB.md',
-                'mods/wurm-waypointer/docs/RENDER_DIAGNOSTICS.md',
-                'mods/wurm-waypointer/docs/button-groups.json',
+                'mods/wurm-waypointer/CHANGELOG.txt',
+                'mods/wurm-waypointer/EXTERNAL_MOD_API.txt',
+                'mods/wurm-waypointer/docs/WAYPOINTER_HUB.txt',
+                'mods/wurm-waypointer/docs/RENDER_DIAGNOSTICS.txt',
                 'mods/wurm-waypointer/assets/gallery/liberty.png',
                 'mods/wurm-waypointer/assets/gallery/novus.png',
                 'mods/wurm-waypointer/assets/gallery/caza.png',
@@ -403,9 +421,10 @@ task dist(type: Zip, dependsOn: [test, verifyArtifact, ':client-wurm:verifyChamo
 build.dependsOn verifyArtifact
 
 task verifyUiKit(type: Exec, dependsOn: jar) {
+    def kitReference = rootProject.findProperty('chamomiloUiKitReference') ?: 'C:/projects/interface items'
     commandLine 'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
-            '-File', 'C:/projects/interface items/tools/Verify-UiKitEmbedding.ps1',
+            '-File', new File(kitReference.toString(), 'tools/Verify-UiKitEmbedding.ps1').absolutePath,
             '-ModJar', jar.archiveFile.get().asFile.absolutePath,
-            '-ReferenceJar', 'C:/projects/updater/dependencies/chamomilo-ui-0.4.4.jar'
+            '-ReferenceJar', new File(updaterReference, 'dependencies/chamomilo-ui-0.4.10.jar').absolutePath
 }
 dist.dependsOn verifyUiKit

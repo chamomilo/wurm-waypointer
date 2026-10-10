@@ -10,9 +10,9 @@ final class WaypointerFilterCheck extends WButton implements ButtonListener {
     private boolean checked;
     WaypointerFilterCheck(boolean checked,Runnable action){
         super("");this.checked=checked;this.action=action;
-        setButtonListener(this);sizeFlags=0;setSize(32,32);sizeFlags=FIXED_WIDTH|FIXED_HEIGHT;
+        setButtonListener(this);sizeFlags=0;setSize(28,28);sizeFlags=FIXED_WIDTH|FIXED_HEIGHT;
     }
-    @Override void setSize(int width,int height){super.setSize(32,32);}
+    @Override void setSize(int width,int height){super.setSize(28,28);}
     void setChecked(boolean checked){this.checked=checked;}
     boolean checked(){return checked;}
     @Override public void buttonPressed(WButton button){motion.pointerPressed(System.nanoTime());}

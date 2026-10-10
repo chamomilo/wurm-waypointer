@@ -37,9 +37,9 @@ import java.util.UUID;
 /** Dense native Wurm-style Phase 1 manager and static source editor. */
 final class WaypointManagerWindow extends WaypointerContentPanel
         implements ButtonListener, InputFieldListener {
-    private static final int ROW_HEIGHT = 32;
-    private static final int CONTROL_GAP = 6;
-    private static final int BUTTON_FONT_PIXELS = 20;
+    private static final int ROW_HEIGHT = 28;
+    private static final int CONTROL_GAP = 4;
+    private static final int BUTTON_FONT_PIXELS = 16;
     private static final int TABLE_WIDTH = 1096;
     private static final int FORM_MINIMUM_WIDTH = 620;
     private static final int SOURCE_MINIMUM_WIDTH = 520;
@@ -196,6 +196,7 @@ final class WaypointManagerWindow extends WaypointerContentPanel
         listTable.setComponent(scroll, WurmBorderPanel.CENTER);
         root.setComponent(listTable, WurmBorderPanel.CENTER);
         WurmBorderPanel footer = new WurmBorderPanel("waypointer.actions.spacing");
+        footer.setInitialSize(TABLE_WIDTH,ROW_HEIGHT+CONTROL_GAP,false);footer.sizeFlags=FIXED_HEIGHT;
         footer.setComponent(gap(1, CONTROL_GAP), NORTH);
         footer.setComponent(actionRow(), CENTER);
         root.setComponent(footer, WurmBorderPanel.SOUTH);
@@ -350,6 +351,7 @@ final class WaypointManagerWindow extends WaypointerContentPanel
             tableLayoutRows.clear();
             tableHeader = header();
             WurmBorderPanel heading = new WurmBorderPanel("waypointer.manager.heading");
+            heading.setInitialSize(TABLE_WIDTH,ROW_HEIGHT+CONTROL_GAP,false);heading.sizeFlags=FIXED_HEIGHT;
             heading.setComponent(tableHeader, NORTH);
             heading.setComponent(gap(1, CONTROL_GAP), SOUTH);
             listTable.setComponent(heading, NORTH);
@@ -1418,7 +1420,7 @@ final class WaypointManagerWindow extends WaypointerContentPanel
             int total = CONTROL_GAP * (row.minimums.length - 1);for (int value : row.minimums) total += value;
             required = Math.max(required, total);
         }
-        return Math.max(900, required);
+        return Math.max(780, required);
     }
 
     private void registerTableRow(WurmArrayPanel<FlexComponent> row) {
@@ -1500,7 +1502,7 @@ final class WaypointManagerWindow extends WaypointerContentPanel
         String[] captions=org.waypoints.next.i18n.Messages.texts(labels);
         for(int i=0;i<preferred.length;i++)preferred[i]=Math.max(preferred[i],uniformCaptionWidth(labels[i]));
         return new WaypointerButtonGroup("all-waypoints.row-actions",org.chamomilo.wurm.ui.v1.UiDensity.HIGH,
-                WaypointerTableActionCell.BUTTON_HEIGHT,20,false,captions,preferred);
+                WaypointerTableActionCell.BUTTON_HEIGHT,16,false,captions,preferred);
     }
 
     private FlexComponent cell(FlexComponent value, int width) {

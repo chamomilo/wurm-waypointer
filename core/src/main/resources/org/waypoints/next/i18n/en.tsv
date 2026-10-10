@@ -3,8 +3,6 @@ ALL WAYPOINTS	ALL WAYPOINTS
 MOBS AROUND	MOBS AROUND
 CONTAINERS AROUND	CONTAINERS AROUND
 OBJECTS AND ITEMS AROUND	OBJECTS AND ITEMS AROUND
-MY VEHICLES AND ANIMALS	MY VEHICLES AND ANIMALS
-MY FRIENDS	MY FRIENDS
 SETTINGS	SETTINGS
 General	General
 Language	Language
@@ -90,7 +88,6 @@ Approximate area	Approximate area
 {0} readings	{0} readings
 Last seen {0} ago	Last seen {0} ago
 Last seen {0}	Last seen {0}
-No friends received from the client.	No friends received from the client.
 No Manage catalogue yet. Press Refresh.	No Manage catalogue yet. Press Refresh.
 Press Refresh to request your Manage lists.	Press Refresh to request your Manage lists.
 Manage request timed out. Native forms remain available.	Manage request timed out. Native forms remain available.
@@ -376,12 +373,10 @@ Developer	Developer
 Open Monitoring with the current filters.	Open Monitoring with the current filters.
 Breeding traits are not supplied in the nearby creature stream.	Breeding traits are not supplied in the nearby creature stream.
 ADD TO MONITOR	ADD TO MONITOR
-Refresh the friends received from the client.	Refresh the friends received from the client.
 Request your animals, land vehicles and ships from the server and show them here.	Request your animals, land vehicles and ships from the server and show them here.
 Position	Position
 Updated	Updated
 Click: ascending, descending, then original order.	Click: ascending, descending, then original order.
-Friend status received from the client.	Friend status received from the client.
 Managed object type received from the server.	Managed object type received from the server.
 Position state. Visible now follows received movement; last known position is saved history; approximate direction has no exact coordinates.	Position state. Visible now follows received movement; last known position is saved history; approximate direction has no exact coordinates.
 Age of the last received position or direction observation.	Age of the last received position or direction observation.
@@ -396,3 +391,26 @@ Bearing {0}° ± {1}°; range {2}–{3} m from the observation point. {4} readin
 Back to Waypointer	Back to Waypointer
 Return to the Waypointer window.	Return to the Waypointer window.
  (last observed)	 (last observed)
+VEHICLES	VEHICLES
+MY ANIMALS	MY ANIMALS
+Animal search point	Animal search point
+Request your animals from the server.	Request your animals from the server.
+Request your land vehicles and ships from the server.	Request your land vehicles and ships from the server.
+No managed animals to display.	No managed animals to display.
+No managed vehicles or ships to display.	No managed vehicles or ships to display.
+Navigate to this animal. If its position is unknown, start a waypoint race with automatic checks within 10 tiles of each search point.	Navigate to this animal. If its position is unknown, start a waypoint race with automatic checks within 10 tiles of each search point.
+Navigate to this vehicle's confirmed or last known position.	Navigate to this vehicle's confirmed or last known position.
+Animal waypoint race: {0}	Animal waypoint race: {0}
+Animal waypoint race started: {0}	Animal waypoint race started: {0}
+Animal search stopped: direction is unavailable.	Animal search stopped: direction is unavailable.
+Animal search stopped: no direction response after three checks.	Animal search stopped: no direction response after three checks.
+Animal found: {0}. Navigation now follows its received position.	Animal found: {0}. Navigation now follows its received position.
+
+Mobs	Mobs
+Objects / items	Objects / items
+ALL MAPS ON SERVER	ALL MAPS ON SERVER
+Show all five server maps	Show all five server maps
+Choose a map to view	Choose a map to view
+Wheel: zoom | drag: pan | CENTER: return to your character	Wheel: zoom | drag: pan | CENTER: return to your character
+Add this animal to ALL WAYPOINTS and automatically start a waypoint race if it is out of sight.	Add this animal to ALL WAYPOINTS and automatically start a waypoint race if it is out of sight.
+Loading full map...	Loading full map...

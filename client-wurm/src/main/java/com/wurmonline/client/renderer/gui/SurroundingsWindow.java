@@ -27,8 +27,8 @@ import java.util.Set;
 /** Native catalog of creatures and ground items currently streamed by Wurm. */
 final class SurroundingsWindow extends WaypointerContentPanel
         implements ButtonListener, InputFieldListener {
-    private static final int ROW_HEIGHT = 32;
-    private static final int TABLE_WIDTH = 950;
+    private static final int ROW_HEIGHT = 28;
+    private static final int TABLE_WIDTH = 780;
     private static final long AUTO_REFRESH_MILLIS = 1000L;
     private static final long SCROLL_SETTLE_MILLIS = 1200L;
 
@@ -134,14 +134,16 @@ final class SurroundingsWindow extends WaypointerContentPanel
         filterPanel.addComponent(excludedNamesFilterRow());
         fieldFilters = (WurmArrayPanel<FlexComponent>) fieldFilterRow();
         filterPanel.addComponent(fieldFilters);
-        countLabel=new WaypointerLabel("0 objects");filterPanel.addComponent(cell(countLabel,800));
-        monitoringButton = WaypointerUi.button("ADD TO MONITOR",this,144,144,org.chamomilo.wurm.ui.v1.UiDensity.LOW);
-        ChamomiloUiV1Button monitorButton=(ChamomiloUiV1Button)monitoringButton;
-        // A three-row primary action is a singleton, separate from 32 px toolbars.
-        WaypointerButtonGroup.primary(monitorButton,"ADD","TO","MONITOR");
+        countLabel=new WaypointerLabel("0 objects");
+        monitoringButton = WaypointerUi.button("ADD TO MONITOR",this,WaypointerButtonGroup.width(org.waypoints.next.i18n.Messages.text("ADD TO MONITOR"),16,org.chamomilo.wurm.ui.v1.UiDensity.HIGH,false),ROW_HEIGHT,org.chamomilo.wurm.ui.v1.UiDensity.HIGH);
+        WaypointerButtonGroup.peers("surroundings.monitor",org.chamomilo.wurm.ui.v1.UiDensity.HIGH,ROW_HEIGHT,monitoringButton);
         monitoringButton.sizeFlags = FIXED_WIDTH | FIXED_HEIGHT;
         monitoringButton.setHoverString(org.waypoints.next.i18n.Messages.text(
                 "Open Monitoring with the current filters."));
+        WurmBorderPanel countRow=new WurmBorderPanel("surroundings.summary");
+        countRow.setComponent(cell(countLabel,400),CENTER);countRow.setComponent(monitoringButton,EAST);
+        countRow.setInitialSize(TABLE_WIDTH,ROW_HEIGHT,false);countRow.sizeFlags=FIXED_HEIGHT;
+        filterPanel.addComponent(countRow);
         WurmBorderPanel top = new WurmBorderPanel("surroundings.top");
         int topHeight = filterPanel.calcHeight();
         top.setInitialSize(TABLE_WIDTH, topHeight, false);
@@ -160,16 +162,9 @@ final class SurroundingsWindow extends WaypointerContentPanel
                     }
                 });
         tablePanel = new WurmBorderPanel("waypointer.surroundings.table-panel");
-        tablePanel.sizeFlags = FIXED_WIDTH;
         tablePanel.setComponent(scrollPanel, WurmBorderPanel.CENTER);
         WurmBorderPanel tableArea = new WurmBorderPanel("surroundings.table-area");
-        tableArea.setComponent(tablePanel, WEST);
-        WurmBorderPanel monitor = new WurmBorderPanel("surroundings.monitor-action");
-        WurmArrayPanel<FlexComponent> monitorRow = horizontal("surroundings.monitor-row");
-        monitorRow.addComponent(spacer(24, 1));
-        monitorRow.addComponent(monitoringButton);
-        monitor.setComponent(monitorRow, NORTH);
-        tableArea.setComponent(monitor, CENTER);
+        tableArea.setComponent(tablePanel, CENTER);
         root.setComponent(tableArea, WurmBorderPanel.CENTER);
         footer = (WurmArrayPanel<FlexComponent>) actionRow();
         root.setComponent(footer, WurmBorderPanel.SOUTH);
@@ -200,12 +195,12 @@ final class SurroundingsWindow extends WaypointerContentPanel
         FilterState state = state();
         if (activeKind == SurroundingKind.ANIMAL) {
             modifierFilter = filterButton("Condition", state.modifiers,
-                    modifierChoices(), 150);
+                    modifierChoices(), 128);
             uniqueFilter = filterButton("Unique", state.uniques,
-                    uniqueChoices(), 125);
-            deedFilter = filterButton("Deed", state.deeds, deedChoices(), 125);
-            layerFilter = filterButton("Layer", state.layers, layerChoices(), 120);
-            markedFilter = filterButton("Mark", state.marks, markChoices(), 115);
+                    uniqueChoices(), 100);
+            deedFilter = filterButton("Deed", state.deeds, deedChoices(), 100);
+            layerFilter = filterButton("Layer", state.layers, layerChoices(), 92);
+            markedFilter = filterButton("Mark", state.marks, markChoices(), 88);
             row.addComponent(modifierFilter);
             row.addComponent(uniqueFilter);
             row.addComponent(deedFilter);
@@ -213,14 +208,14 @@ final class SurroundingsWindow extends WaypointerContentPanel
             row.addComponent(markedFilter);
         } else {
             categoryFilter = filterButton("Category", state.categories,
-                    categoryChoices(activeKind), 145);
+                    categoryChoices(activeKind), 124);
             materialFilter = filterButton("Material", state.materials,
-                    materialChoices(), 135);
+                    materialChoices(), 114);
             rarityFilter = filterButton("Rarity", state.rarities,
-                    rarityChoices(), 105);
-            deedFilter = filterButton("Deed", state.deeds, deedChoices(), 120);
-            layerFilter = filterButton("Layer", state.layers, layerChoices(), 100);
-            markedFilter = filterButton("Mark", state.marks, markChoices(), 100);
+                    rarityChoices(), 92);
+            deedFilter = filterButton("Deed", state.deeds, deedChoices(), 98);
+            layerFilter = filterButton("Layer", state.layers, layerChoices(), 88);
+            markedFilter = filterButton("Mark", state.marks, markChoices(), 88);
             row.addComponent(categoryFilter);
             row.addComponent(materialFilter);
             row.addComponent(rarityFilter);
@@ -320,7 +315,7 @@ final class SurroundingsWindow extends WaypointerContentPanel
                 widths[i]=Math.max(widths[i],value.width);
                 if(value instanceof WaypointerTableActionCell)widths[i]=Math.max(widths[i],WaypointerUi.captionWidth(((WaypointerTableActionCell)value).button));
                 else if(value instanceof WButton)widths[i]=Math.max(widths[i],WaypointerUi.captionWidth((WButton)value));
-                else if(value instanceof WaypointerLabel)widths[i]=Math.max(widths[i],((WaypointerLabel)value).textWidth());
+                else if(value instanceof WaypointerLabel && !(value instanceof WaypointerTableLabel))widths[i]=Math.max(widths[i],((WaypointerLabel)value).textWidth());
             }
         }
         for(FlexComponent child:layoutRows){
@@ -361,8 +356,8 @@ final class SurroundingsWindow extends WaypointerContentPanel
         WurmArrayPanel<FlexComponent> row = new WaypointerTableHeader.Row("surroundings.headers");
         sortActions.clear();
         String[] markCaptions=org.waypoints.next.i18n.Messages.texts(new String[]{"Mark","Unmark"});
-        markWidth=Math.max(MARK_WIDTH,Math.max(WaypointerButtonGroup.width(markCaptions[0],20,org.chamomilo.wurm.ui.v1.UiDensity.HIGH,false),WaypointerButtonGroup.width(markCaptions[1],20,org.chamomilo.wurm.ui.v1.UiDensity.HIGH,false)));
-        markTypography=new WaypointerButtonGroup("surroundings.row-marks",org.chamomilo.wurm.ui.v1.UiDensity.HIGH,WaypointerTableActionCell.BUTTON_HEIGHT,20,false,markCaptions,new int[]{markWidth,markWidth});
+        markWidth=Math.max(MARK_WIDTH,Math.max(WaypointerButtonGroup.width(markCaptions[0],16,org.chamomilo.wurm.ui.v1.UiDensity.HIGH,false),WaypointerButtonGroup.width(markCaptions[1],16,org.chamomilo.wurm.ui.v1.UiDensity.HIGH,false)));
+        markTypography=new WaypointerButtonGroup("surroundings.row-marks",org.chamomilo.wurm.ui.v1.UiDensity.HIGH,WaypointerTableActionCell.BUTTON_HEIGHT,16,false,markCaptions,new int[]{markWidth,markWidth});
         addHeader(row,"Mark",markWidth,SurroundingsQuery.SortColumn.MARK);
         addHeader(row,"Name",NAME_WIDTH,SurroundingsQuery.SortColumn.NAME);
         if (activeKind == SurroundingKind.ANIMAL) {
@@ -517,11 +512,11 @@ final class SurroundingsWindow extends WaypointerContentPanel
         captions.add(org.waypoints.next.i18n.Messages.text("All (clear selection)"));
         captions.add(org.waypoints.next.i18n.Messages.text("Done"));
         for(Choice<T> choice:choices)captions.add(org.waypoints.next.i18n.Messages.text(choice.label));
-        for(String caption:captions)desiredWidth=Math.max(desiredWidth,WaypointerButtonGroup.width(caption,20,org.chamomilo.wurm.ui.v1.UiDensity.HIGH,false));
+        for(String caption:captions)desiredWidth=Math.max(desiredWidth,WaypointerButtonGroup.width(caption,16,org.chamomilo.wurm.ui.v1.UiDensity.HIGH,false));
         desiredWidth=Math.min(desiredWidth,Math.max(120,(hud.getWidth()-20-64-(columnCount-1)*8)/columnCount-38));
         int choicesWidth=columnCount*(desiredWidth+38)+(columnCount-1)*8;
         int[] geometry=new int[captions.size()];java.util.Arrays.fill(geometry,desiredWidth);
-        WaypointerButtonGroup typography=new WaypointerButtonGroup("surroundings.filter-choices",org.chamomilo.wurm.ui.v1.UiDensity.HIGH,ROW_HEIGHT,20,false,captions.toArray(new String[0]),geometry);
+        WaypointerButtonGroup typography=new WaypointerButtonGroup("surroundings.filter-choices",org.chamomilo.wurm.ui.v1.UiDensity.HIGH,ROW_HEIGHT,16,false,captions.toArray(new String[0]),geometry);
         final Map<WaypointerFilterCheck,Choice<T>> checks=new LinkedHashMap<WaypointerFilterCheck,Choice<T>>();
         Runnable changed = () -> {
             for(Map.Entry<WaypointerFilterCheck,Choice<T>> entry:checks.entrySet())entry.getKey().setChecked(selected.contains(entry.getValue().value));
@@ -675,10 +670,8 @@ final class SurroundingsWindow extends WaypointerContentPanel
         int required = Math.max(TABLE_WIDTH, fieldFilters.calcWidth());
         required = Math.max(required, footer.calcWidth());
         if (tableHeader != null) required = Math.max(required,
-                tableHeader.calcWidth() + 18 + 24 + monitoringButton.width);
-        // Both text filters retain a useful editor and complete example.
-        required = Math.max(required, 92 + 220 + clearSearch.width
-                + Math.max(250, text.getWidth(org.waypoints.next.i18n.Messages.text("Example: catseyes, post")) + 12));
+                tableHeader.calcWidth() + 18);
+        required = Math.max(required, 68 + 220 + clearSearch.width);
         return required + 8;
     }
 
@@ -691,7 +684,7 @@ final class SurroundingsWindow extends WaypointerContentPanel
     private <T> WButton filterButton(String prefix, Set<T> selected,
                                      List<Choice<T>> choices, int width) {
         WButton result = button(summary(prefix, selected, choices), width);
-        filterWidths.put(result,Math.max(width,WaypointerButtonGroup.width(org.waypoints.next.i18n.Messages.text(prefix+": All"),20,org.chamomilo.wurm.ui.v1.UiDensity.HIGH,false)));
+        filterWidths.put(result,Math.max(width,WaypointerButtonGroup.width(org.waypoints.next.i18n.Messages.text(prefix+": All"),16,org.chamomilo.wurm.ui.v1.UiDensity.HIGH,false)));
         List<String> variants=new ArrayList<String>();variants.add(prefix+": All");
         for(Choice<T> choice:choices)variants.add(prefix+": "+choice.label);
         for(int count=1;count<=choices.size();count++)variants.add(prefix+": "+count);
@@ -713,13 +706,13 @@ final class SurroundingsWindow extends WaypointerContentPanel
     private void coordinateFilters(){
         List<String> captions=new ArrayList<String>();List<Integer> widths=new ArrayList<Integer>();
         for(Map.Entry<WButton,Integer> member:filterWidths.entrySet())for(String variant:filterCaptions.get(member.getKey())){
-            captions.add(filterCaption(org.waypoints.next.i18n.Messages.text(variant),member.getValue(),20));widths.add(member.getValue());
+            captions.add(filterCaption(org.waypoints.next.i18n.Messages.text(variant),member.getValue(),16));widths.add(member.getValue());
         }
         // Dynamic category text is unbounded: reserve a readable common size and
         // shorten overflowing captions, retaining full selection in the native hint.
         captions.add("ÁgjЙЁ");widths.add(1024);
         int[] geometry=new int[widths.size()];for(int i=0;i<geometry.length;i++)geometry[i]=widths.get(i);
-        filterTypography=new WaypointerButtonGroup("surroundings.filters",org.chamomilo.wurm.ui.v1.UiDensity.HIGH,ROW_HEIGHT,20,false,captions.toArray(new String[0]),geometry);
+        filterTypography=new WaypointerButtonGroup("surroundings.filters",org.chamomilo.wurm.ui.v1.UiDensity.HIGH,ROW_HEIGHT,16,false,captions.toArray(new String[0]),geometry);
         for(Map.Entry<WButton,Integer> member:filterWidths.entrySet()){
             ChamomiloUiV1Button button=(ChamomiloUiV1Button)member.getKey();
             button.setCaptionRows(filterCaption(button.getLabel(),member.getValue(),filterTypography.fontPixels));

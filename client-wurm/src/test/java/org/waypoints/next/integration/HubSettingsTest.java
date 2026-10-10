@@ -10,7 +10,7 @@ import static org.junit.Assert.*;
 
 public class HubSettingsTest {
     @Rule public TemporaryFolder temporary=new TemporaryFolder();
-    @Test public void sharedLanguageUsesSavedPreferencesAndDefersUiApplication() throws Exception {
+    @Test public void sharedLanguageChangesImmediatelyAndPersistsInTheBackground() throws Exception {
         Path path = temporary.getRoot().toPath().resolve("settings.config");
         String before = "# User settings\nlanguage=en\ncustom=keep\n";
         Files.write(path, before.getBytes(StandardCharsets.UTF_8));
@@ -22,16 +22,31 @@ public class HubSettingsTest {
         initial.setProperty("custom", "keep");
         settings.configure(initial);
         settings.setUserLanguage("ru");
+        assertEquals("ru", org.waypoints.next.i18n.Messages.language());
+        assertEquals("ru", settings.values().getProperty("language"));
         assertTrue("Language save did not finish", applied.await(5, java.util.concurrent.TimeUnit.SECONDS));
         assertEquals("ru", pending.get().getProperty("language"));
         assertEquals("ru", settings.values().getProperty("language"));
         assertEquals("keep", pending.get().getProperty("custom"));
-        assertEquals("en", org.waypoints.next.i18n.Messages.language());
+        assertEquals("ru", org.waypoints.next.i18n.Messages.language());
         Properties saved = new Properties();
         try (java.io.InputStream in = Files.newInputStream(path)) { saved.load(in); }
         assertEquals("ru", saved.getProperty("language"));
         assertEquals("keep", saved.getProperty("custom"));
         assertEquals(before, new String(Files.readAllBytes(path.resolveSibling("settings.config.bak")), StandardCharsets.UTF_8));
+    }
+    @Test public void settingsDraftCannotOverrideTheUpdatersLatestLanguage() throws Exception {
+        java.util.concurrent.CountDownLatch saved=new java.util.concurrent.CountDownLatch(2);
+        Path path=temporary.getRoot().toPath().resolve("settings.config");
+        HubSettings settings=new HubSettings(path,p->saved.countDown());
+        Properties initial=new Properties();initial.setProperty("language","en");settings.configure(initial);
+        Properties stale=settings.values();stale.setProperty("language","de");
+        settings.setUserLanguage("ru");settings.save(stale);
+        assertEquals("ru",org.waypoints.next.i18n.Messages.language());
+        assertEquals("ru",settings.values().getProperty("language"));
+        assertTrue(saved.await(5,java.util.concurrent.TimeUnit.SECONDS));
+        Properties persisted=new Properties();try(java.io.InputStream input=Files.newInputStream(path)){persisted.load(input);}
+        assertEquals("ru",persisted.getProperty("language"));
     }
     @Test public void unsupportedAndUnchangedSharedLanguagesKeepLocalChoice() {
         Path path = temporary.getRoot().toPath().resolve("settings.config");

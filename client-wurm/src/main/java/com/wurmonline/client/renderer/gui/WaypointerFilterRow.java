@@ -6,28 +6,26 @@ final class WaypointerFilterRow extends WurmBorderPanel {
     private final String help;
     WaypointerFilterRow(String label, WurmInputField input, WButton clear, String example) {
         super("waypointer.filter.row");
-        setInitialSize(800,56,false);
+        setInitialSize(800,28,false);
         sizeFlags=FIXED_HEIGHT;
         editor=input;
+        WaypointerButtonGroup.peers("text-filter.clear",org.chamomilo.wurm.ui.v1.UiDensity.HIGH,28,clear);
         help=org.waypoints.next.i18n.Messages.text(label.startsWith("+")
                 ? "Show rows matching any comma-separated fragment. Empty means all rows."
-                : "Hide rows matching any comma-separated fragment. Empty excludes nothing.");
+                : "Hide rows matching any comma-separated fragment. Empty excludes nothing.")
+                +" "+org.waypoints.next.i18n.Messages.text(example);
         WurmLabel caption=new WaypointerLabel(label,help);
-        caption.setInitialSize(800,24,false);
-        caption.sizeFlags=FIXED_HEIGHT;
         caption.text=com.wurmonline.client.renderer.gui.text.WaypointerFonts.body(true);
-        setComponent(caption,NORTH);
+        caption.setInitialSize(Math.max(58,caption.text.getWidth(org.waypoints.next.i18n.Messages.text(label))+10),28,false);
+        caption.sizeFlags=FIXED_WIDTH|FIXED_HEIGHT;
+        setComponent(caption,WEST);
         WurmBorderPanel body=new WurmBorderPanel("filter.body");
         input.prompt="";
-        input.setInitialSize(310,32,false);
+        input.setInitialSize(310,28,false);
         body.setComponent(WaypointerUi.view(input),CENTER);
-        clear.setHoverString(org.waypoints.next.i18n.Messages.text("Clear this text filter."));
         WurmArrayPanel<FlexComponent> trailing=new WurmArrayPanel<FlexComponent>("filter.trailing",1);
         trailing.addComponent(clear);
-        trailing.addComponent(new FlexComponent("filter.gap",0,0,6,32){{sizeFlags=FIXED_WIDTH|FIXED_HEIGHT;}});
-        WurmLabel hint=new WaypointerLabel(example);
-        hint.setInitialSize(Math.max(250,hint.text.getWidth(org.waypoints.next.i18n.Messages.text(example))+12),32,false);
-        trailing.addComponent(hint);
+        clear.setHoverString(org.waypoints.next.i18n.Messages.text("Clear this text filter.")+" "+help);
         trailing.sizeFlags=FIXED_WIDTH;
         body.setComponent(trailing,EAST);
         setComponent(body,CENTER);

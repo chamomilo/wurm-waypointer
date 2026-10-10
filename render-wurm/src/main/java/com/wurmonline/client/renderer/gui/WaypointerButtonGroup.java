@@ -17,13 +17,16 @@ final class WaypointerButtonGroup {
     private int lineHeight, lineAscent;
 
     WaypointerButtonGroup(String id, UiDensity density, int height, String[] captions, int[] widths) {
-        this(id,density,height,128,false,captions,widths);
+        this(id,density,height,16,false,captions,widths);
     }
     WaypointerButtonGroup(String id, UiDensity density, int height, int ceiling, boolean uppercase, String[] captions, int[] widths) {
         this(id,density,height,ceiling,uppercase,captions,widths,UiScale.BASE,true);
     }
     static WaypointerButtonGroup compact(String id,int height,String[] captions,int[] widths) {
         return new WaypointerButtonGroup(id,UiDensity.HIGH,height,20,false,captions,widths,new UiScale(.5f),false);
+    }
+    static WaypointerButtonGroup painted(String id,int height,String[] captions,int[] widths) {
+        return new WaypointerButtonGroup(id,UiDensity.HIGH,height,16,false,captions,widths,UiScale.BASE,false);
     }
     static int compactWidth(String caption,int height) {
         UiButtonLayout policy=UiButtonLayout.fit(new String[]{"Ag"},1024,height,UiDensity.HIGH,new UiScale(.5f),true);
@@ -39,7 +42,10 @@ final class WaypointerButtonGroup {
         this.id=id;this.density=density;this.height=height;this.uppercase=uppercase;
         // The public custom-font wrapper reserves 12 px per side. Low additionally
         // retains its 18 px safe inset. Account for this before selecting a size.
-        UiButtonLayout policy=UiButtonLayout.fit(new String[]{"Ag"},1024,height,density,scale,true);
+        // Reuse the kit's safe insets; actual ink and native custom-font metrics
+        // below also support the deliberately compact 24 px table actions.
+        int policyHeight=Math.max(height,scale.pixels(density==UiDensity.HIGH?28:32));
+        UiButtonLayout policy=UiButtonLayout.fit(new String[]{"Ag"},1024,policyHeight,density,scale,true);
         int insetX=nativeButton?Math.max(12,policy.insetX):policy.insetX,insetY=policy.insetY;
         int maximum=Math.min(ceiling,density==UiDensity.LOW?Math.min(32,Math.round(height*.45f)):128);
         int chosen=0, top=0, bottom=0;
@@ -81,17 +87,6 @@ final class WaypointerButtonGroup {
     static void active(WButton button,boolean active){
         ((CaptionFont)button.text).active=active;((CaptionFont)button.textBold).active=active;
     }
-    /** User-requested uppercase Low-density primary action, measured as one block. */
-    static void primary(ChamomiloUiV1Button button,String... rows){
-        WaypointerButtonGroup group=new WaypointerButtonGroup("surroundings.monitor-primary",UiDensity.LOW,144,32,true,rows,new int[]{144,144,144});
-        int top=0,bottom=0;
-        for(String row:rows)for(boolean weight:new boolean[]{false,true}){
-            Rectangle ink=UiTypography.ink(group.display(row),group.fontPixels,weight,UiDensity.LOW);
-            top=Math.min(top,ink.y);bottom=Math.max(bottom,ink.y+ink.height);
-        }
-        group.lineHeight=bottom-top+4;group.lineAscent=-top+2;
-        button.setCaptionRows(rows);group.apply(button,144);
-    }
     private String display(String caption){return uppercase?caption.toUpperCase(Locale.ROOT):UiTypography.caption(caption,density);}
     static int width(String caption,int pixels,UiDensity density,boolean uppercase){
         String value=uppercase?caption.toUpperCase(Locale.ROOT):UiTypography.caption(caption,density);int span=0;
@@ -103,7 +98,7 @@ final class WaypointerButtonGroup {
     }
     static void peers(String id,UiDensity density,int height,WButton... buttons){
         String[] captions=new String[buttons.length];int[] widths=new int[buttons.length];
-        for(int i=0;i<buttons.length;i++){captions[i]=buttons[i].getLabel();widths[i]=Math.max(buttons[i].width,width(captions[i],20,density,false));}
+        for(int i=0;i<buttons.length;i++){captions[i]=buttons[i].getLabel();widths[i]=Math.max(buttons[i].width,width(captions[i],16,density,false));}
         WaypointerButtonGroup group=new WaypointerButtonGroup(id,density,height,captions,widths);
         for(int i=0;i<buttons.length;i++)group.apply((ChamomiloUiV1Button)buttons[i],widths[i]);
     }

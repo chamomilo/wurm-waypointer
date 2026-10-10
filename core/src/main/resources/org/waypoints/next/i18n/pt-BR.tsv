@@ -3,8 +3,6 @@ ALL WAYPOINTS	TODOS OS PONTOS
 MOBS AROUND	CRIATURAS PRÓXIMAS
 CONTAINERS AROUND	RECIPIENTES PRÓXIMOS
 OBJECTS AND ITEMS AROUND	OBJETOS E ITENS PRÓXIMOS
-MY VEHICLES AND ANIMALS	MEUS VEÍCULOS E ANIMAIS
-MY FRIENDS	MEUS AMIGOS
 SETTINGS	CONFIGURAÇÕES
 General	Geral
 Language	Idioma
@@ -90,7 +88,6 @@ Approximate area	Área aproximada
 {0} readings	{0} leituras
 Last seen {0} ago	Visto há {0}
 Last seen {0}	Visto há {0}
-No friends received from the client.	Nenhum amigo recebido do cliente.
 No Manage catalogue yet. Press Refresh.	Sem lista do Manage. Clique em Atualizar.
 Press Refresh to request your Manage lists.	Clique em Atualizar para solicitar as listas do Manage.
 Manage request timed out. Native forms remain available.	Tempo esgotado. Os formulários nativos continuam disponíveis.
@@ -233,8 +230,8 @@ Name asc	Nome crescente
 Delete {0} permanently?	Excluir {0} permanentemente?
 This cannot be undone.	Esta ação não pode ser desfeita.
 now	agora
-+ filter	+ filter
-- filter	- filter
++ filter	+ filtro
+- filter	- filtro
 Example: horse, wolf	Exemplo: horse, wolf
 {0} of {1}; {2} tracked	{0} de {1}; {2} rastreados
 Tracked target cache could not be read. Existing file preserved.	Não foi possível ler o cache de alvos. Arquivo existente preservado.
@@ -375,7 +372,7 @@ Friendly	Amigável
 Developer	Desenvolvedor
 Open Monitoring with the current filters.	Abrir o monitor com os filtros atuais.
 Breeding traits are not supplied in the nearby creature stream.	Traços de criação não são enviados no fluxo de criaturas próximas.
-ADD TO MONITOR	ADD TO MONITOR
+ADD TO MONITOR	Adicionar ao monitor
 Unmark	Desmarcar
 Delete this waypoint immediately.	Excluir este waypoint imediatamente.
 Clear this text filter.	Limpar este filtro de texto.
@@ -383,12 +380,10 @@ Click: ascending, descending, then original order. ^ ascending; v descending.	Cl
 Toggle this value. Multiple selected values are combined with OR.	Alternar este valor. Vários valores selecionados são combinados com OU.
 Clear all selections in this filter; allow every value.	Limpar todas as seleções neste filtro; permitir todos os valores.
 Close this list. Selection changes already apply immediately.	Fechar esta lista. As alterações da seleção já são aplicadas imediatamente.
-Refresh the friends received from the client.	Atualizar a lista de amigos recebida pelo cliente.
 Request your animals, land vehicles and ships from the server and show them here.	Solicitar seus animais, veículos terrestres e navios ao servidor e exibi-los aqui.
 Position	Posição
 Updated	Atualizado
 Click: ascending, descending, then original order.	Cliques: crescente, decrescente e depois ordem original.
-Friend status received from the client.	Estado do amigo recebido pelo cliente.
 Managed object type received from the server.	Tipo do objeto gerenciado recebido do servidor.
 Position state. Visible now follows received movement; last known position is saved history; approximate direction has no exact coordinates.	Estado da posição. Alvos visíveis acompanham movimentos recebidos; a última posição é histórica; a direção aproximada não fornece coordenadas exatas.
 Age of the last received position or direction observation.	Idade da última observação de posição ou direção recebida.
@@ -403,3 +398,26 @@ Bearing {0}° ± {1}°; range {2}–{3} m from the observation point. {4} readin
 Back to Waypointer	Voltar ao Waypointer
 Return to the Waypointer window.	Voltar à janela do Waypointer.
  (last observed)	 (última observação)
+VEHICLES	VEÍCULOS
+MY ANIMALS	MEUS ANIMAIS
+Animal search point	Ponto de busca do animal
+Request your animals from the server.	Solicitar seus animais ao servidor.
+Request your land vehicles and ships from the server.	Solicitar seus veículos terrestres e navios ao servidor.
+No managed animals to display.	Nenhum animal gerenciado para exibir.
+No managed vehicles or ships to display.	Nenhum veículo ou navio gerenciado para exibir.
+Navigate to this animal. If its position is unknown, start a waypoint race with automatic checks within 10 tiles of each search point.	Navegar até este animal. Se a posição for desconhecida, iniciar uma busca com verificações automáticas a menos de 10 tiles de cada ponto.
+Navigate to this vehicle's confirmed or last known position.	Navegar até a posição confirmada ou última conhecida deste veículo.
+Animal waypoint race: {0}	Busca do animal: {0}
+Animal waypoint race started: {0}	Busca do animal iniciada: {0}
+Animal search stopped: direction is unavailable.	Busca interrompida: direção indisponível.
+Animal search stopped: no direction response after three checks.	Busca interrompida: sem resposta após três verificações.
+Animal found: {0}. Navigation now follows its received position.	Animal encontrado: {0}. A navegação segue a posição recebida.
+
+Mobs	Criaturas
+Objects / items	Objetos / itens
+ALL MAPS ON SERVER	TODOS OS MAPAS DO SERVIDOR
+Show all five server maps	Mostrar os cinco mapas do servidor
+Choose a map to view	Escolha um mapa para ver
+Wheel: zoom | drag: pan | CENTER: return to your character	Roda: zoom | arrastar: mover | CENTER: voltar ao personagem
+Add this animal to ALL WAYPOINTS and automatically start a waypoint race if it is out of sight.	Adicione este animal a ALL WAYPOINTS e inicie automaticamente a busca por waypoints se ele estiver fora de vista.
+Loading full map...	Carregando o mapa completo...

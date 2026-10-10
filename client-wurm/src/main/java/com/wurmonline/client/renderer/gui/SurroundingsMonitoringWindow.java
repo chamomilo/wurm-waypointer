@@ -25,7 +25,7 @@ final class SurroundingsMonitoringWindow extends WaypointerUiWindow
         implements ButtonListener {
     static final int WINDOW_WIDTH = 440;
     private static final int TABLE_WIDTH = 410;
-    private static final int ROW_HEIGHT = 32;
+    private static final int ROW_HEIGHT = 28;
     private static final int FOOTER_GAP = 8;
     private static final int MARK_WIDTH = 62;
     private static final int NAME_WIDTH = 230;
@@ -60,12 +60,12 @@ final class SurroundingsMonitoringWindow extends WaypointerUiWindow
         this.queries = Collections.unmodifiableList(
                 new ArrayList<SurroundingsQuery>(queries));
         String[] captions=org.waypoints.next.i18n.Messages.texts(new String[]{"Mark","Clear"});
-        markWidth=Math.max(MARK_WIDTH,Math.max(WaypointerButtonGroup.width(captions[0],20,org.chamomilo.wurm.ui.v1.UiDensity.HIGH,false),
-                WaypointerButtonGroup.width(captions[1],20,org.chamomilo.wurm.ui.v1.UiDensity.HIGH,false)));
+        markWidth=Math.max(MARK_WIDTH,Math.max(WaypointerButtonGroup.width(captions[0],16,org.chamomilo.wurm.ui.v1.UiDensity.HIGH,false),
+                WaypointerButtonGroup.width(captions[1],16,org.chamomilo.wurm.ui.v1.UiDensity.HIGH,false)));
         rowMarks=new WaypointerButtonGroup("monitoring.row-marks",org.chamomilo.wurm.ui.v1.UiDensity.HIGH,
-                WaypointerTableActionCell.BUTTON_HEIGHT,20,false,captions,new int[]{markWidth,markWidth});
+                WaypointerTableActionCell.BUTTON_HEIGHT,16,false,captions,new int[]{markWidth,markWidth});
         setTitle(org.waypoints.next.i18n.Messages.text("Wurm Waypointer - Monitoring"));
-        setTitleFont(ChamomiloUiV1Fonts.caption(18,true,UiDensity.HIGH));
+        setTitleFont(ChamomiloUiV1Fonts.caption(16,true,UiDensity.HIGH));
         build();
     }
 
@@ -104,8 +104,8 @@ final class SurroundingsMonitoringWindow extends WaypointerUiWindow
         String[] captions=org.waypoints.next.i18n.Messages.texts(new String[]{"Back to Waypointer","Refresh","{0} found; {1} tracked; {2} filters"});
         captions[2]=org.waypoints.next.i18n.Messages.format("{0} found; {1} tracked; {2} filters",0,0,0);
         int[] widths=new int[captions.length];
-        for(int i=0;i<widths.length;i++)widths[i]=WaypointerButtonGroup.width(captions[i],20,UiDensity.HIGH,false);
-        WaypointerButtonGroup group=new WaypointerButtonGroup("monitoring.footer",UiDensity.HIGH,ROW_HEIGHT,20,false,captions,widths);
+        for(int i=0;i<widths.length;i++)widths[i]=WaypointerButtonGroup.width(captions[i],16,UiDensity.HIGH,false);
+        WaypointerButtonGroup group=new WaypointerButtonGroup("monitoring.footer",UiDensity.HIGH,ROW_HEIGHT,16,false,captions,widths);
         surroundingsButton = button("Back to Waypointer", widths[0]);
         surroundingsButton.setHoverString(org.waypoints.next.i18n.Messages.text(
                 "Return to the Waypointer window."));

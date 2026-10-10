@@ -54,13 +54,18 @@ public final class WaypointerUi {
         if (selected) canvas.fill(UiColor.EDGE, 1, x + 5, y + height - 3, Math.max(0, width - 10), 2);
     }
     public static WButton button(String label, ButtonListener listener, int width) {
-        return button(label,listener,width,32,UiDensity.HIGH);
+        ChamomiloUiV1Button result=button(label,listener,width,28,UiDensity.HIGH);
+        WaypointerButtonGroup.peers("compact.action",UiDensity.HIGH,28,result);
+        return result;
     }
     static ChamomiloUiV1Button button(String label, ButtonListener listener, int width,int height,UiDensity density) {
         final WButton[] button = new WButton[1];
         ChamomiloUiV1Button result = new ChamomiloUiV1Button(Messages.text(label),width,height,
                 () -> listener.buttonClicked(button[0]));
-        result.setDensity(density);button[0]=result;return result;
+        result.setDensity(density);
+        // The constructor starts in Low density at 32 px. Reset its native
+        // fixed height before attaching compact High density controls to a row.
+        result.resize(width,height);button[0]=result;return result;
     }
     static int captionWidth(WButton button) {
         if (button instanceof ChamomiloUiV1Button) {
@@ -105,7 +110,7 @@ public final class WaypointerUi {
         WeakReference<ChamomiloUiV1TextField> reference = INPUTS.get(component);
         ChamomiloUiV1TextField wrapper = reference == null ? null : reference.get();
         if (wrapper == null) throw new IllegalStateException("Unwrapped text field");
-        wrapper.resize(Math.max(48, component.width), Math.max(32, component.height));
+        wrapper.resize(Math.max(48, component.width), Math.max(28, component.height));
         wrapper.sizeFlags = component.sizeFlags;
         wrapper.setPlaceholder(((WurmInputField) component).prompt);
         ((WurmInputField) component).prompt = "";

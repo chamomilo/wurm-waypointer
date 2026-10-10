@@ -71,6 +71,8 @@ public class HookBytecodeCompatibilityTest {
                 + "InventoryMetaWindowManager").toBytecode().length > 0);
         assertTrue(pool.get("com.wurmonline.client.renderer.cell.CellRenderer")
                 .toBytecode().length > 0);
+        assertTrue(pool.get("com.wurmonline.client.renderer.cell.CellRenderable")
+                .toBytecode().length > 0);
         assertTrue(pool.get("com.wurmonline.client.renderer.WorldRender")
                 .toBytecode().length > 0);
     }

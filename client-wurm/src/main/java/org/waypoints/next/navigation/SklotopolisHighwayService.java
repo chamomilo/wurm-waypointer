@@ -68,8 +68,16 @@ public final class SklotopolisHighwayService implements NavigationHighwaySource 
 
     public synchronized void activate(ServerIdentity server) {
         ServerMapProfile profile = SklotopolisMapProfiles.resolve(server);
+        activateProfile(profile, server == null ? "" : server.getEndpointFingerprint());
+    }
+
+    /** A separate instance serves published-map browsing without changing navigation. */
+    public synchronized void browse(ServerMapProfile profile) {
+        activateProfile(profile, profile == null ? "" : "published|" + profile.getId());
+    }
+
+    private void activateProfile(ServerMapProfile profile, String serverKey) {
         String url = profile == null ? "" : profile.getHighwaysUrl();
-        String serverKey = server == null ? "" : server.getEndpointFingerprint();
         String nextKey = serverKey + "|" + url + "|"
                 + (profile == null ? configuration.getMapWidth()
                 : profile.getMapWidth()) + "x"

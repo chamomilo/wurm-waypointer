@@ -22,6 +22,9 @@ import static org.junit.Assert.*;
 public class ServerMapTextureLifecycleTest {
     @Test public void reconnectReusesAssetsAndReplacedJobsReleaseTheirNativeRequests() throws Throwable {
         ClassPool pool=new ClassPool(true);
+        CtClass runtime=pool.get("org.waypoints.next.integration.WurmWaypointerRuntime");
+        runtime.getClassInitializer().setBody("{}");
+        runtime.getDeclaredMethod("stopMapBrowsing").setBody("{}");
         String probe=Probe.class.getName();
         CtClass fonts=pool.get("com.wurmonline.client.renderer.gui.text.WaypointerMiniMapFonts");
         if(fonts.getClassInitializer()!=null)fonts.getClassInitializer().setBody("{}");
@@ -77,10 +80,22 @@ public class ServerMapTextureLifecycleTest {
             worker.runNext(); // Even a request superseded while decoding is consumed.
             assertEquals(3,reads);assertEquals(3,consumed);assertTrue(requests.isEmpty());
             worker.runNext();assertEquals(4,reads);assertEquals(4,consumed);assertTrue(requests.isEmpty());
+            Object home=prepare(snapshot("sklotopolis-liberty",4));
+            Object browsing=prepareBrowser(snapshot("sklotopolis-caza",1));
+            assertNotSame(home,browsing);assertSame(home,prepare(snapshot("sklotopolis-liberty",4)));
+            worker.runNext();assertEquals(5,reads);assertEquals(5,consumed);
+            assertSame(browsing,prepareBrowser(snapshot("sklotopolis-caza",1)));
+            prepareBrowser(snapshot("sklotopolis-old-infinity",2));
+            assertSame("Browsing never replaces the connected surface",home,prepare(snapshot("sklotopolis-liberty",4)));
+            worker.runNext();assertEquals(6,reads);assertTrue(requests.isEmpty());
         }
         private static Object prepare(ServerMapSnapshot snapshot)throws Exception {
             Method method=ServerMapWindowBridge.class.getDeclaredMethod("prepare",ServerMapSnapshot.class);
             method.setAccessible(true);return method.invoke(null,snapshot);
+        }
+        private static Object prepareBrowser(ServerMapSnapshot snapshot)throws Exception {
+            Method method=ServerMapWindowBridge.class.getDeclaredMethod("prepareSurface",ServerMapSnapshot.class,boolean.class);
+            method.setAccessible(true);return method.invoke(null,snapshot,true);
         }
         private static ServerMapSnapshot snapshot(String id,long revision)throws Exception {
             Constructor<ServerMapProfile> profile=ServerMapProfile.class.getDeclaredConstructor(

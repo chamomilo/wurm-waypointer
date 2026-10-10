@@ -3,8 +3,6 @@ ALL WAYPOINTS	ВСЕ ТОЧКИ
 MOBS AROUND	СУЩЕСТВА РЯДОМ
 CONTAINERS AROUND	КОНТЕЙНЕРЫ РЯДОМ
 OBJECTS AND ITEMS AROUND	ОБЪЕКТЫ И ПРЕДМЕТЫ РЯДОМ
-MY VEHICLES AND ANIMALS	МОЙ ТРАНСПОРТ И ЖИВОТНЫЕ
-MY FRIENDS	МОИ ДРУЗЬЯ
 SETTINGS	НАСТРОЙКИ
 General	Общие
 Language	Язык
@@ -90,7 +88,6 @@ Approximate area	Примерная область
 {0} readings	Замеров: {0}
 Last seen {0} ago	Видна {0} назад
 Last seen {0}	Видна {0} назад
-No friends received from the client.	Клиент ещё не передал список друзей.
 No Manage catalogue yet. Press Refresh.	Списка Manage пока нет. Нажмите «Обновить».
 Press Refresh to request your Manage lists.	Нажмите «Обновить» для запроса списков Manage.
 Manage request timed out. Native forms remain available.	Истекло время запроса Manage. Обычные окна доступны.
@@ -233,8 +230,8 @@ Name asc	Имя ↑
 Delete {0} permanently?	Удалить {0} навсегда?
 This cannot be undone.	Это действие нельзя отменить.
 now	сейчас
-+ filter	+ filter
-- filter	- filter
++ filter	+ фильтр
+- filter	- фильтр
 Example: horse, wolf	Пример: horse, wolf
 {0} of {1}; {2} tracked	{0} из {1}; отслеживается: {2}
 Tracked target cache could not be read. Existing file preserved.	Не удалось прочитать кэш целей. Существующий файл сохранён.
@@ -375,7 +372,7 @@ Friendly	Дружелюбный
 Developer	Разработчик
 Open Monitoring with the current filters.	Открыть монитор с текущими фильтрами.
 Breeding traits are not supplied in the nearby creature stream.	Племенные черты не передаются в потоке соседних существ.
-ADD TO MONITOR	ADD TO MONITOR
+ADD TO MONITOR	Добавить в мониторинг
 Unmark	Снять метку
 Show rows matching any comma-separated fragment. Empty means all rows.	Показать строки, совпавшие с любым фрагментом через запятую. Пустое поле показывает всё.
 Hide rows matching any comma-separated fragment. Empty excludes nothing.	Скрыть строки, совпавшие с любым фрагментом через запятую. Пустое поле ничего не исключает.
@@ -422,12 +419,10 @@ Exact saved destination of a completed search.	Точное сохранённо
 Intermediate position in a search; the destination is not confirmed yet.	Промежуточная позиция поиска. Назначение ещё не подтверждено.
 The target has no confirmed position yet. Waiting for client or provider data.	Положение цели ещё не подтверждено. Ожидание данных клиента или источника.
 Last coordinate update: {0}	Последнее обновление координат: {0}
-Refresh the friends received from the client.	Обновить список друзей, полученный клиентом.
 Request your animals, land vehicles and ships from the server and show them here.	Запросить у сервера ваших животных, наземный транспорт и корабли и показать их здесь.
 Position	Позиция
 Updated	Обновлено
 Click: ascending, descending, then original order.	Нажатия: по возрастанию, по убыванию, затем исходный порядок.
-Friend status received from the client.	Статус друга, полученный клиентом.
 Managed object type received from the server.	Тип управляемого объекта, полученный от сервера.
 Position state. Visible now follows received movement; last known position is saved history; approximate direction has no exact coordinates.	Состояние позиции. Видимая цель следует за перемещениями; последняя позиция сохранена ранее; примерное направление не даёт точных координат.
 Age of the last received position or direction observation.	Возраст последнего полученного положения или измерения направления.
@@ -442,3 +437,26 @@ Bearing {0}° ± {1}°; range {2}–{3} m from the observation point. {4} readin
 Back to Waypointer	Назад в Waypointer
 Return to the Waypointer window.	Вернуться в окно Waypointer.
  (last observed)	 (последнее наблюдение)
+VEHICLES	ТРАНСПОРТ
+MY ANIMALS	МОИ ЖИВОТНЫЕ
+Animal search point	Точка поиска животного
+Request your animals from the server.	Запросить у сервера ваших животных.
+Request your land vehicles and ships from the server.	Запросить у сервера ваш наземный транспорт и корабли.
+No managed animals to display.	Нет доступных животных.
+No managed vehicles or ships to display.	Нет доступного транспорта или кораблей.
+Navigate to this animal. If its position is unknown, start a waypoint race with automatic checks within 10 tiles of each search point.	Вести к животному. Если позиция неизвестна, начать гонку с автоматическими проверками ближе 10 тайлов к каждой точке поиска.
+Navigate to this vehicle's confirmed or last known position.	Вести к подтверждённой или последней известной позиции транспорта.
+Animal waypoint race: {0}	Гонка к животному: {0}
+Animal waypoint race started: {0}	Гонка к животному начата: {0}
+Animal search stopped: direction is unavailable.	Поиск животного остановлен: направление недоступно.
+Animal search stopped: no direction response after three checks.	Поиск животного остановлен: нет ответа после трёх проверок.
+Animal found: {0}. Navigation now follows its received position.	Животное найдено: {0}. Навигация следует его полученной позиции.
+
+Mobs	Существа
+Objects / items	Объекты / предметы
+ALL MAPS ON SERVER	ВСЕ КАРТЫ СЕРВЕРА
+Show all five server maps	Показать все пять карт сервера
+Choose a map to view	Выберите карту для просмотра
+Wheel: zoom | drag: pan | CENTER: return to your character	Колесо: масштаб | перетаскивание: движение | CENTER: вернуться к персонажу
+Add this animal to ALL WAYPOINTS and automatically start a waypoint race if it is out of sight.	Добавить животное в ALL WAYPOINTS и автоматически начать поиск по вейпоинтам, если его не видно.
+Loading full map...	Загрузка полной карты...

@@ -81,6 +81,15 @@ public final class SklotopolisMapService {
     public synchronized void activate(ServerIdentity server) {
         ServerMapProfile profile = SklotopolisMapProfiles.resolve(server);
         String fingerprint = server == null ? "" : server.getEndpointFingerprint();
+        activateProfile(profile, fingerprint);
+    }
+
+    /** Use a separate service instance for published-map browsing, without a game identity. */
+    public synchronized void browse(ServerMapProfile profile) {
+        activateProfile(profile, "published");
+    }
+
+    private void activateProfile(ServerMapProfile profile, String fingerprint) {
         String key = profile == null ? "" : fingerprint + "|" + profile.getId();
         if (key.equals(activeKey)) return;
         cancel();

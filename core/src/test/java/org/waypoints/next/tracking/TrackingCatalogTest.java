@@ -26,7 +26,7 @@ public class TrackingCatalogTest {
         }
         assertFalse(catalog.current().isEmpty());
         assertTrue(catalog.waypoints().isEmpty());
-        WaypointRecord friend=catalog.find(ManagedKind.PLAYER,ManagedKind.PLAYER.name());
+        WaypointRecord friend=catalog.find(ManagedKind.ANIMAL,ManagedKind.ANIMAL.name());
         catalog.enabled(friend.getId(),false,now);
         assertTrue(catalog.waypoints().isEmpty());
         catalog.enabled(friend.getId(),true,now);
@@ -37,12 +37,12 @@ public class TrackingCatalogTest {
     }
     @Test public void removingAWaypointSurvivesCatalogueRefreshMovementAndRestart()throws Exception{
         TrackingCatalog catalog=catalog();
-        WaypointRecord r=catalog.candidate(ManagedKind.PLAYER,"Friend","Friend","Online",now);
+        WaypointRecord r=catalog.candidate(ManagedKind.ANIMAL,"Mare","Mare","Manage horse",now);
         catalog.enabled(r.getId(),true,now);
         assertEquals(WaypointResolution.PENDING,catalog.waypoints().get(0).getResolution());
         catalog.removeWaypoint(r.getId(),now.plusSeconds(1));
-        catalog.candidate(ManagedKind.PLAYER,"Friend","Friend","Online",now.plusSeconds(2));
-        catalog.live(ManagedKind.PLAYER,"Friend","Friend","Online",new WaypointCoordinate(20,40,2d,WaypointLayer.SURFACE),now.plusSeconds(3));
+        catalog.candidate(ManagedKind.ANIMAL,"Mare","Mare","Manage horse",now.plusSeconds(2));
+        catalog.live(ManagedKind.ANIMAL,"Mare","Mare","Manage horse",new WaypointCoordinate(20,40,2d,WaypointLayer.SURFACE),now.plusSeconds(3));
         assertTrue(catalog.waypoints().isEmpty());
         assertEquals(1,catalog.current().size());
         WaypointStore store=new WaypointStore(temporary.getRoot().toPath().resolve("removed.wpt"),new WaypointFormatCodec(new WaypointRecordValidator()));
@@ -66,7 +66,7 @@ public class TrackingCatalogTest {
     @Test public void legacyCacheKeepsEnabledChoicesAndHidesAutomaticCandidates(){
         TrackingCatalog old=catalog();
         WaypointRecord selected=old.candidate(ManagedKind.ANIMAL,"42","Mare","Manage horse",now);
-        WaypointRecord automatic=old.candidate(ManagedKind.PLAYER,"Friend","Friend","Offline",now);
+        WaypointRecord automatic=old.candidate(ManagedKind.ANIMAL,"Mare","Mare","Manage horse",now);
         Map<String,List<String>> selectedExtensions=new LinkedHashMap<String,List<String>>(selected.getExtensions());
         selectedExtensions.remove("tracking.waypoint.added");
         Map<String,List<String>> automaticExtensions=new LinkedHashMap<String,List<String>>(automatic.getExtensions());
@@ -88,13 +88,13 @@ public class TrackingCatalogTest {
         restored.retentionDays(1);restored.expire(now.plusSeconds(86401));assertNull(restored.find(record.getId()).getCoordinate());assertTrue(restored.find(record.getId()).isEnabled());
     }
     @Test public void livePositionsMoveWhileApproximateReadingsNeverBecomeExactCoordinates(){
-        TrackingCatalog catalog=catalog();WaypointRecord record=catalog.live(ManagedKind.PLAYER,"Friend","Friend","Online",new WaypointCoordinate(20,40,2d,WaypointLayer.SURFACE),now);catalog.enabled(record.getId(),true,now);
+        TrackingCatalog catalog=catalog();WaypointRecord record=catalog.live(ManagedKind.ANIMAL,"Mare","Mare","Manage horse",new WaypointCoordinate(20,40,2d,WaypointLayer.SURFACE),now);catalog.enabled(record.getId(),true,now);
         StaticNavigationRegistry registry=new StaticNavigationRegistry();NavigationContext context=new NavigationContext(server,"Alice",64);
         NavigationSnapshot first=registry.reconcile(new WaypointRevisionSnapshot(catalog.revision(),catalog.all()),context);assertEquals(20,first.getTargets().get(0).getCoordinate().getTileX(),0);
-        catalog.live(ManagedKind.PLAYER,"friend","Friend","Online",new WaypointCoordinate(22,41,2d,WaypointLayer.SURFACE),now.plusSeconds(1));assertEquals(1,catalog.all().size());
+        catalog.live(ManagedKind.ANIMAL,"mare","Mare","Manage horse",new WaypointCoordinate(22,41,2d,WaypointLayer.SURFACE),now.plusSeconds(1));assertEquals(1,catalog.all().size());
         NavigationSnapshot moved=registry.reconcile(new WaypointRevisionSnapshot(catalog.revision(),catalog.all()),context);assertEquals(22,moved.getTargets().get(0).getCoordinate().getTileX(),0);
-        catalog.vanished(ManagedKind.PLAYER,"Friend",now.plusSeconds(2));NavigationSnapshot old=registry.reconcile(new WaypointRevisionSnapshot(catalog.revision(),catalog.all()),context);assertTrue(old.getTargets().get(0).getName().contains("Last known"));assertEquals(MarkerStyle.WorldStyle.COMPASS_ONLY,old.getTargets().get(0).getMarkerStyle().getWorldStyle());
-        catalog.pending(ManagedKind.PLAYER,"Friend","Other server",now.plusSeconds(3));assertTrue(registry.reconcile(new WaypointRevisionSnapshot(catalog.revision(),catalog.all()),context).getTargets().isEmpty());
+        catalog.vanished(ManagedKind.ANIMAL,"Mare",now.plusSeconds(2));NavigationSnapshot old=registry.reconcile(new WaypointRevisionSnapshot(catalog.revision(),catalog.all()),context);assertTrue(old.getTargets().get(0).getName().contains("Last known"));assertEquals(MarkerStyle.WorldStyle.COMPASS_ONLY,old.getTargets().get(0).getMarkerStyle().getWorldStyle());
+        catalog.pending(ManagedKind.ANIMAL,"Mare","Unavailable",now.plusSeconds(3));assertTrue(registry.reconcile(new WaypointRevisionSnapshot(catalog.revision(),catalog.all()),context).getTargets().isEmpty());
     }
     @Test public void bearingsIntersectAndExpireWithoutInventingAPoint(){
         TrackingCatalog catalog=catalog();WaypointRecord record=catalog.candidate(ManagedKind.ANIMAL,"42","Mare","Manage horse",now);

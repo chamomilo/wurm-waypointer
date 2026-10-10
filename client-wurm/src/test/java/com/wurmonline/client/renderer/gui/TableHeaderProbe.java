@@ -18,7 +18,7 @@ final class TableHeaderProbe {
         }
     }
     static void verify(WurmArrayPanel<?> row) {
-        check(row instanceof WaypointerTableHeader.Row&&row.height==32,"Standard shared 32px header band: "+row.getClass().getSimpleName()+" height="+row.height);
+        check(row instanceof WaypointerTableHeader.Row&&row.height==28,"Standard shared 32px header band: "+row.getClass().getSimpleName()+" height="+row.height);
         int baseline=-1;String group=null;
         for(FlexComponent component:row.components) {
             if(!(component instanceof WButton))continue;
@@ -26,16 +26,16 @@ final class TableHeaderProbe {
             WaypointerTableHeader header=(WaypointerTableHeader)component;
             if(group==null)group=header.group;
             check(group.equals(header.group),"One named heading group per table");
-            check(header.text==header.textBold&&((WaypointerLayoutProbe.ProbeFont)header.text).awtFont().equals(UiTypography.font(18,true,UiDensity.HIGH)),"Shared 18px Alegreya Sans SC Bold in every state");
-            check(header.height==32&&header.width>=header.text.getWidth(header.getLabel())+34,"Caption and indicator have separate space");
+            check(header.text==header.textBold&&((WaypointerLayoutProbe.ProbeFont)header.text).awtFont().equals(UiTypography.font(16,true,UiDensity.HIGH)),"Shared 18px Alegreya Sans SC Bold in every state");
+            check(header.height==28&&header.width>=header.text.getWidth(header.getLabel())+28,"Caption and indicator have separate space");
             for(boolean hover:new boolean[]{false,true}) {
                 header.hovered=hover;WaypointerLayoutProbe.clearPaintedLabel(header.getLabel());header.render(null,1f);
                 Point point=WaypointerLayoutProbe.paintedLabel(header.getLabel());check(point!=null,"Full heading is painted");
                 if(baseline<0)baseline=point.y-header.y;
                 check(point.y-header.y==baseline,"All headings and hover states share one baseline");
-                Rectangle ink=UiTypography.ink(header.getLabel(),18,true,UiDensity.HIGH);
+                Rectangle ink=UiTypography.ink(header.getLabel(),16,true,UiDensity.HIGH);
                 check(point.y+ink.y>=header.y+3&&point.y+ink.y+ink.height<=header.y+header.height-3,"Heading ink clears frame");
-                check(point.x+header.text.getWidth(header.getLabel())<=header.x+header.width-28,"Heading clears fixed sort slot");
+                check(point.x+header.text.getWidth(header.getLabel())<=header.x+header.width-22,"Heading clears fixed sort slot");
             }
             header.hovered=false;
             NativeUiRenderFixture.beginAlphaFrame();header.render(null,1f);List<Float> expected=NativeUiRenderFixture.endAlphaFrame();

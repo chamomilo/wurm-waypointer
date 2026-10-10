@@ -72,8 +72,7 @@ public final class WaypointManagerRow {
     }
 
     public boolean isTrackedTarget() {
-        return sourceType == WaypointSourceType.PLAYER
-                || (expiresAt == null && (sourceType == WaypointSourceType.MANAGED_ANIMAL
+        return (expiresAt == null && (sourceType == WaypointSourceType.MANAGED_ANIMAL
                 || sourceType == WaypointSourceType.MANAGED_ITEM));
     }
 
@@ -83,7 +82,7 @@ public final class WaypointManagerRow {
 
     /** Age of the last provider-confirmed position, or -1 when not applicable. */
     public long getDataAgeMillis(Instant now) {
-        if ((sourceType != WaypointSourceType.DEED && sourceType != WaypointSourceType.PLAYER && sourceType != WaypointSourceType.MANAGED_ANIMAL && sourceType != WaypointSourceType.MANAGED_ITEM) || lastResolvedAt == null
+        if ((sourceType != WaypointSourceType.DEED && sourceType != WaypointSourceType.MANAGED_ANIMAL && sourceType != WaypointSourceType.MANAGED_ITEM) || lastResolvedAt == null
                 || now == null) return -1L;
         return Math.max(0L, now.toEpochMilli() - lastResolvedAt.toEpochMilli());
     }

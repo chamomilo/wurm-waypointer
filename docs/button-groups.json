@@ -7,74 +7,73 @@
   "groups": [
     {
       "id": "tracked-targets.refresh",
-      "block": "MY VEHICLES AND ANIMALS and MY FRIENDS catalogue toolbar",
+      "block": "VEHICLES and MY ANIMALS catalogue toolbar",
       "members": [
         "Refresh"
       ],
       "density": "HIGH",
       "family": "Alegreya Sans SC",
-      "height": 32,
+      "height": 28,
       "captionRows": 1,
-      "sharedFontSize": "largest supported fit in both weights",
-      "widths": "at least 100 px; increase to retain the localized caption",
+      "sharedFontSize": "16 px shared across every localized caption and both weights",
+      "widths": "full localized captions measured at 16 px in both weights; 12 px native wrapper side insets",
       "baseline": "explicit common ink bounds in normal and hover states"
     },
     {
       "id": "tracked-targets.actions",
-      "block": "repeated catalogue table action columns in both managed and friends views",
+      "block": "repeated catalogue table action columns in vehicle and animal views",
       "members": [
         "Track",
         "Untrack",
         "Nav",
         "Stop",
-        "Direction",
         "Clear last seen"
       ],
       "density": "HIGH",
       "family": "Alegreya Sans SC",
-      "height": 28,
+      "height": 24,
       "captionRows": 1,
-      "sharedFontSize": "one supported fit across all reserved state captions",
-      "widths": "localized widths measured in both weights at 20 px; state pairs share their maximum width; 6 px gaps",
+      "sharedFontSize": "16 px shared across every localized caption and both weights",
+      "widths": "full localized captions measured at 16 px in both weights; 12 px native wrapper side insets",
       "baseline": "common ink bounds across all members and both weights",
       "overflow": "increase width without independently shrinking a caption",
-      "rowLayout": "32 px row; 2 px above and below the action; 4 px gap between adjacent buttons"
+      "rowLayout": "28 px row, 24 px action, 2 px above and below"
     },
     {
       "id": "tracked-targets.headers",
-      "block": "managed and friends table column headings",
+      "block": "vehicle and animal table column headings",
       "members": "every column, including action columns and all sorting states",
       "density": "HIGH",
       "family": "Alegreya Sans SC Bold",
-      "height": 32,
+      "height": 28,
       "captionRows": 1,
-      "sharedFontSize": "18 px",
+      "sharedFontSize": "16 px Bold for both resting and hovered headers",
       "baseline": "shared ink union across all localized headings",
-      "widths": "body column boundaries with one outer frame and no vertical dividers per updated TABLE-HEADERS.md; 6 px caption inset and 16 px reserved sort slot",
-      "overflow": "ellipsis with complete semantic hover hint"
+      "overflow": "ellipsis with complete semantic hover hint",
+      "widths": "full localized 16 px Bold captions plus 28 px for caption inset and fixed sort glyph space"
     },
     {
       "id": "hub.navigation",
-      "block": "seven left selectors",
+      "block": "one top navigation toolbar",
       "members": [
-        "ALL WAYPOINTS",
-        "MOBS AROUND",
-        "CONTAINERS AROUND",
-        "OBJECTS AND ITEMS AROUND",
-        "MY VEHICLES AND ANIMALS",
-        "MY FRIENDS",
-        "SETTINGS"
+        "Waypoints",
+        "Mobs",
+        "Containers",
+        "Objects / items",
+        "Vehicles",
+        "My animals",
+        "Settings"
       ],
-      "density": "LOW",
-      "family": "Alegreya Sans",
-      "height": 56,
-      "widths": "one equal width measured from every localized regular/bold caption, minimum 248 px",
+      "density": "HIGH",
+      "family": "Alegreya Sans SC",
+      "height": 28,
+      "widths": "individual localized caption widths; 4 px gaps",
       "captionRows": 1,
       "typographicLevel": "navigation",
-      "sharedFontSize": "largest supported group size within the Low density preference; 24 px",
-      "captionCase": "uppercase per explicit user override; Low density family and spacing are retained",
+      "sharedFontSize": "16 px",
+      "captionCase": "translated source case",
       "baseline": "common vertical ink union of all members and both weights",
-      "overflow": "increase the equal group width to retain full captions"
+      "overflow": "increase individual caption widths to retain full captions"
     },
     {
       "id": "all-waypoints.commands",
@@ -83,11 +82,11 @@
       "captionVariants": "On/Off, Nav/Stop, all command and editor captions in the active language",
       "density": "HIGH",
       "family": "Alegreya Sans SC",
-      "height": 32,
-      "widths": "individual caption widths measured in both weights, with native custom-font wrapper spacing and 6 px external gaps",
+      "height": 28,
+      "widths": "full localized captions measured at 16 px in both weights; 12 px native wrapper side insets",
       "captionRows": 1,
       "typographicLevel": "command",
-      "sharedFontSize": "largest supported size fitting every declared variant and its geometry",
+      "sharedFontSize": "16 px shared across every localized caption and both weights",
       "baseline": "common vertical ink union across every variant and both weights",
       "overflow": "increase individual width; never independently resize the font"
     },
@@ -103,11 +102,11 @@
       ],
       "density": "HIGH",
       "family": "Alegreya Sans SC",
-      "height": 32,
+      "height": 28,
       "captionRows": 1,
       "typographicLevel": "footer-action",
-      "widths": "individual caption widths in both weights",
-      "sharedFontSize": "largest shared fit",
+      "widths": "full localized captions measured at 16 px in both weights; 12 px native wrapper side insets",
+      "sharedFontSize": "16 px shared across every localized caption and both weights",
       "baseline": "common ink bounds across the entire row and both weights"
     },
     {
@@ -116,11 +115,11 @@
       "members": "all captioned filter buttons; sorting is handled by interactive table headers",
       "density": "HIGH",
       "family": "Alegreya Sans SC",
-      "height": 32,
+      "height": 28,
       "captionRows": 1,
       "typographicLevel": "filter-command",
       "captionVariants": "All, every single choice and all selection counts in the current language",
-      "sharedFontSize": "explicit readable 20 px for unbounded dynamic category text",
+      "sharedFontSize": "16 px shared across every localized caption and both weights",
       "baseline": "common ink bounds across all displayed variants and both weights",
       "overflow": "ellipsis in display-only caption rows; native labels and full selection hints remain intact"
     },
@@ -135,10 +134,10 @@
       ],
       "density": "HIGH",
       "family": "Alegreya Sans SC",
-      "height": 32,
+      "height": 28,
       "captionRows": 1,
       "typographicLevel": "footer-action",
-      "sharedFontSize": "largest shared fit with individual widths",
+      "sharedFontSize": "16 px shared across every localized caption and both weights",
       "baseline": "common across the entire row and both weights"
     },
     {
@@ -148,36 +147,33 @@
         "Save settings",
         "Reset draft"
       ],
-      "density": "LOW",
-      "family": "Alegreya Sans",
-      "height": 40,
+      "density": "HIGH",
+      "family": "Alegreya Sans SC",
+      "height": 28,
       "captionRows": 1,
       "typographicLevel": "footer-action",
-      "sharedFontSize": "largest shared fit within the Low preference",
+      "sharedFontSize": "16 px shared across every localized caption and both weights",
       "baseline": "common across both actions and weights"
     },
     {
-      "id": "surroundings.monitor-primary",
-      "block": "separate ADD TO MONITOR primary action",
+      "id": "surroundings.monitor",
+      "block": "summary toolbar above the surroundings table",
       "members": [
         "ADD TO MONITOR"
       ],
-      "density": "LOW",
-      "family": "Alegreya Sans",
-      "height": 144,
-      "width": 144,
-      "captionRows": 3,
+      "density": "HIGH",
+      "family": "Alegreya Sans SC",
+      "height": 28,
+      "captionRows": 1,
       "rows": [
-        "ADD",
-        "TO",
-        "MONITOR"
+        "ADD TO MONITOR"
       ],
-      "captionCase": "uppercase per explicit user override",
+      "captionCase": "translated source case",
       "typographicLevel": "primary-action",
-      "separateBecause": "square geometry, three caption rows and different hierarchy from compact peer commands",
-      "sharedFontSize": "independent Low density fit in both weights",
-      "baseline": "center complete three-row ink block; preserve safe outer insets and 4 px row gaps",
-      "overflow": "full rows at a readable size"
+      "separateBecause": "single action in the summary row",
+      "sharedFontSize": "16 px shared across every localized caption and both weights",
+      "baseline": "one centered caption with the toolbar clearances",
+      "overflow": "retain the full localized single-line caption"
     },
     {
       "id": "all-waypoints.top-actions",
@@ -188,9 +184,9 @@
       ],
       "density": "HIGH",
       "family": "Alegreya Sans SC",
-      "height": 32,
+      "height": 28,
       "captionRows": 1,
-      "sharedFontSize": "largest common fit",
+      "sharedFontSize": "16 px shared across every localized caption and both weights",
       "baseline": "common ink union in both weights"
     },
     {
@@ -199,10 +195,11 @@
       "members": "every visible column with fixed trailing chevron slots",
       "density": "HIGH",
       "family": "Alegreya Sans SC Bold",
-      "height": 32,
+      "height": 28,
       "captionRows": 1,
-      "sharedFontSize": "18 px",
-      "baseline": "common Bold ink union across localized headings"
+      "sharedFontSize": "16 px Bold for both resting and hovered headers",
+      "baseline": "common Bold ink union across localized headings",
+      "widths": "full localized 16 px Bold captions plus 28 px for caption inset and fixed sort glyph space"
     },
     {
       "id": "all-waypoints.headers",
@@ -210,10 +207,11 @@
       "members": "every column; only sortable data headings have chevrons",
       "density": "HIGH",
       "family": "Alegreya Sans SC Bold",
-      "height": 32,
+      "height": 28,
       "captionRows": 1,
-      "sharedFontSize": "18 px",
-      "baseline": "common Bold ink union; single shared frame"
+      "sharedFontSize": "16 px Bold for both resting and hovered headers",
+      "baseline": "common Bold ink union; single shared frame",
+      "widths": "full localized 16 px Bold captions plus 28 px for caption inset and fixed sort glyph space"
     },
     {
       "id": "monitoring.headers",
@@ -225,10 +223,11 @@
       ],
       "density": "HIGH",
       "family": "Alegreya Sans SC Bold",
-      "height": 32,
+      "height": 28,
       "captionRows": 1,
-      "sharedFontSize": "18 px",
-      "baseline": "common Bold ink union; non-sortable headings retain reserved slots"
+      "sharedFontSize": "16 px Bold for both resting and hovered headers",
+      "baseline": "common Bold ink union; non-sortable headings retain reserved slots",
+      "widths": "full localized 16 px Bold captions plus 28 px for caption inset and fixed sort glyph space"
     },
     {
       "id": "surroundings.row-marks",
@@ -236,11 +235,11 @@
       "members": "all rows, including offscreen entries and both state captions",
       "density": "HIGH",
       "family": "Alegreya Sans SC",
-      "height": 28,
+      "height": 24,
       "captionRows": 1,
-      "sharedFontSize": "20 px",
+      "sharedFontSize": "16 px shared across every localized caption and both weights",
       "baseline": "common ink union in both weights",
-      "rowLayout": "32 px row; 2 px above and below the action; 4 px gap between adjacent buttons"
+      "rowLayout": "28 px row, 24 px action, 2 px above and below"
     },
     {
       "id": "surroundings.filter-choices",
@@ -248,11 +247,11 @@
       "members": "all choice captions, clear-selection and Done; separate icon-only check squares are excluded",
       "density": "HIGH",
       "family": "Alegreya Sans SC",
-      "height": 32,
+      "height": 28,
       "captionRows": 1,
-      "sharedFontSize": "20 px",
+      "sharedFontSize": "16 px shared across every localized caption and both weights",
       "baseline": "common ink union in both weights",
-      "widths": "equal choice-caption widths measured across the full localized list"
+      "widths": "full localized captions measured at 16 px in both weights; 12 px native wrapper side insets"
     },
     {
       "id": "all-waypoints.row-actions",
@@ -269,13 +268,13 @@
       ],
       "density": "HIGH",
       "family": "Alegreya Sans SC",
-      "height": 28,
-      "rowHeight": 32,
+      "height": 24,
+      "rowHeight": 28,
       "verticalInset": 2,
       "captionRows": 1,
-      "sharedFontSize": "one shared fit capped at 20 px across both weights and all state captions",
+      "sharedFontSize": "16 px shared across every localized caption and both weights",
       "baseline": "common vertical ink union",
-      "widths": "existing responsive columns and 6 px horizontal gaps"
+      "widths": "full localized captions measured at 16 px in both weights; 12 px native wrapper side insets"
     },
     {
       "id": "monitoring.row-marks",
@@ -286,11 +285,11 @@
       ],
       "density": "HIGH",
       "family": "Alegreya Sans SC",
-      "height": 28,
-      "rowHeight": 32,
+      "height": 24,
+      "rowHeight": 28,
       "verticalInset": 2,
       "captionRows": 1,
-      "sharedFontSize": "20 px when both localized captions fit",
+      "sharedFontSize": "16 px shared across every localized caption and both weights",
       "baseline": "common ink union in both weights"
     },
     {
@@ -303,11 +302,11 @@
       ],
       "density": "HIGH",
       "family": "Alegreya Sans SC",
-      "height": 32,
+      "height": 28,
       "captionRows": 1,
-      "sharedFontSize": "one shared fit capped at 20 px",
+      "sharedFontSize": "16 px shared across every localized caption and both weights",
       "baseline": "one ink union for both button weights and the count",
-      "widths": "full localized captions, 8 px external gaps"
+      "widths": "full localized captions measured at 16 px in both weights; 12 px native wrapper side insets"
     },
     {
       "id": "mini-map.footer",
@@ -324,6 +323,33 @@
       "sharedFontSize": "20 px shared compact fit in regular and bold; 20 px numeric field shares the absolute baseline",
       "baseline": "one centered ink union including all ten digits; numerals occupy at least half the field height",
       "excluded": "minus and plus use icon glyphs"
+    },
+    {
+      "id": "text-filter.clear",
+      "block": "inclusion and exclusion text filter actions",
+      "members": [
+        "Clear"
+      ],
+      "density": "HIGH",
+      "family": "Alegreya Sans SC",
+      "height": 28,
+      "captionRows": 1,
+      "sharedFontSize": "16 px in regular and bold",
+      "baseline": "common caption ink bounds in both weights",
+      "widths": "localized Clear caption plus 12 px native wrapper side insets"
+    },
+    {
+      "id": "main-map.controls",
+      "block": "general full-map toolbar",
+      "members": ["ALL MAPS ON SERVER", "Zoom speed: 1X / 2X / 4X", "CENTER", "NAV LINE", "MINI MAP", "DEEDS", "ROADS", "MARKS"],
+      "density": "HIGH",
+      "family": "Alegreya Sans SC",
+      "height": 32,
+      "captionRows": 1,
+      "sharedFontSize": "one measured fit for the complete localized row in regular and bold, ceiling 16 px",
+      "baseline": "centered union of every member's ink in both weights",
+      "widths": [200, 128, 72, 88, 88, 64, 64, 64],
+      "excluded": "search and close are icon controls"
     }
   ]
 }

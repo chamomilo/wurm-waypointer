@@ -63,10 +63,29 @@ public final class WaypointerLayoutProbe {
         frame.invoke(null,map,null,map.x+3,map.y+21);
         String title="Map of: Sklotopolis-Novus";
         plate.invoke(null,map,null,map.x+4,map.y,map.textBold.getWidth(title)+48,title);
-        int x=map.x+map.width-380,y=map.y+46;
-        WaypointerUi.paintButton(map,null,"zoom","Zoom speed: 1X",false,false,true,false,x,y,125,32);
-        WaypointerUi.paintButton(map,null,"center","CENTER",false,false,true,false,x+130,y,85,32);
-        WaypointerUi.paintButton(map,null,"close","@close",false,false,true,false,map.x+map.width-38,y,32,32);
+        paintedLabels.clear();
+        Class<?> stateType=Class.forName(ServerMapWindowBridge.class.getName()+"$State");
+        Constructor<?> constructor=stateType.getDeclaredConstructor(String.class,org.waypoints.next.map.MapViewport.class,org.waypoints.next.map.MapOverlayVisibility.class);constructor.setAccessible(true);
+        Object state=constructor.newInstance("sklotopolis-novus",new org.waypoints.next.map.MapViewport(4096,4096,920,620,2000,2000),new org.waypoints.next.map.MapOverlayVisibility(true,true,true));
+        for(String methodName:new String[]{"drawAllMapsButton","drawZoomFactorButton","drawCenterButton","drawNavigationLineButton","drawMiniMapButton","drawLayerButtons","drawSearchButton","drawCloseButton"}){
+            Method method=ServerMapWindowBridge.class.getDeclaredMethod(methodName,WorldMap.class,Queue.class,stateType,int.class,int.class);method.setAccessible(true);
+            method.invoke(null,map,null,state,map.x+3,map.y+21);
+        }
+        WaypointerButtonGroup group=ServerMapWindowBridge.toolbarGroup();
+        check(group.fontPixels>=12,"Main map toolbar remains readable: "+org.waypoints.next.i18n.Messages.language());
+        String[] captions={"ALL MAPS ON SERVER","Zoom speed: 1X","CENTER","NAV LINE","MINI MAP","DEEDS","ROADS","MARKS"};
+        int[] starts={22,226,358,434,526,618,686,754},widths={200,128,72,88,88,64,64,64};
+        for(int i=0;i<captions.length;i++){
+            String caption=org.waypoints.next.i18n.Messages.text(captions[i]);Point point=paintedLabels.get(caption);
+            check(point!=null,"Main map paints full localized caption: "+caption);
+            check(point.y==map.y+21+25+group.baseline,"Map controls share a baseline: "+caption);
+            for(boolean bold:new boolean[]{false,true}){
+                Rectangle ink=org.chamomilo.wurm.ui.v1.UiTypography.ink(caption,group.fontPixels,bold,org.chamomilo.wurm.ui.v1.UiDensity.HIGH);
+                int span=Math.max(org.chamomilo.wurm.ui.v1.UiTypography.width(caption,group.fontPixels,bold,org.chamomilo.wurm.ui.v1.UiDensity.HIGH),ink.x+ink.width)-Math.min(0,ink.x);
+                check(span<=widths[i]-8,"Main map caption fits both weights: "+caption);
+            }
+            if(i+1<starts.length)check(starts[i]+widths[i]+4==starts[i+1],"Map toolbar spacing");
+        }
         int water=canvas.getRGB(map.x+50,map.y+70);
         for(int[] point:new int[][]{{10,31},{916,31},{10,631},{916,631}})
             check(canvas.getRGB(map.x+point[0],map.y+point[1])!=water,"All four map frame corners are visible");

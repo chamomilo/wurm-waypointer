@@ -19,7 +19,7 @@ public final class TrackingCatalog {
     }
     public synchronized void restore(Collection<WaypointRecord> saved) {
         for(WaypointRecord r:saved) {
-            if(!isTracked(r))continue;
+            if(!isTracked(r)||r.getSourceType()==WaypointSourceType.PLAYER)continue;
             if(!records.containsKey(r.getId()))records.put(r.getId(),
                     membership(offline(r, Instant.now()), isWaypoint(r)));
         }
@@ -51,10 +51,10 @@ public final class TrackingCatalog {
         extensions.put("tracking.kind",Collections.singletonList(kind.name()));
         extensions.put(WAYPOINT_ADDED,Collections.singletonList("false"));
         WaypointRecord record=WaypointRecord.builder().id(id).name(name).description(description)
-                .sourceType(kind==ManagedKind.PLAYER?WaypointSourceType.PLAYER:kind==ManagedKind.ANIMAL?WaypointSourceType.MANAGED_ANIMAL:WaypointSourceType.MANAGED_ITEM)
+                .sourceType(kind==ManagedKind.ANIMAL?WaypointSourceType.MANAGED_ANIMAL:WaypointSourceType.MANAGED_ITEM)
                 .sourceKey("tracked:"+kind.name()+":"+key).createdByUser(user).serverIdentity(server)
                 .resolution(WaypointResolution.PENDING).coordinate(null).lastResolvedAt(null).enabled(false)
-                .markerStyle(new MarkerStyle(MarkerStyle.WorldStyle.COLORED_BEAM,kind==ManagedKind.PLAYER?0.3f:1f,0.8f,0.3f,1f,1f,1f,true,true))
+                .markerStyle(new MarkerStyle(MarkerStyle.WorldStyle.COLORED_BEAM,1f,0.8f,0.3f,1f,1f,1f,true,true))
                 .createdAt(now).updatedAt(now).extensions(extensions).build();
         records.put(id,record);revision++;return record;
     }

@@ -92,6 +92,10 @@ public final class WurmWaypointerRuntime {
             new SklotopolisHighwayService(LOGGER);
     private static final SklotopolisMapService SERVER_MAPS =
             new SklotopolisMapService(LOGGER);
+    private static final SklotopolisMapService BROWSED_MAPS =
+            new SklotopolisMapService(LOGGER);
+    private static final SklotopolisHighwayService BROWSED_HIGHWAYS =
+            new SklotopolisHighwayService(LOGGER);
     private static final WurmLocalSurfaceMap LOCAL_SURFACE = new WurmLocalSurfaceMap();
     private static final StaticNavigationController STATIC_NAVIGATION =
             new StaticNavigationController(LOGGER, HIGHWAYS);
@@ -209,9 +213,17 @@ public final class WurmWaypointerRuntime {
                     STATIC_WAYPOINTS.importSharedClipboardFromManager(hud, identity);
                 }
                 @Override public boolean isNavigatorActive(UUID id) {
-                    return STATIC_NAVIGATION.isNavigatorActive(id);
+                    return TRACKED.isRaceActive(id)||STATIC_NAVIGATION.isNavigatorActive(id);
                 }
                 @Override public boolean toggleNavigator(UUID id) {
+                    if(TRACKED.isAnimal(id)){
+                        if(isNavigatorActive(id)){TRACKED.stopRace(id);STATIC_NAVIGATION.stopNavigator(id);return false;}
+                        NavigationRenderFrame frame=currentNavigationFrame();
+                        NavigationTarget previous=frame==null?null:frame.getSnapshot().getActiveNavigator();
+                        if(previous!=null)STATIC_NAVIGATION.stopNavigator(previous.getKey().getWaypointId());
+                        return TRACKED.navigate(id);
+                    }
+                    TRACKED.cancelRace(null);
                     NavigationTarget target = STATIC_NAVIGATION.toggleNavigator(id);
                     if (target == null) {
                         event("Navigator requires an enabled waypoint on the current server.");
@@ -451,6 +463,10 @@ public final class WurmWaypointerRuntime {
         SERVER_MAPS.configure(waypointConfiguration.isServerMapEnabled(),
                 waypointConfiguration.getServerMapCacheDirectory(),
                 waypointConfiguration.getServerMapSyncMinutes(), false);
+        BROWSED_MAPS.configure(waypointConfiguration.isServerMapEnabled(),
+                waypointConfiguration.getServerMapCacheDirectory(),
+                waypointConfiguration.getServerMapSyncMinutes(), true);
+        BROWSED_HIGHWAYS.configure(waypointConfiguration);
         VANILLA_LANDMARKS.configure(waypointConfiguration);
         for (DynamicWaypointProvider provider : DYNAMIC_WAYPOINTS) {
             provider.configure(waypointConfiguration);
@@ -501,7 +517,8 @@ public final class WurmWaypointerRuntime {
             java.util.Properties changedSettings = pendingSettings;
             if (changedSettings != null) {
                 pendingSettings = null;
-                HUB_SETTINGS.configure(changedSettings);
+                // Current preferences and language already changed on the HUD thread.
+                // An older completed disk write must not restore its language snapshot.
                 TRACKED.configure(changedSettings);
                 configure(configuration, WaypointClientConfiguration.from(changedSettings));
                 String profile = changedSettings.getProperty("scannerProfile", "off");
@@ -544,7 +561,10 @@ public final class WurmWaypointerRuntime {
                     waypointConfiguration.getMapBounds());
             ARCHAEOLOGY.bind(archaeologyContext);
             SURROUNDINGS.bind(identity, world.getUsername());
-            TRACKED.tick(currentHud, identity, java.time.Instant.now());
+            NavigationRenderFrame priorAnimalFrame=currentNavigationFrame();
+            NavigationTarget priorAnimalOwner=priorAnimalFrame==null?null:priorAnimalFrame.getSnapshot().getActiveNavigator();
+            TRACKED.navigationOwner(priorAnimalOwner==null?null:priorAnimalOwner.getKey().getWaypointId());
+            TRACKED.tick(currentHud, identity, SURROUNDINGS, java.time.Instant.now());
             SURROUNDINGS.tick(System.currentTimeMillis());
             refreshScannerOutlineTargets(world);
             STATIC_NAVIGATION.tick(world, currentHud, identity,
@@ -552,6 +572,9 @@ public final class WurmWaypointerRuntime {
                             VANILLA_LANDMARKS.combine(
                                     STATIC_WAYPOINTS.revisionSnapshot())));
             startRequestedNavigation();
+            NavigationRenderFrame animalFrame=currentNavigationFrame();
+            NavigationTarget animalOwner=animalFrame==null?null:animalFrame.getSnapshot().getActiveNavigator();
+            TRACKED.navigationOwner(animalOwner==null?null:animalOwner.getKey().getWaypointId());
             STATIC_WAYPOINTS.flushEvents(currentHud);
             flushDynamicMessages();
             ArchaeologyRuntime.SoundCue archaeologySound;
@@ -1079,6 +1102,7 @@ public final class WurmWaypointerRuntime {
                                                   String operation) {
         try {
             MiniMapWindowBridge.visibilityChanged(hud, component);
+            ServerMapWindowBridge.visibilityChanged(component, visible);
             if (component != null && "com.wurmonline.client.renderer.gui.CompassComponent"
                     .equals(component.getClass().getName())) {
                 LOGGER.info("Compass visibility changed: visible=" + visible
@@ -1104,6 +1128,7 @@ public final class WurmWaypointerRuntime {
             CustomMapMarkWindowBridge.detach(hud, "disconnect");
             MiniMapWindowBridge.detach(hud, "disconnect");
             SERVER_MAPS.deactivate();
+            stopMapBrowsing();
             LOCAL_SURFACE.clear();
             DEEDS.deactivate();
             ServerMapWindowBridge.resetAll();
@@ -1137,6 +1162,7 @@ public final class WurmWaypointerRuntime {
             CustomMapMarkWindowBridge.detach(hud, "server transfer");
             MiniMapWindowBridge.detach(hud, "server transfer");
             SERVER_MAPS.deactivate();
+            stopMapBrowsing();
             LOCAL_SURFACE.clear();
             DEEDS.deactivate();
             ServerMapWindowBridge.resetAll();
@@ -1209,6 +1235,19 @@ public final class WurmWaypointerRuntime {
     /** Immutable data consumed by the native M-map bridge. */
     public static ServerMapSnapshot serverMapSnapshot() {
         return DEEDS.overlay(SERVER_MAPS.current());
+    }
+
+    public static ServerMapSnapshot browsedMapSnapshot(org.waypoints.next.map.ServerMapProfile profile) {
+        BROWSED_MAPS.browse(profile);
+        BROWSED_HIGHWAYS.browse(profile);
+        return BROWSED_MAPS.current();
+    }
+
+    public static HighwayTileIndex browsedMapHighways() { return BROWSED_HIGHWAYS.current(); }
+
+    public static void stopMapBrowsing() {
+        BROWSED_MAPS.deactivate();
+        BROWSED_HIGHWAYS.deactivate();
     }
 
     public static List<org.waypoints.next.map.LocalSurfaceMap.Chunk> localSurfaceMap() {
@@ -1481,11 +1520,20 @@ public final class WurmWaypointerRuntime {
             SurroundingKey removed = new SurroundingKey(
                     SurroundingKind.ANIMAL, creatureId);
             SURROUNDINGS.removeAuthoritatively(removed);
-            removeVanishedMarks(removed);
+            removeVanishedMarks(removed, true);
         } catch (Throwable failure) {
             LOGGER.log(Level.FINE,
                     "Creature-to-corpse waypoint lifecycle failed open", failure);
         }
+    }
+
+    /** Also handles confirmed death without a streamed corpse. */
+    public static void surroundingsCreatureDied(Object renderable) {
+        if (!(renderable instanceof com.wurmonline.client.renderer.cell.CreatureCellRenderable)
+                || renderable instanceof com.wurmonline.client.renderer.cell.PlayerCellRenderable) return;
+        com.wurmonline.client.renderer.cell.CreatureCellRenderable creature =
+                (com.wurmonline.client.renderer.cell.CreatureCellRenderable) renderable;
+        if (!creature.isItem()) surroundingsCreatureReplacedByCorpse(creature.getId(), 0L);
     }
 
     /** Called when Wurm clears the active cell renderer. */
@@ -1551,6 +1599,7 @@ public final class WurmWaypointerRuntime {
             while ((request = provider.pollNavigationRequest()) != null) {
                 NavigationTarget started = STATIC_NAVIGATION.startNavigator(request);
                 if (started != null && started.isNavigatorActive()) {
+                    if(provider!=TRACKED)TRACKED.cancelRace(null);
                     event("Navigator started: " + oneLine(started.getName())
                             + " (" + provider.navigationReason() + ").");
                 }
@@ -1565,6 +1614,7 @@ public final class WurmWaypointerRuntime {
             NavigationTarget started = target == null ? null
                     : STATIC_NAVIGATION.startNavigator(target.getKey());
             if (started != null && started.isNavigatorActive()) {
+                TRACKED.cancelRace(null);
                 event("Navigator started: " + oneLine(started.getName())
                         + " (external API request).");
             }
@@ -1705,7 +1755,7 @@ public final class WurmWaypointerRuntime {
                     SurroundingKind.ANIMAL, SurroundingKind.ITEM,
                     SurroundingKind.CONTAINER}) {
                 removed += removeVanishedMarks(new SurroundingKey(
-                        kind, subject.getWurmId()));
+                        kind, subject.getWurmId()), true);
             }
             return removed;
         }
@@ -1713,12 +1763,18 @@ public final class WurmWaypointerRuntime {
                 ? SurroundingKind.ANIMAL
                 : subject.getKind() == WurmObjectKind.CONTAINER
                 ? SurroundingKind.CONTAINER : SurroundingKind.ITEM;
-        return removeVanishedMarks(new SurroundingKey(kind, subject.getWurmId()));
+        return removeVanishedMarks(new SurroundingKey(kind, subject.getWurmId()), true);
     }
 
     private static int removeVanishedMarks(SurroundingKey removed) {
-        List<UUID> deleted = STATIC_WAYPOINTS
-                .removeVanishedSurroundingsWaypoint(removed);
+        return removeVanishedMarks(removed, false);
+    }
+
+    private static int removeVanishedMarks(SurroundingKey removed,
+                                          boolean subjectEnded) {
+        List<UUID> deleted = new ArrayList<UUID>(STATIC_WAYPOINTS
+                .removeVanishedSurroundingsWaypoint(removed));
+        if (subjectEnded) deleted.addAll(TRACKED.subjectVanished(removed));
         if (deleted.isEmpty()) return 0;
         boolean navigatorStopped = false;
         for (UUID id : deleted) {

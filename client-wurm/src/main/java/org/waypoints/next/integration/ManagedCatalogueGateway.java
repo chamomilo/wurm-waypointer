@@ -41,7 +41,10 @@ final class ManagedCatalogueGateway {
         if(pending==null&&!waitingDirection&&!queue.isEmpty()&&now>=nextRequest)send(queue.removeFirst(),now);
     }
     void refresh(){if(busy())return;queue.add(ManagedKind.ANIMAL);queue.add(ManagedKind.VEHICLE);queue.add(ManagedKind.SHIP);revision++;}
-    void locate(String key,String name){if(busy())return;locateKey=key;locateName=name;queue.add(ManagedKind.ANIMAL);revision++;}
+    void refresh(boolean animals){if(busy())return;if(animals)queue.add(ManagedKind.ANIMAL);else{queue.add(ManagedKind.VEHICLE);queue.add(ManagedKind.SHIP);}revision++;}
+    boolean locate(String key,String name){if(busy())return false;locateKey=key;locateName=name;queue.add(ManagedKind.ANIMAL);revision++;return true;}
+    boolean directionPending(){return locateKey!=null;}
+    void cancelDirection(){if(locateKey!=null)reset();}
     private boolean busy(){return pending!=null||waitingDirection||!queue.isEmpty()||clock.getAsLong()<nextRequest;}
     private void send(ManagedKind kind,long now){
         try{
@@ -68,7 +71,7 @@ final class ManagedCatalogueGateway {
         pending=null;receiver.catalogue(kind,parsed);revision++;
         status="Manage list received.";
         if(found){waitingDirection=true;deadline=clock.getAsLong()+8000;status="Waiting for animal direction…";}
-        else if(locateKey!=null){locateKey=null;status="Animal direction is unavailable for this list.";}
+        else if(locateKey!=null){String key=locateKey;locateKey=null;status="Animal direction is unavailable for this list.";receiver.direction(key,status,null);}
         return true;
     }
     void event(String tab,String text,long now){

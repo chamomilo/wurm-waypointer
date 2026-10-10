@@ -84,6 +84,9 @@ public final class WaypointRecordValidator {
                 throw new IllegalArgumentException(
                         "archaeology report waypoints require coordinates");
             }
+        } else if (record.getSourceType()==WaypointSourceType.MANAGED_ANIMAL
+                && record.getResolution()==WaypointResolution.SEARCH_STEP) {
+            if(record.getCoordinate()==null)throw new IllegalArgumentException("animal search points require coordinates");
         } else if (record.getResolution() == WaypointResolution.SEARCH_STEP
                 || record.getResolution() == WaypointResolution.EXACT_SAVED) {
             throw new IllegalArgumentException(

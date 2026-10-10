@@ -2,8 +2,8 @@ package com.wurmonline.client.renderer.gui;
 
 /** Keeps table pitch stable while leaving real, non-clickable space between actions. */
 final class WaypointerTableActionCell extends WurmArrayPanel<FlexComponent> {
-    static final int ROW_HEIGHT = 32;
-    static final int BUTTON_HEIGHT = 28;
+    static final int ROW_HEIGHT = 28;
+    static final int BUTTON_HEIGHT = 24;
     static final int INSET = (ROW_HEIGHT - BUTTON_HEIGHT) / 2;
     final ChamomiloUiV1Button button;
 
@@ -34,7 +34,9 @@ final class WaypointerTableActionCell extends WurmArrayPanel<FlexComponent> {
 
     private static FlexComponent padding() {
         return new FlexComponent("waypointer.table-action.gap", 0, 0, 1, INSET) {{
-            sizeFlags = FIXED_HEIGHT;
+            // A stretching spacer remembers the previous column width and
+            // prevents the native array from shrinking on window resize.
+            sizeFlags = FIXED_WIDTH | FIXED_HEIGHT;
         }};
     }
 }

@@ -17,6 +17,7 @@ import com.wurmonline.client.renderer.gui.text.TextFont;
 import com.wurmonline.client.renderer.gui.text.WaypointerFonts;
 import com.wurmonline.client.renderer.gui.text.WaypointerMiniMapFonts;
 import org.waypoints.next.integration.WurmWaypointerRuntime;
+import org.waypoints.next.i18n.Messages;
 import org.waypoints.next.map.Deed;
 import org.waypoints.next.map.MapPoint;
 import org.waypoints.next.map.MapOverlayVisibility;
@@ -78,6 +79,11 @@ public final class ServerMapWindowBridge {
     private static final int MINI_MAP_BUTTON_WIDTH = 88;
     private static final int NAV_LINE_BUTTON_WIDTH = 88;
     private static final int ZOOM_FACTOR_BUTTON_WIDTH = 128;
+    private static final int ALL_MAPS_BUTTON_WIDTH = 200;
+    private static final int GALLERY_CARD_SIZE = 164;
+    private static final int GALLERY_CARD_GAP = 30;
+    private static WaypointerButtonGroup toolbarGroup;
+    private static long toolbarLanguageRevision = -1;
     private static final MapOverlayVisibility.Layer[] LAYER_BUTTONS = {
             MapOverlayVisibility.Layer.DEEDS,
             MapOverlayVisibility.Layer.HIGHWAYS,
@@ -119,6 +125,7 @@ public final class ServerMapWindowBridge {
                 }
             });
     private static PreparedSurface prepared;
+    private static PreparedSurface browsedSurface;
     private static final PreparedArtwork[] mapGallery =
             new PreparedArtwork[MAP_GALLERY_FILES.length];
 
@@ -140,28 +147,39 @@ public final class ServerMapWindowBridge {
 
             int left = map.x + CONTENT_OFFSET_X;
             int top = map.y + CONTENT_OFFSET_Y;
+            State state = state(map, profile);
+            state.viewport.resize(CONTENT_WIDTH, CONTENT_HEIGHT);
+            if (state.allMaps || state.browsedGalleryIndex >= 0) {
+                renderMapBrowser(map, queue, state, profile, left, top);
+                return true;
+            }
             PreparedSurface surface = snapshot != null && snapshot.hasSurface()
                     ? prepare(snapshot) : null;
             if (surface == null || !surface.ready || surface.failed) {
+                state.loadingGallery = true;
                 renderLoadingGallery(map, queue, profile, left, top);
+                drawMainMapChrome(map, queue, state, profile, left, top);
                 return true;
             }
             scheduleSurfaceIndex(surface, profile);
             if (surface.texture == null) {
                 reportOnce("texture-unavailable",
                         "Prepared server map texture is missing", null);
+                state.loadingGallery = true;
                 renderLoadingGallery(map, queue, profile, left, top);
+                drawMainMapChrome(map, queue, state, profile, left, top);
                 return true;
             }
             if (!surface.texture.isValid() && !surface.texture.needReinit()) {
                 reportOnce("texture-invalid",
                         "Prepared server map texture cannot be initialized", null);
+                state.loadingGallery = true;
                 renderLoadingGallery(map, queue, profile, left, top);
+                drawMainMapChrome(map, queue, state, profile, left, top);
                 return true;
             }
 
-            State state = state(map, profile);
-            state.viewport.resize(CONTENT_WIDTH, CONTENT_HEIGHT);
+            state.loadingGallery = false;
             HeadsUpDisplay.scissor.pushClip(
                     left, top, CONTENT_WIDTH, CONTENT_HEIGHT);
             try {
@@ -227,13 +245,15 @@ public final class ServerMapWindowBridge {
         ServerMapProfile profile = customProfile(
                 WurmWaypointerRuntime.serverMapSnapshot());
         if (profile == null) return;
+        State state = state(map, profile);
+        if (state.browsedGalleryIndex >= 0) profile = galleryProfile(state.browsedGalleryIndex);
         String display = profile.getDisplayName() == null ? ""
                 : profile.getDisplayName().trim().replace(' ', '-');
+        String title = state.allMaps ? Messages.text("ALL MAPS ON SERVER") : "Map of: " + display;
         drawNameplate(map, queue,
                 map.x + CONTENT_OFFSET_X + 3, map.y,
                 Math.max(54, Math.min(CONTENT_WIDTH - 5,
-                        MAIN_TITLE_TEXT.getWidth("Map of: " + display) + 48)),
-                "Map of: " + display);
+                        MAIN_TITLE_TEXT.getWidth(title) + 48)), title);
     }
 
     /** Draws the compact player-centred view without taking ownership of it. */
@@ -353,6 +373,14 @@ public final class ServerMapWindowBridge {
     public static boolean leftPressed(WorldMap map, int mouseX, int mouseY) {
         State state = activeState(map);
         if (state == null || !insideContent(map, mouseX, mouseY)) return false;
+        if (insideAllMapsButton(map, mouseX, mouseY)) {
+            state.allMapsButtonPressed = true; state.dragging = false;
+            updateHover(map, state, mouseX, mouseY); return true;
+        }
+        if (!homeView(state) && (insideNavigationLineButton(map, mouseX, mouseY)
+                || (layerButtonAt(map, mouseX, mouseY) != null
+                && !layerAvailable(state, layerButtonAt(map, mouseX, mouseY)))
+                || insideSearchButton(map, mouseX, mouseY))) return true;
         if (insideZoomFactorButton(map, mouseX, mouseY)) {
             state.zoomFactorButtonPressed = true;
             state.dragging = false;
@@ -396,6 +424,10 @@ public final class ServerMapWindowBridge {
             updateHover(map, state, mouseX, mouseY);
             return true;
         }
+        if (galleryVisible(state)) {
+            state.pressedGalleryCard = galleryCardAt(map, mouseX, mouseY);
+            state.dragging = false; updateHover(map, state, mouseX, mouseY); return true;
+        }
         state.dragging = true;
         state.dragged = false;
         state.pressX = mouseX;
@@ -409,6 +441,9 @@ public final class ServerMapWindowBridge {
     public static boolean mouseDragged(WorldMap map, int mouseX, int mouseY) {
         State state = activeState(map);
         if (state == null) return false;
+        if (state.allMapsButtonPressed || galleryVisible(state)) {
+            updateHover(map, state, mouseX, mouseY); return true;
+        }
         if (state.zoomFactorButtonPressed) {
             updateHover(map, state, mouseX, mouseY);
             return true;
@@ -454,6 +489,20 @@ public final class ServerMapWindowBridge {
     public static boolean leftReleased(WorldMap map, int mouseX, int mouseY) {
         State state = activeState(map);
         if (state == null) return false;
+        if (state.allMapsButtonPressed) {
+            state.allMapsButtonPressed = false;
+            if (insideAllMapsButton(map, mouseX, mouseY)) {
+                state.allMaps = !state.allMaps;
+                if (state.allMaps) WurmWaypointerRuntime.stopMapBrowsing();
+            }
+            state.dragging = false; state.pressedGalleryCard = -1;
+            updateHover(map, state, mouseX, mouseY); return true;
+        }
+        if (state.pressedGalleryCard >= 0) {
+            int index = state.pressedGalleryCard; state.pressedGalleryCard = -1;
+            if (index == galleryCardAt(map, mouseX, mouseY)) selectGallery(state, index);
+            updateHover(map, state, mouseX, mouseY); return true;
+        }
         if (state.zoomFactorButtonPressed) {
             state.zoomFactorButtonPressed = false;
             if (insideZoomFactorButton(map, mouseX, mouseY)) MiniMapWindowBridge.cycleZoomFactor();
@@ -463,6 +512,7 @@ public final class ServerMapWindowBridge {
         if (state.centerButtonPressed) {
             state.centerButtonPressed = false;
             if (insideCenterButton(map, mouseX, mouseY)) {
+                returnHome(state);
                 state.viewport.centerOn(WurmWaypointerRuntime.currentPlayerTileX() + 0.5d,
                         WurmWaypointerRuntime.currentPlayerTileY() + 0.5d);
             }
@@ -473,6 +523,7 @@ public final class ServerMapWindowBridge {
             state.closeButtonPressed = false;
             updateHover(map, state, mouseX, mouseY);
             if (insideCloseButton(map, mouseX, mouseY)) {
+                WurmWaypointerRuntime.stopMapBrowsing();
                 HeadsUpDisplay current = WurmComponent.hud;
                 if (current != null) current.hideComponent(map);
             }
@@ -517,7 +568,7 @@ public final class ServerMapWindowBridge {
             return true;
         }
         if (!state.dragging) return false;
-        boolean create = !state.dragged && insideContent(map, mouseX, mouseY);
+        boolean create = homeView(state) && !state.dragged && insideContent(map, mouseX, mouseY);
         state.dragging = false;
         updateHover(map, state, mouseX, mouseY);
         if (create) requestWaypoint(map, state, mouseX, mouseY);
@@ -527,6 +578,7 @@ public final class ServerMapWindowBridge {
     public static boolean rightPressed(WorldMap map, int mouseX, int mouseY) {
         State state = activeState(map);
         if (state == null || !insideContent(map, mouseX, mouseY)) return false;
+        if (!homeView(state) || insideAllMapsButton(map, mouseX, mouseY)) return true;
         if (insideZoomFactorButton(map, mouseX, mouseY)) return true;
         if (insideCenterButton(map, mouseX, mouseY)) return true;
         if (insideNavigationLineButton(map, mouseX, mouseY)) return true;
@@ -546,7 +598,8 @@ public final class ServerMapWindowBridge {
         State state = activeState(map);
         if (state == null || !insideContent(map, mouseX, mouseY)
                 || !isTopmostMapTarget(map, mouseX, mouseY)) return false;
-        if (layerButtonAt(map, mouseX, mouseY) != null
+        if (galleryVisible(state) || insideAllMapsButton(map, mouseX, mouseY)
+                || layerButtonAt(map, mouseX, mouseY) != null
                 || insideSearchButton(map, mouseX, mouseY)
                 || insideCloseButton(map, mouseX, mouseY)
                 || insideMiniMapButton(map, mouseX, mouseY)
@@ -591,7 +644,9 @@ public final class ServerMapWindowBridge {
                 || !insideContent(map, mouseX, mouseY)) return false;
         updateHover(map, state, mouseX, mouseY);
         String hover = "";
-        if (state.centerButtonHover) {
+        if (state.allMapsButtonHover) {
+            hover = Messages.text("Show all five server maps");
+        } else if (state.centerButtonHover) {
             hover = "Center map on your character";
         } else if (state.navigationLineButtonHover) {
             hover = "NAV LINE: continuous active-navigation line is "
@@ -607,6 +662,12 @@ public final class ServerMapWindowBridge {
             hover = "Search deeds";
         } else if (state.closeButtonHover) {
             hover = "Close map";
+        } else if (galleryVisible(state)) {
+            hover = state.hoveredGalleryCard >= 0 ? MAP_GALLERY_LABELS[state.hoveredGalleryCard]
+                    : Messages.text("Choose a map to view");
+        } else if (!homeView(state)) {
+            hover = state.hoverInside ? "X=" + state.hoverTileX + " Y=" + state.hoverTileY : "";
+            if (state.hoveredDeed != null) hover += " | Deed: " + state.hoveredDeed.getName();
         } else {
             List<String> lines = mapHoverLines(state.viewport,
                     mouseX - map.x - CONTENT_OFFSET_X,
@@ -629,17 +690,25 @@ public final class ServerMapWindowBridge {
         HeadsUpDisplay current = WurmComponent.hud;
         WorldMap map = current == null ? null : current.getWorldMap();
         State state = activeState(map);
-        if (state != null) state.viewport.focusOn(
+        if (state != null) { returnHome(state); state.viewport.focusOn(
                 tileX + 0.5d, tileY + 0.5d,
-                DEED_FOCUS_PIXELS_PER_TILE);
+                DEED_FOCUS_PIXELS_PER_TILE); }
     }
 
     public static synchronized void reset(WorldMap map) {
-        if (map != null) STATES.remove(map);
+        if (map != null) {
+            STATES.remove(map);
+            WurmWaypointerRuntime.stopMapBrowsing();
+        }
+    }
+
+    public static void visibilityChanged(Object component, boolean visible) {
+        if (component instanceof WorldMap && !visible) WurmWaypointerRuntime.stopMapBrowsing();
     }
 
     public static synchronized void resetAll() {
         STATES.clear();
+        WurmWaypointerRuntime.stopMapBrowsing();
         for(LocalSurfaceTexture value:LOCAL_TEXTURES.values())value.texture.dispose();
         LOCAL_TEXTURES.clear();lastLocalSnapshot=null;
         // The published image and its terrain index are independent of the HUD/world session.
@@ -657,13 +726,18 @@ public final class ServerMapWindowBridge {
 
     private static synchronized PreparedSurface prepare(
             ServerMapSnapshot snapshot) {
+        return prepareSurface(snapshot, false);
+    }
+
+    private static synchronized PreparedSurface prepareSurface(ServerMapSnapshot snapshot, boolean browsing) {
         Path file = snapshot.getSurfaceImage().toAbsolutePath().normalize();
         String key = snapshot.getProfile().getId() + "|" + file + "|"
                 + snapshot.getSurfaceRevision();
-        if (prepared != null && key.equals(prepared.key)) return prepared;
+        PreparedSurface current = browsing ? browsedSurface : prepared;
+        if (current != null && key.equals(current.key)) return current;
         final PreparedSurface next = new PreparedSurface(key, file,
                 new WaypointerFileResourceUrl(file, snapshot.getSurfaceRevision()));
-        prepared = next;
+        if (browsing) browsedSurface = next; else prepared = next;
         TEXTURE_WORKER.execute(new Runnable() {
             @Override public void run() {
                 try {
@@ -688,7 +762,7 @@ public final class ServerMapWindowBridge {
     }
 
     private static synchronized boolean isCurrentSurface(PreparedSurface surface) {
-        return prepared == surface;
+        return prepared == surface || browsedSurface == surface;
     }
 
     private static void scheduleSurfaceIndex(final PreparedSurface surface,
@@ -782,11 +856,85 @@ public final class ServerMapWindowBridge {
     private static synchronized State activeState(WorldMap map) {
         if (map == null) return null;
         ServerMapSnapshot snapshot = WurmWaypointerRuntime.serverMapSnapshot();
-        if (snapshot == null || snapshot.getProfile() == null || !snapshot.hasSurface()
-                || prepared == null || prepared.texture == null || prepared.failed) {
-            return null;
+        ServerMapProfile profile = customProfile(snapshot);
+        if (profile == null) return null;
+        State state = state(map, profile);
+        if (state.browsedGalleryIndex < 0 && (snapshot == null || !snapshot.hasSurface()
+                || prepared == null || !prepared.ready || prepared.failed || prepared.texture == null)) state.loadingGallery = true;
+        return state;
+    }
+
+    private static boolean galleryVisible(State state) {
+        return state.allMaps || (state.loadingGallery && state.browsedGalleryIndex < 0);
+    }
+    private static boolean homeView(State state) {
+        return !galleryVisible(state) && state.browsedGalleryIndex < 0;
+    }
+    private static ServerMapProfile galleryProfile(int index) {
+        for (ServerMapProfile profile : SklotopolisMapProfiles.all())
+            if (profile.getId().equals(MAP_GALLERY_PROFILE_IDS[index])) return profile;
+        throw new IllegalArgumentException("Unknown gallery map: " + index);
+    }
+    private static void returnHome(State state) {
+        WurmWaypointerRuntime.stopMapBrowsing();
+        state.allMaps = false; state.loadingGallery = false; state.browsedGalleryIndex = -1;
+        state.viewport = state.homeViewport; state.dragging = false; state.pressedGalleryCard = -1;
+        clearHoveredWaypoint(state); state.hoveredDeed = null;
+    }
+    private static void selectGallery(State state, int index) {
+        ServerMapProfile profile = galleryProfile(index);
+        if (state.profileId.equals(profile.getId())) { returnHome(state); return; }
+        MapViewport viewport = state.galleryViewports.get(index);
+        if (viewport == null) {
+            viewport = new MapViewport(profile.getMapWidth(), profile.getMapHeight(), CONTENT_WIDTH, CONTENT_HEIGHT,
+                    profile.getMapWidth() / 2d, profile.getMapHeight() / 2d);
+            state.galleryViewports.put(index, viewport);
         }
-        return state(map, snapshot.getProfile());
+        state.viewport = viewport; state.browsedGalleryIndex = index; state.allMaps = false; state.browsedMapReady = false;
+        state.loadingGallery = false; state.dragging = false; state.hoverInside = false;
+        clearHoveredWaypoint(state); state.hoveredDeed = null;
+    }
+    private static int galleryCardLeft(int index) {
+        int count = index < 3 ? 3 : 2, column = index < 3 ? index : index - 3;
+        return (CONTENT_WIDTH - GALLERY_CARD_SIZE * count - GALLERY_CARD_GAP * (count - 1)) / 2
+                + column * (GALLERY_CARD_SIZE + GALLERY_CARD_GAP);
+    }
+    private static int galleryCardTop(int index) { return index < 3 ? 116 : 348; }
+    private static int galleryCardAt(WorldMap map, int x, int y) {
+        x -= map.x + CONTENT_OFFSET_X; y -= map.y + CONTENT_OFFSET_Y;
+        for (int i = 0; i < MAP_GALLERY_FILES.length; i++)
+            if (x >= galleryCardLeft(i) - 5 && x < galleryCardLeft(i) + GALLERY_CARD_SIZE + 5
+                    && y >= galleryCardTop(i) - 5 && y < galleryCardTop(i) + GALLERY_CARD_SIZE + 28) return i;
+        return -1;
+    }
+    private static void renderMapBrowser(WorldMap map, Queue queue, State state,
+                                         ServerMapProfile home, int left, int top) {
+        if (state.allMaps) {
+            renderLoadingGallery(map, queue, home, left, top);
+            drawMainMapChrome(map, queue, state, home, left, top); return;
+        }
+        HeadsUpDisplay.scissor.pushClip(left, top, CONTENT_WIDTH, CONTENT_HEIGHT);
+        try {
+            drawWaterBacking(map, queue, left, top);
+            ServerMapSnapshot snapshot = WurmWaypointerRuntime.browsedMapSnapshot(galleryProfile(state.browsedGalleryIndex));
+            PreparedSurface surface = snapshot != null && snapshot.hasSurface() ? prepareSurface(snapshot, true) : null;
+            state.browsedMapReady = surface != null && surface.ready && !surface.failed && surface.texture != null
+                    && (surface.texture.isValid() || surface.texture.needReinit());
+            ResourceTexture texture = state.browsedMapReady ? surface.texture : mapGalleryTexture(state.browsedGalleryIndex);
+            if (texture != null) drawSurface(queue, texture, state.viewport, left, top);
+            if (layerVisible(state, MapOverlayVisibility.Layer.HIGHWAYS)) try {
+                drawHighways(queue, state.viewport, left, top, CONTENT_WIDTH, CONTENT_HEIGHT,
+                        WurmWaypointerRuntime.browsedMapHighways());
+            } catch (Throwable failure) {
+                reportOnce("browsed-highways", "Published map highways overlay failed open", failure);
+            }
+            if (snapshot != null && layerVisible(state, MapOverlayVisibility.Layer.DEEDS)) try {
+                drawDeeds(map, queue, state.viewport, left, top, snapshot.getDeeds(), state);
+            } catch (Throwable failure) {
+                reportOnce("browsed-deeds", "Published map deeds overlay failed open", failure);
+            }
+            drawMainMapChrome(map, queue, state, galleryProfile(state.browsedGalleryIndex), left, top);
+        } finally { HeadsUpDisplay.scissor.popClip(); }
     }
 
     private static void drawSurface(Queue queue, ResourceTexture texture,
@@ -862,27 +1010,18 @@ public final class ServerMapWindowBridge {
                     left, top, CONTENT_WIDTH, CONTENT_HEIGHT);
             UiPainter.background(WaypointerUi.canvas(map, queue), UiBackground.SOLID, 1, left, top, CONTENT_WIDTH, CONTENT_HEIGHT);
 
-            int cardSize = 164;
-            int rowGap = 30;
-            int firstRowLeft = left
-                    + (CONTENT_WIDTH - cardSize * 3 - rowGap * 2) / 2;
-            int secondRowLeft = left
-                    + (CONTENT_WIDTH - cardSize * 2 - rowGap) / 2;
-            int firstRowTop = top + 116;
-            int secondRowTop = top + 348;
             for (int index = 0; index < MAP_GALLERY_FILES.length; index++) {
-                int column = index < 3 ? index : index - 3;
-                int x = (index < 3 ? firstRowLeft : secondRowLeft)
-                        + column * (cardSize + rowGap);
-                int y = index < 3 ? firstRowTop : secondRowTop;
+                int x = left + galleryCardLeft(index);
+                int y = top + galleryCardTop(index);
                 drawGalleryCard(map, queue, profile, index,
-                        x, y, cardSize);
+                        x, y, GALLERY_CARD_SIZE);
             }
 
             drawMainMapEdgeGuard(map, queue, left, top);
             drawMainMapFrame(map, queue, left, top);
 
-            String loading = "LOADING " + mapWorldName(profile) + " MAP...";
+            String loading = state(map, profile).allMaps ? Messages.text("Choose a map to view")
+                    : "LOADING " + mapWorldName(profile) + " MAP...";
             int loadingX = left
                     + (CONTENT_WIDTH - MAIN_TITLE_TEXT.getWidth(loading)) / 2;
             MAIN_TITLE_TEXT.moveTo(loadingX, top + CONTENT_HEIGHT - 32);
@@ -898,6 +1037,7 @@ public final class ServerMapWindowBridge {
                                         int x, int y, int size) {
         boolean active = profile != null && profile.getId().equals(
                 MAP_GALLERY_PROFILE_IDS[index]);
+        active |= state(map, profile).hoveredGalleryCard == index;
         float edgeRed = active ? 0.96f : 0.28f;
         float edgeGreen = active ? 0.76f : 0.21f;
         float edgeBlue = active ? 0.30f : 0.13f;
@@ -946,6 +1086,7 @@ public final class ServerMapWindowBridge {
                     failure);
         }
         try {
+            drawAllMapsButton(map, queue, state, left, top);
             drawLayerButtons(map, queue, state, left, top);
             drawMiniMapButton(map, queue, state, left, top);
             drawCenterButton(map, queue, state, left, top);
@@ -1463,6 +1604,13 @@ public final class ServerMapWindowBridge {
         map.fillRect(queue, 0.16f, 0.09f, 0.035f, 0.90f,
                 left + 22, top + CONTENT_HEIGHT - 42,
                 CONTENT_WIDTH - 44, 20);
+        if (!homeView(state) || state.allMapsButtonHover) {
+            String help = state.allMapsButtonHover ? Messages.text("Show all five server maps")
+                    : galleryVisible(state) ? Messages.text("Choose a map to view")
+                    : mapWorldName(profile) + " | " + (state.hoverInside ? "X=" + state.hoverTileX + " Y=" + state.hoverTileY + " | " : "")
+                    + Messages.text(state.browsedMapReady ? "Wheel: zoom | drag: pan | CENTER: return to your character" : "Loading full map...");
+            text(queue, help, left + 28, top + CONTENT_HEIGHT - 27, 1f, .92f, .72f, 1f, left, top); return;
+        }
         String coordinate = state.hoverInside
                 ? "X=" + state.hoverTileX + " Y=" + state.hoverTileY
                         + "  Tile: " + hoveredTileDescription(state) + "  "
@@ -1501,7 +1649,29 @@ public final class ServerMapWindowBridge {
     private static void drawLayerButtons(WorldMap map, Queue queue, State state, int left, int top) {
         for (MapOverlayVisibility.Layer layer : LAYER_BUTTONS)
             WaypointerUi.paintButton(map, queue, "layer" + layer, layerButtonLabel(layer), state.hoveredLayerButton == layer,
-                    state.pressedLayerButton == layer, true, layerVisible(state, layer), layerButtonLeft(left, layer), top + SEARCH_BUTTON_TOP, LAYER_BUTTON_WIDTH, LAYER_BUTTON_HEIGHT);
+                    state.pressedLayerButton == layer, layerAvailable(state, layer), layerVisible(state, layer), layerButtonLeft(left, layer), top + SEARCH_BUTTON_TOP, LAYER_BUTTON_WIDTH, LAYER_BUTTON_HEIGHT, toolbarGroup());
+    }
+
+    static WaypointerButtonGroup toolbarGroup() {
+        if (toolbarGroup == null || toolbarLanguageRevision != Messages.revision()) {
+            toolbarGroup = WaypointerButtonGroup.painted("main-map.controls", LAYER_BUTTON_HEIGHT,
+                    Messages.texts(new String[]{"ALL MAPS ON SERVER", "Zoom speed: 1X", "Zoom speed: 2X", "Zoom speed: 4X",
+                            "CENTER", "NAV LINE", "MINI MAP", "DEEDS", "ROADS", "MARKS"}),
+                    new int[]{ALL_MAPS_BUTTON_WIDTH, ZOOM_FACTOR_BUTTON_WIDTH, ZOOM_FACTOR_BUTTON_WIDTH, ZOOM_FACTOR_BUTTON_WIDTH,
+                            72, NAV_LINE_BUTTON_WIDTH, MINI_MAP_BUTTON_WIDTH, LAYER_BUTTON_WIDTH, LAYER_BUTTON_WIDTH, LAYER_BUTTON_WIDTH});
+            toolbarLanguageRevision = Messages.revision();
+        }
+        return toolbarGroup;
+    }
+    private static boolean insideAllMapsButton(WorldMap map, int x, int y) {
+        int left = map.x + CONTENT_OFFSET_X + MAIN_MAP_FRAME_INSET;
+        int top = map.y + CONTENT_OFFSET_Y + SEARCH_BUTTON_TOP;
+        return x >= left && x < left + ALL_MAPS_BUTTON_WIDTH && y >= top && y < top + LAYER_BUTTON_HEIGHT;
+    }
+    private static void drawAllMapsButton(WorldMap map, Queue queue, State state, int left, int top) {
+        WaypointerUi.paintButton(map, queue, "AllMaps", "ALL MAPS ON SERVER", state.allMapsButtonHover,
+                state.allMapsButtonPressed, true, galleryVisible(state), left + MAIN_MAP_FRAME_INSET,
+                top + SEARCH_BUTTON_TOP, ALL_MAPS_BUTTON_WIDTH, LAYER_BUTTON_HEIGHT, toolbarGroup());
     }
 
     private static boolean insideCenterButton(WorldMap map, int x, int y) {
@@ -1523,19 +1693,19 @@ public final class ServerMapWindowBridge {
     }
 
     private static void drawZoomFactorButton(WorldMap map, Queue queue, State state, int left, int top) {
-        WaypointerUi.paintButton(map, queue, "ZoomFactor", "Zoom speed: " + MiniMapWindowBridge.getZoomFactor() + "X", state.zoomFactorButtonHover, state.zoomFactorButtonPressed, true, false, zoomFactorButtonLeft(left), top + SEARCH_BUTTON_TOP, ZOOM_FACTOR_BUTTON_WIDTH, LAYER_BUTTON_HEIGHT);
+        WaypointerUi.paintButton(map, queue, "ZoomFactor", "Zoom speed: " + MiniMapWindowBridge.getZoomFactor() + "X", state.zoomFactorButtonHover, state.zoomFactorButtonPressed, true, false, zoomFactorButtonLeft(left), top + SEARCH_BUTTON_TOP, ZOOM_FACTOR_BUTTON_WIDTH, LAYER_BUTTON_HEIGHT, toolbarGroup());
     }
 
     private static void drawCenterButton(WorldMap map, Queue queue, State state, int left, int top) {
-        WaypointerUi.paintButton(map, queue, "Center", "CENTER", state.centerButtonHover, false, true, false, navigationLineButtonLeft(left) - LAYER_BUTTON_GAP - 72, top + SEARCH_BUTTON_TOP, 72, LAYER_BUTTON_HEIGHT);
+        WaypointerUi.paintButton(map, queue, "Center", "CENTER", state.centerButtonHover, state.centerButtonPressed, true, false, navigationLineButtonLeft(left) - LAYER_BUTTON_GAP - 72, top + SEARCH_BUTTON_TOP, 72, LAYER_BUTTON_HEIGHT, toolbarGroup());
     }
 
     private static void drawMiniMapButton(WorldMap map, Queue queue, State state, int left, int top) {
-        WaypointerUi.paintButton(map, queue, "MiniMap", "MINI MAP", state.miniMapButtonHover, state.miniMapButtonPressed, true, MiniMapWindowBridge.isEnabled(), miniMapButtonLeft(left), top + SEARCH_BUTTON_TOP, MINI_MAP_BUTTON_WIDTH, LAYER_BUTTON_HEIGHT);
+        WaypointerUi.paintButton(map, queue, "MiniMap", "MINI MAP", state.miniMapButtonHover, state.miniMapButtonPressed, true, MiniMapWindowBridge.isEnabled(), miniMapButtonLeft(left), top + SEARCH_BUTTON_TOP, MINI_MAP_BUTTON_WIDTH, LAYER_BUTTON_HEIGHT, toolbarGroup());
     }
 
     private static void drawNavigationLineButton(WorldMap map, Queue queue, State state, int left, int top) {
-        WaypointerUi.paintButton(map, queue, "NavigationLine", "NAV LINE", state.navigationLineButtonHover, state.navigationLineButtonPressed, true, MiniMapWindowBridge.isNavigationLineVisible(), navigationLineButtonLeft(left), top + SEARCH_BUTTON_TOP, NAV_LINE_BUTTON_WIDTH, LAYER_BUTTON_HEIGHT);
+        WaypointerUi.paintButton(map, queue, "NavigationLine", "NAV LINE", state.navigationLineButtonHover, state.navigationLineButtonPressed, homeView(state), MiniMapWindowBridge.isNavigationLineVisible(), navigationLineButtonLeft(left), top + SEARCH_BUTTON_TOP, NAV_LINE_BUTTON_WIDTH, LAYER_BUTTON_HEIGHT, toolbarGroup());
     }
 
     private static String layerButtonLabel(MapOverlayVisibility.Layer layer) {
@@ -1714,7 +1884,7 @@ public final class ServerMapWindowBridge {
     }
 
     private static void drawSearchButton(WorldMap map, Queue queue, State state, int left, int top) {
-        WaypointerUi.paintButton(map, queue, "Search", "@search", state.searchButtonHover, false, true, false, searchButtonLeft(left), top + SEARCH_BUTTON_TOP, SEARCH_BUTTON_SIZE, LAYER_BUTTON_HEIGHT);
+        WaypointerUi.paintButton(map, queue, "Search", "@search", state.searchButtonHover, false, homeView(state), false, searchButtonLeft(left), top + SEARCH_BUTTON_TOP, SEARCH_BUTTON_SIZE, LAYER_BUTTON_HEIGHT);
     }
 
     private static void drawCloseButton(WorldMap map, Queue queue, State state, int left, int top) {
@@ -1723,6 +1893,7 @@ public final class ServerMapWindowBridge {
 
     private static void requestWaypoint(WorldMap map, State state,
                                         int mouseX, int mouseY) {
+        if (!homeView(state)) return;
         if (state.hoveredDeed != null) {
             Deed selected = state.hoveredDeed;
             state.viewport.focusOn(selected.getX() + 0.5d,
@@ -1786,6 +1957,8 @@ public final class ServerMapWindowBridge {
 
     private static void updateHover(WorldMap map, State state,
                                     int mouseX, int mouseY) {
+        state.allMapsButtonHover = insideAllMapsButton(map, mouseX, mouseY);
+        state.hoveredGalleryCard = galleryVisible(state) ? galleryCardAt(map, mouseX, mouseY) : -1;
         state.zoomFactorButtonHover = insideZoomFactorButton(map, mouseX, mouseY);
         state.centerButtonHover = insideCenterButton(map, mouseX, mouseY);
         state.searchButtonHover = insideSearchButton(map, mouseX, mouseY);
@@ -1795,7 +1968,7 @@ public final class ServerMapWindowBridge {
         state.navigationLineButtonHover = insideNavigationLineButton(
                 map, mouseX, mouseY);
         state.hoveredLayerButton = layerButtonAt(map, mouseX, mouseY);
-        if (state.zoomFactorButtonHover || state.centerButtonHover || state.searchButtonHover || state.closeButtonHover
+        if (galleryVisible(state) || state.allMapsButtonHover || state.zoomFactorButtonHover || state.centerButtonHover || state.searchButtonHover || state.closeButtonHover
                 || state.miniMapButtonHover
                 || state.navigationLineButtonHover
                 || state.hoveredLayerButton != null) {
@@ -1811,7 +1984,9 @@ public final class ServerMapWindowBridge {
         if (state.hoverInside) {
             state.hoverTileX = (int) Math.floor(point.getX());
             state.hoverTileY = (int) Math.floor(point.getY());
-            updateHoveredWaypoint(map, state, mouseX, mouseY);
+            if (homeView(state)) {
+                updateHoveredWaypoint(map, state, mouseX, mouseY);
+            } else { clearHoveredWaypoint(state); }
             updateHoveredDeed(map, state, mouseX, mouseY);
         } else {
             clearHoveredWaypoint(state);
@@ -1823,7 +1998,8 @@ public final class ServerMapWindowBridge {
                                           int mouseX, int mouseY) {
         state.hoveredDeed = null;
         if (!layerVisible(state, MapOverlayVisibility.Layer.DEEDS)) return;
-        ServerMapSnapshot snapshot = WurmWaypointerRuntime.serverMapSnapshot();
+        ServerMapSnapshot snapshot = homeView(state) ? WurmWaypointerRuntime.serverMapSnapshot()
+                : WurmWaypointerRuntime.browsedMapSnapshot(galleryProfile(state.browsedGalleryIndex));
         if (snapshot == null || snapshot.getDeeds() == null) return;
         double bestDistanceSquared = DEED_HIT_RADIUS * DEED_HIT_RADIUS;
         for (Deed deed : snapshot.getDeeds()) {
@@ -2056,6 +2232,7 @@ public final class ServerMapWindowBridge {
 
     private static boolean layerVisible(State state,
                                         MapOverlayVisibility.Layer layer) {
+        if (!homeView(state)) return layerAvailable(state, layer) && state.overlays.isVisible(layer);
         if (layer == MapOverlayVisibility.Layer.DEEDS) {
             return MiniMapWindowBridge.areDeedsVisible();
         }
@@ -2067,6 +2244,10 @@ public final class ServerMapWindowBridge {
 
     private static void toggleLayer(State state,
                                     MapOverlayVisibility.Layer layer) {
+        if (!homeView(state)) {
+            if (layerAvailable(state, layer)) state.overlays.toggle(layer);
+            return;
+        }
         if (layer == MapOverlayVisibility.Layer.DEEDS) {
             MiniMapWindowBridge.toggleDeeds();
         } else if (layer == MapOverlayVisibility.Layer.HIGHWAYS) {
@@ -2074,6 +2255,12 @@ public final class ServerMapWindowBridge {
         } else {
             state.overlays.toggle(layer);
         }
+    }
+
+    private static boolean layerAvailable(State state, MapOverlayVisibility.Layer layer) {
+        return !galleryVisible(state) && (homeView(state)
+                || layer == MapOverlayVisibility.Layer.DEEDS
+                || layer == MapOverlayVisibility.Layer.HIGHWAYS);
     }
 
     private static boolean visibleWaypoint(WaypointRecord record,
@@ -2156,7 +2343,11 @@ public final class ServerMapWindowBridge {
 
     private static final class State {
         private final String profileId;
-        private final MapViewport viewport;
+        private MapViewport viewport;
+        private final MapViewport homeViewport;
+        private final Map<Integer,MapViewport> galleryViewports = new HashMap<Integer,MapViewport>();
+        private boolean allMaps, loadingGallery, allMapsButtonPressed, allMapsButtonHover, browsedMapReady;
+        private int browsedGalleryIndex = -1, pressedGalleryCard = -1, hoveredGalleryCard = -1;
         private final MapOverlayVisibility overlays;
         private boolean dragging;
         private boolean dragged;
@@ -2191,6 +2382,7 @@ public final class ServerMapWindowBridge {
                       MapOverlayVisibility overlays) {
             this.profileId = profileId;
             this.viewport = viewport;
+            this.homeViewport = viewport;
             this.overlays = overlays;
         }
     }

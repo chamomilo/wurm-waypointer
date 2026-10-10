@@ -274,8 +274,7 @@ public final class StaticNavigationRegistry {
                 && record.getSourceType() != WaypointSourceType.DEED
                 && record.getSourceType() != WaypointSourceType.ARCHAEOLOGY_REPORT
                 && record.getSourceType() != WaypointSourceType.MANAGED_ANIMAL
-                && record.getSourceType() != WaypointSourceType.MANAGED_ITEM
-                && record.getSourceType() != WaypointSourceType.PLAYER)
+                && record.getSourceType() != WaypointSourceType.MANAGED_ITEM)
                 || !renderableResolution(record)
                 || record.getCoordinate() == null || record.getMarkerStyle() == null
                 || record.getMarkerStyle().getWorldStyle() == MarkerStyle.WorldStyle.HIDDEN) {
@@ -299,7 +298,8 @@ public final class StaticNavigationRegistry {
                     || resolution == WaypointResolution.STALE;
         }
         if (org.waypoints.next.tracking.TrackingCatalog.isTracked(record)) {
-            return resolution == WaypointResolution.LIVE_EXACT || resolution == WaypointResolution.LAST_SEEN;
+            return resolution == WaypointResolution.LIVE_EXACT || resolution == WaypointResolution.LAST_SEEN
+                    || (record.getSourceType()==WaypointSourceType.MANAGED_ANIMAL&&resolution==WaypointResolution.SEARCH_STEP);
         }
         return resolution == WaypointResolution.STATIC_EXACT;
     }
@@ -383,6 +383,8 @@ public final class StaticNavigationRegistry {
 
     private static String navigationName(WaypointRecord record) {
         if (record.getSourceType() != WaypointSourceType.VANILLA_SYSTEM) {
+            if(record.getSourceType()==WaypointSourceType.MANAGED_ANIMAL&&record.getResolution()==WaypointResolution.SEARCH_STEP)
+                return record.getName()+" ("+org.waypoints.next.i18n.Messages.text("Animal search point")+")";
             return record.getResolution() == WaypointResolution.LAST_SEEN
                     ? record.getName() + " (" + org.waypoints.next.i18n.Messages.text("Last known position") + ")" : record.getName();
         }

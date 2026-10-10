@@ -45,6 +45,8 @@ final class SurroundingsRuntime implements DynamicWaypointProvider {
             new HashMap<SurroundingKey, Object>();
     private final Map<SurroundingKey, Long> pendingRemovals =
             new HashMap<SurroundingKey, Long>();
+    private final java.util.Set<SurroundingKey> endedSubjects =
+            new java.util.HashSet<SurroundingKey>();
     private final ScannerSession scanner = new ScannerSession();
     private final Deque<String> messages = new ArrayDeque<String>();
 
@@ -162,11 +164,13 @@ final class SurroundingsRuntime implements DynamicWaypointProvider {
         renderableKinds.clear();
         renderables.clear();
         pendingRemovals.clear();
+        endedSubjects.clear();
         catalog.clearEntries();
         scanner.clearObserved();
     }
 
     synchronized void removeAuthoritatively(SurroundingKey key) {
+        endedSubjects.add(key);
         SurroundingEntry removed = catalog.find(key);
         renderableKinds.remove(Long.valueOf(key.getWurmId()));
         renderables.remove(key);
@@ -182,6 +186,8 @@ final class SurroundingsRuntime implements DynamicWaypointProvider {
     }
 
     SurroundingEntry find(SurroundingKey key) { return catalog.find(key); }
+
+    Collection<SurroundingEntry> entries() { return catalog.entries(); }
 
     List<SurroundingEntry> findAll(Collection<SurroundingKey> keys) {
         return catalog.findAll(keys);
@@ -338,7 +344,7 @@ final class SurroundingsRuntime implements DynamicWaypointProvider {
     }
 
     private SurroundingEntry classified(SurroundingEntry entry) {
-        return entry == null ? null : entry.withDeedStatus(
+        return entry == null || endedSubjects.contains(entry.getKey()) ? null : entry.withDeedStatus(
                 SurroundingsCatalog.deedStatus(entry, deedAreas, deedDataAvailable));
     }
 
@@ -382,6 +388,7 @@ final class SurroundingsRuntime implements DynamicWaypointProvider {
         renderableKinds.clear();
         renderables.clear();
         pendingRemovals.clear();
+        endedSubjects.clear();
         catalog.clearSession();
         scanner.deactivate();
         messages.clear();

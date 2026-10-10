@@ -15,24 +15,25 @@ final class WaypointerSettingsPanel extends WaypointerContentPanel implements Bu
     private int minimumWidth;
     WaypointerSettingsPanel(SettingsController controller){
         super("waypointer.settings",false);this.controller=controller;Properties values=controller.values();
-        int labelWidth=340;for(SettingSpec spec:SettingSpec.ALL)labelWidth=Math.max(labelWidth,text.getWidth(Messages.text(spec.label))+16);
-        minimumWidth=Math.max(900,labelWidth+418);
+        int labelWidth=280;for(SettingSpec spec:SettingSpec.ALL)if(!spec.key.equals("language"))labelWidth=Math.max(labelWidth,text.getWidth(Messages.text(spec.label))+12);
+        minimumWidth=Math.max(620,labelWidth+250);
         WurmArrayPanel<FlexComponent> content=new WurmArrayPanel<FlexComponent>("settings.rows",0,true);String group="";
         for(SettingSpec spec:SettingSpec.ALL){
-            if(!group.equals(spec.group)){group=spec.group;WurmLabel heading=new WaypointerLabel(Messages.text(group));heading.setInitialSize(800,38,false);content.addComponent(heading);}
-            WurmBorderPanel row=new WurmBorderPanel("setting."+spec.key);row.setInitialSize(800,38,false);row.sizeFlags=FIXED_HEIGHT;
-            WurmLabel label=new WaypointerLabel(Messages.text(spec.label));label.setInitialSize(labelWidth,38,false);label.sizeFlags=FIXED_WIDTH|FIXED_HEIGHT;row.setComponent(label,WEST);
+            if(spec.key.equals("language"))continue; // The shared updater owns language selection.
+            if(!group.equals(spec.group)){group=spec.group;WurmLabel heading=new WaypointerLabel(Messages.text(group));heading.text=com.wurmonline.client.renderer.gui.text.WaypointerFonts.body(true);heading.setInitialSize(800,28,false);content.addComponent(heading);}
+            WurmBorderPanel row=new WurmBorderPanel("setting."+spec.key);row.setInitialSize(800,30,false);row.sizeFlags=FIXED_HEIGHT;
+            WurmLabel label=new WaypointerLabel(Messages.text(spec.label));label.setInitialSize(labelWidth,30,false);label.sizeFlags=FIXED_WIDTH|FIXED_HEIGHT;row.setComponent(label,WEST);
             String value=values.getProperty(spec.key,spec.defaultValue);FlexComponent editor;
             if(spec.type==SettingSpec.Type.BOOLEAN||spec.type==SettingSpec.Type.CHOICE){
-                int selected=Arrays.asList(spec.choices).indexOf(value);String[] labels=spec.key.equals("language")?Messages.NAMES:spec.type==SettingSpec.Type.BOOLEAN?Messages.texts(new String[]{"Off","On"}):Messages.texts(spec.choices);
+                int selected=Arrays.asList(spec.choices).indexOf(value);String[] labels=spec.type==SettingSpec.Type.BOOLEAN?Messages.texts(new String[]{"Off","On"}):Messages.texts(spec.choices);
                 editor=WaypointerUi.dropDown("setting."+spec.key,Math.max(0,selected),labels);
             }else{WurmInputField input=WaypointerUi.input("setting."+spec.key,this);input.prompt="";input.setTextMoveToEnd(value);editor=input;}
-            editor.setInitialSize(400,32,false);row.setComponent(WaypointerUi.view(editor),CENTER);editors.put(spec,editor);content.addComponent(row);
+            editor.setInitialSize(240,28,false);row.setComponent(WaypointerUi.view(editor),CENTER);editors.put(spec,editor);content.addComponent(row);
         }
         scroll=new ChamomiloUiV1ScrollPanel("settings.scroll",content,false,true);setComponent(scroll,CENTER);
         WurmArrayPanel<FlexComponent> footer=new WurmArrayPanel<FlexComponent>("settings.footer",1);
-        save=WaypointerUi.button("Save settings",this,180,40,org.chamomilo.wurm.ui.v1.UiDensity.LOW);reset=WaypointerUi.button("Reset draft",this,170,40,org.chamomilo.wurm.ui.v1.UiDensity.LOW);footer.addComponent(save);footer.addComponent(reset);status.setInitialSize(450,40,false);footer.addComponent(status);setComponent(footer,SOUTH);
-        WaypointerButtonGroup.peers("settings.footer",org.chamomilo.wurm.ui.v1.UiDensity.LOW,40,save,reset);
+        save=WaypointerUi.button("Save settings",this,130);reset=WaypointerUi.button("Reset draft",this,120);footer.componentWidthOffset=4;footer.addComponent(save);footer.addComponent(reset);status.setInitialSize(240,28,false);footer.addComponent(status);setComponent(footer,SOUTH);
+        WaypointerButtonGroup.peers("settings.footer",org.chamomilo.wurm.ui.v1.UiDensity.HIGH,28,save,reset);
     }
     @Override public void buttonPressed(WButton button){}
     @Override public void buttonClicked(WButton button){

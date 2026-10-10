@@ -18,6 +18,8 @@ public class WaypointerUiWindow extends ChamomiloUiV1Window {
         resizable = resize;
         text=WaypointerFonts.body();textBold=WaypointerFonts.body(true);
         setTitleFont(WaypointerFonts.title());
+        setHeaderHeight(29);
+        setContentPadding(4);
     }
     @Override protected void renderComponent(Queue queue, float ignoredAlpha) {
         // Match Keybinder: HUD focus/fade alpha must not pulse an open custom window.

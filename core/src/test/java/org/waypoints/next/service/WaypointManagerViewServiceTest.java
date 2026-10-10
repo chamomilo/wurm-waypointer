@@ -106,8 +106,7 @@ public class WaypointManagerViewServiceTest {
     }
 
     @Test public void trackedTargetsSupportRemovalButKeepAutomaticCoordinates() {
-        for (WaypointSourceType type : Arrays.asList(WaypointSourceType.PLAYER,
-                WaypointSourceType.MANAGED_ANIMAL, WaypointSourceType.MANAGED_ITEM)) {
+        for (WaypointSourceType type : Arrays.asList(WaypointSourceType.MANAGED_ANIMAL, WaypointSourceType.MANAGED_ITEM)) {
             WaypointRecord target = WaypointRecord.copyOf(records.get(0))
                     .sourceType(type).sourceKey("tracked:" + type + ":42").build();
             WaypointManagerRow row = service.snapshot(Arrays.asList(target),

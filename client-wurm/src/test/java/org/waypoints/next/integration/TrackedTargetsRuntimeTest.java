@@ -67,7 +67,7 @@ public class TrackedTargetsRuntimeTest {
         TrackingCatalog catalog = new TrackingCatalog();
         catalog.bind(ServerIdentity.of(new ServerEndpoint("127.0.0.1",3724,27016),
                 "Fixture","Fixture",ServerIdentity.Resolution.RESOLVED),"Alice",now);
-        WaypointRecord friend = catalog.candidate(ManagedKind.PLAYER,"Friend","Friend","Offline",now);
+        WaypointRecord friend = catalog.candidate(ManagedKind.ANIMAL,"Mare","Mare","Manage horse",now);
         catalog.candidate(ManagedKind.ANIMAL,"42","Mare","Manage horse",now);
         catalog.live(ManagedKind.VEHICLE,"43","Cart","Manage cart",
                 new WaypointCoordinate(20,40,2d,WaypointLayer.SURFACE),now);

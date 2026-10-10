@@ -27,12 +27,17 @@ final class HubSettings implements SettingsController {
                 || code.equals(current.getProperty("language", "en"))) return;
         Properties next = values();
         next.setProperty("language", code);
-        save(next);
+        current=next;
+        Messages.select(code); // The updater changes every mod in the same HUD operation.
+        persist(next);
     }
     @Override public synchronized void save(Properties draft){
-        final Properties next=values();for(SettingSpec spec:SettingSpec.ALL)next.setProperty(spec.key,spec.validate(draft.getProperty(spec.key,next.getProperty(spec.key,spec.defaultValue))));
-        WaypointClientConfiguration.from(next);status="Saving settings…";
-        writer.execute(()->{try{write(file,next);synchronized(this){current=next;}apply.accept(next);status="Settings saved. File paths take effect after restart.";}
+        final Properties next=values();for(SettingSpec spec:SettingSpec.ALL)if(!spec.key.equals("language"))next.setProperty(spec.key,spec.validate(draft.getProperty(spec.key,next.getProperty(spec.key,spec.defaultValue))));
+        WaypointClientConfiguration.from(next);current=next;persist(next);
+    }
+    private void persist(final Properties next){
+        status="Saving settings…";
+        writer.execute(()->{try{write(file,next);apply.accept(next);status="Settings saved. File paths take effect after restart.";}
             catch(Exception failure){status="Settings could not be saved.";Logger.getLogger("WurmWaypointer.Settings").log(Level.WARNING,status,failure);}});
     }
     @Override public String status(){return Messages.text(status);}

@@ -18,16 +18,11 @@ public final class HubLayoutProbe {
     private static final SurroundingsCatalog surroundings=new SurroundingsCatalog();
     private static final Properties settings=new Properties();
     private static final ServerIdentity server=ServerIdentity.of(new ServerEndpoint("127.0.0.1",3724,27016),"Fixture","Fixture",ServerIdentity.Resolution.RESOLVED);
-    private static int saves,clearPreviews,managedRefreshes,friendRefreshes,manualFriendRefreshes;
+    private static int saves,clearPreviews,managedRefreshes,animalRefreshes;
     private static long trackingRevision;
-    private static final Map<UUID,Boolean> friendPresence=new HashMap<UUID,Boolean>();
     public static void main(String[] args)throws Exception{
         Files.createDirectories(Paths.get(args[1]));Instant now=Instant.now();TrackingCatalog tracking=new TrackingCatalog();tracking.bind(server,"Alice",now);
         WaypointRecord mare=tracking.live(ManagedKind.ANIMAL,"42","Mare Alpha","Manage horse",new WaypointCoordinate(110,90,2d,WaypointLayer.SURFACE),now);tracking.enabled(mare.getId(),true,now);tracking.vanished(ManagedKind.ANIMAL,"42",now);
-        friendPresence.put(tracking.candidate(ManagedKind.PLAYER,"Friend","Friend","Online; offline note",now).getId(),true);
-        friendPresence.put(tracking.live(ManagedKind.PLAYER,"Alice Friend","Alice Friend","Online",new WaypointCoordinate(125,100,2d,WaypointLayer.SURFACE),now).getId(),true);
-        friendPresence.put(tracking.candidate(ManagedKind.PLAYER,"Offline Friend","Offline Friend","Offline; online note",now).getId(),false);
-        tracking.candidate(ManagedKind.PLAYER,"Unknown Friend","Unknown Friend","Unknown; online note",now);
         tracking.candidate(ManagedKind.ANIMAL,"43","Horse Beta","Manage horse",now);
         tracking.live(ManagedKind.VEHICLE,"44","Cart Gamma","Manage small cart",new WaypointCoordinate(200,100,2d,WaypointLayer.SURFACE),now);
         tracking.bearing(ManagedKind.ANIMAL,"43",AnimalBearing.parse("The Horse Beta is some distance away in front of you.","Horse Beta",100,100,0),now);
@@ -37,8 +32,16 @@ public final class HubLayoutProbe {
             switch(m.getName()){
                 case "context":return new WaypointManagerContext("Alice",server,100,100,2,WaypointLayer.SURFACE);
                 case "snapshot":return new WaypointManagerViewService().snapshot(tracking.waypoints(),(WaypointManagerQuery)a[0]);
+                case "tracking":return proxy(TrackingController.class,(p2,m2,a2)->{
+                    if(m2.getName().equals("refresh")){if((Boolean)a2[0])animalRefreshes++;else managedRefreshes++;return null;}
+                    if(m2.getName().equals("revision"))return trackingRevision;
+                    if(m2.getName().equals("records")){List<WaypointRecord> list=new ArrayList<WaypointRecord>();for(WaypointRecord r:records)if((r.getSourceType()==WaypointSourceType.MANAGED_ANIMAL)==(Boolean)a2[0])list.add(r);return list;}
+                    if(m2.getName().equals("canNavigate")){for(WaypointRecord r:records)if(r.getId().equals(a2[0]))return r.getSourceType()==WaypointSourceType.MANAGED_ANIMAL||r.isEnabled()&&r.getCoordinate()!=null;return false;}
+                    if(m2.getName().equals("status"))return "Manage list received.";
+                    if(m2.getName().equals("detail")){for(WaypointRecord r:records)if(r.getId().equals(a2[0]))return r.getDescription();return "";}
+                    return defaultValue(m2);
+                });
                 case "surroundings":return proxy(SurroundingsController.class,(p2,m2,a2)->{if(m2.getName().equals("snapshot"))return surroundings.snapshot((SurroundingsQuery)a2[0],400,400);if(m2.getName().equals("setWaypoint")){surroundings.setWaypoint((SurroundingKey)a2[0],(Boolean)a2[1]);return null;}if(m2.getName().equals("revision"))return surroundings.revision();return defaultValue(m2);});
-                case "tracking":return proxy(TrackingController.class,(p2,m2,a2)->{if(m2.getName().equals("refresh")){if((Boolean)a2[0])friendRefreshes++;else managedRefreshes++;return null;}if(m2.getName().equals("revision"))return trackingRevision;if(m2.getName().equals("records")){List<WaypointRecord> list=new ArrayList<WaypointRecord>();for(WaypointRecord r:records)if((r.getSourceType()==WaypointSourceType.PLAYER)==(Boolean)a2[0])list.add(r);return list;}if(m2.getName().equals("online"))return friendPresence.get((UUID)a2[0]);if(m2.getName().equals("status"))return "Manage list received.";if(m2.getName().equals("detail")){for(WaypointRecord r:records)if(r.getId().equals(a2[0]))return r.getDescription();return "";}return defaultValue(m2);});
                 case "settings":return proxy(SettingsController.class,(p2,m2,a2)->{if(m2.getName().equals("values")){Properties copy=new Properties();copy.putAll(settings);return copy;}if(m2.getName().equals("status"))return "";if(m2.getName().equals("save")){settings.putAll((Properties)a2[0]);saves++;}return null;});
                 case "clearLivePreview":clearPreviews++;return null;
                 case "reportFailure":throw new AssertionError(String.valueOf(a[0]),(Throwable)a[1]);
@@ -50,20 +53,25 @@ public final class HubLayoutProbe {
             System.out.println("TRACKED_TABLE_SCROLL_OK: SDK scroll, background order and visible UUID retention");return;
         }
         for(String language:Messages.CODES){Messages.select(language);settings.setProperty("language",language);WaypointerLayoutProbe.preparePreview(args[0],args[2],12);
-            WaypointerHubWindow hub=new WaypointerHubWindow(controller);hub.setSize(1480,700);hub.setPosition(10,10);hub.gameTick();
+            WaypointerHubWindow hub=new WaypointerHubWindow(controller);hub.setSize(1120,480);hub.setPosition(10,10);hub.gameTick();
             @SuppressWarnings("unchecked") Map<WButton,WaypointerSection> selectors=(Map<WButton,WaypointerSection>)field(hub,"selectors");check(selectors.size()==7,"Seven selectors");
             WaypointerLayoutProbe.savePreview(hub,Paths.get(args[1],"initial.png").toString());
             WaypointerLayoutProbe.verifyStableOpacity(hub);
             for(Map.Entry<WButton,WaypointerSection> selector:selectors.entrySet()){
-                WButton button=selector.getKey();check(button instanceof ChamomiloUiV1Button,"Approved skin");check(((ChamomiloUiV1Button)button).density()==UiDensity.LOW,"Navigation has low density");check(!((ChamomiloUiV1Button)button).captionShortened(),"Navigation preserves full caption");check(button.height==56,"Selector text fits: "+language+" "+button.getLabel()+" width="+button.width+" text="+button.text.getWidth(button.getLabel()));if(button.isEnabled())hub.buttonClicked(button);hub.gameTick();
+                WButton button=selector.getKey();check(button instanceof ChamomiloUiV1Button,"Approved skin");check(((ChamomiloUiV1Button)button).density()==UiDensity.HIGH,"Navigation uses compact captions");check(!((ChamomiloUiV1Button)button).captionShortened(),"Navigation preserves full caption");check(button.height==28,"Selector text fits: "+language+" "+button.getLabel()+" width="+button.width+" text="+button.text.getWidth(button.getLabel()));if(button.isEnabled())hub.buttonClicked(button);hub.gameTick();
                 check(button.y>=hub.y&&button.y+button.height<=hub.y+hub.height,"Selector inside window");
                 for(WurmComponent c=button;c!=null;c=c.parent)check(c.width>0&&c.height>0,"Selector has visible parents");
                 check(hub.getComponentAt(button.x+button.width/2,button.y+button.height/2)==button,"Selector reachable by native hit testing");
                 check(field(hub,"section")==selector.getValue(),"Selector routes to its section");
                 WaypointerContentPanel panel=panels(hub).get(selector.getValue());check(!((Object)panel instanceof WWindow),"Feature is a panel");
-                hub.setSize(1,700);hub.gameTick();
+                hub.setSize(1,480);hub.gameTick();
                 check(hub.width==hub.minimumWindowWidth(),"Minimum width is enforced");
-                verifyScrollWidths(panel);
+                try { verifyScrollWidths(panel); }
+                catch (AssertionError failure) {
+                    String geometry="";
+                    if(panel instanceof WaypointManagerWindow){Method minimum=WaypointManagerWindow.class.getDeclaredMethod("minimumTableColumns");minimum.setAccessible(true);geometry=Arrays.toString((int[])minimum.invoke(panel));}
+                    throw new AssertionError(language+" "+selector.getValue()+" hub="+hub.width+"x"+hub.height+" columns="+geometry,failure);
+                }
                 if(panel instanceof SurroundingsWindow)verifySurroundings((SurroundingsWindow)panel,selector.getValue());
                 if(panel instanceof SurroundingsWindow){
                     SurroundingsMonitoringWindow monitor=new SurroundingsMonitoringWindow(((SurroundingsWindow)panel).controller(),Collections.singletonList(SurroundingsQuery.builder().kind(selector.getValue()==WaypointerSection.MOBS_AROUND?SurroundingKind.ANIMAL:selector.getValue()==WaypointerSection.CONTAINERS_AROUND?SurroundingKind.CONTAINER:SurroundingKind.ITEM).build()));
@@ -96,7 +104,6 @@ public final class HubLayoutProbe {
                 }
                 for(WButton tab:selectors.keySet())verifyPaintedCaption(tab,tab.getLabel(),tab.text,0,1);
                 if(panel instanceof TrackedTargetsPanel)verifyTrackedTargets((TrackedTargetsPanel)panel);
-                if(selector.getValue()==WaypointerSection.MY_FRIENDS)verifyFriendFilter(hub,(TrackedTargetsPanel)panel,args[1],language);
                 if(panel instanceof SurroundingsWindow){
                     WButton monitor=(WButton)field(panel,"monitoringButton");
                     verifyMonitorCaption(monitor);
@@ -107,14 +114,14 @@ public final class HubLayoutProbe {
                         monitor.hovered=false;
                     }
                 }
-                check(panel.x>button.x+button.width,"Selectors are attached to the left");
+                check(panel.y>=button.y+button.height,"Navigation is above the content");
             }
             hub.select(WaypointerSection.ALL_WAYPOINTS);WaypointManagerWindow manager=(WaypointManagerWindow)panels(hub).get(WaypointerSection.ALL_WAYPOINTS);
             check(!manager.hasInputField()&&manager.getInputField()==null,"Waypoint list has no text input");
             Map<WButton,?> rowActions=(Map<WButton,?>)field(manager,"rowActions");
             boolean canRemove=false;
             for(Map.Entry<WButton,?> entry:rowActions.entrySet()){
-                check(mare.getId().equals(field(entry.getValue(),"id")),"Unselected friends and managed targets stay outside ALL WAYPOINTS");
+                check(mare.getId().equals(field(entry.getValue(),"id")),"Unselected managed targets stay outside ALL WAYPOINTS");
                 if(field(entry.getValue(),"kind").toString().equals("REMOVE_TRACKED")){
                     canRemove=true;check(entry.getKey().isEnabled(),"Tracked waypoint has an enabled Delete button");
                     check(entry.getKey().width>=WaypointerUi.captionWidth(entry.getKey()),"Delete label fits the selected density: "+language);
@@ -135,7 +142,9 @@ public final class HubLayoutProbe {
                     verifyInputRouting(hub,button,panels(hub).get(selector.getValue()));
                 }
             }
-            hub.select(WaypointerSection.SETTINGS);WaypointerSettingsPanel panel=(WaypointerSettingsPanel)panels(hub).get(WaypointerSection.SETTINGS);panel.buttonClicked((WButton)field(panel,"save"));check(saves>0,"Settings save action");
+            hub.select(WaypointerSection.SETTINGS);WaypointerSettingsPanel panel=(WaypointerSettingsPanel)panels(hub).get(WaypointerSection.SETTINGS);
+            for(SettingSpec spec:((Map<SettingSpec,FlexComponent>)field(panel,"editors")).keySet())check(!spec.key.equals("language"),"Only the updater offers language selection");
+            panel.buttonClicked((WButton)field(panel,"save"));check(saves>0,"Settings save action");
             check(hub instanceof ChamomiloUiV1Window,"Standard window");
             verifyAuxiliaryUi(hub,language,args[1]);
             FilterListProbe.verify(hub,args[1],language);
@@ -145,37 +154,47 @@ public final class HubLayoutProbe {
             hub.toggleMaximized();check(hub.width==WurmComponent.hud.getWidth()-20,"Standard maximize uses the current HUD");
             hub.toggleMaximized();check(hub.width==normalWidth&&hub.height==normalHeight,"Standard maximize restores dimensions");
         }
-        for(int size:new int[]{10,18}){WaypointerLayoutProbe.preparePreview(args[0],args[2],size);Messages.select("ru");WaypointerHubWindow hub=new WaypointerHubWindow(controller);hub.setSize(1,850);hub.setPosition(10,10);for(WaypointerSection view:WaypointerSection.values()){hub.select(view);hub.gameTick();verifyScrollWidths(panels(hub).get(view));WaypointerLayoutProbe.savePreview(hub,Paths.get(args[1],"waypointer-ru-font-"+size+"-"+view+".png").toString());}}
-        check(managedRefreshes==Messages.CODES.length+2&&friendRefreshes==Messages.CODES.length+2+manualFriendRefreshes,"First selection requests each catalogue once; switching back does not resend; explicit Refresh sends one request");
+        for(int size:new int[]{10,18}){WaypointerLayoutProbe.preparePreview(args[0],args[2],size);Messages.select("ru");WaypointerHubWindow hub=new WaypointerHubWindow(controller);hub.setSize(1,480);hub.setPosition(10,10);for(WaypointerSection view:WaypointerSection.values()){hub.select(view);hub.gameTick();verifyScrollWidths(panels(hub).get(view));WaypointerLayoutProbe.savePreview(hub,Paths.get(args[1],"waypointer-ru-font-"+size+"-"+view+".png").toString());}}
         WaypointerLayoutProbe.preparePreview(args[0],args[2],12);Messages.select("en");verifyTrackedScroll(controller);WaypointManagerPanelProbe.verify(args[1]);check(clearPreviews>0,"Editor previews cleaned on leave");NativeUiRenderFixture.verified();Messages.select("en");System.out.println("WAYPOINTER_UI_OK: native SDK UV crops, HUD blend/depth state, seven panels, four languages, clicks/input routing, typography groups, fonts 10/12/18");
     }
     private static void verifyTrackedTargets(TrackedTargetsPanel panel)throws Exception {
         WButton refresh=(WButton)field(panel,"refreshButton");
-        check(refresh.getLabel().equals(Messages.text("Refresh"))&&refresh.height==32,"Refresh keeps a complete caption and standard height");
+        check(refresh.getLabel().equals(Messages.text("Refresh"))&&refresh.height==28,"Refresh keeps a complete caption and standard height");
         check(WaypointerButtonGroup.id(refresh.text).equals("tracked-targets.refresh"),"Refresh uses explicit caption metrics");
         verifyTrackedCaption(refresh);
         int pixels=-1,ascent=-1;
         Set<?> fixedActions=(Set<?>)field(panel,"fixedActions");
         for(WButton button:((Map<WButton,?>)field(panel,"actions")).keySet()) {
             if(fixedActions.contains(button))continue;
+            check(!button.getLabel().equals(Messages.text("Direction")),"MY ANIMALS has no separate Direction action");
             check(WaypointerButtonGroup.id(button.text).equals("tracked-targets.actions"),"All catalogue row actions belong to one group");
             int current=WaypointerButtonGroup.fontPixels(button.text);
             if(pixels<0){pixels=current;ascent=button.text.getAscent();}
-            check(button.height==28&&current==pixels&&WaypointerButtonGroup.fontPixels(button.textBold)==pixels
+            check(button.height==24&&current==pixels&&WaypointerButtonGroup.fontPixels(button.textBold)==pixels
                     &&button.text.getAscent()==ascent&&button.textBold.getAscent()==ascent,"Catalogue row actions share font, baseline and height");
             verifyTableAction(button);
             verifyTrackedCaption(button);
         }
-        check(pixels>=18,"Catalogue actions retain readable text");
+        check(pixels>=16,"Catalogue actions retain readable text");
         WurmArrayPanel<?> rows=(WurmArrayPanel<?>)field(panel,"rows"),headers=(WurmArrayPanel<?>)field(panel,"headers");
+        boolean animals=(Boolean)field(panel,"animals");
+        List<UUID> displayOrder=(List<UUID>)field(panel,"displayOrder");
+        for(int i=0;i<displayOrder.size();i++){
+            WaypointRecord record=null;for(WaypointRecord r:records)if(r.getId().equals(displayOrder.get(i)))record=r;
+            check(record!=null&&(record.getSourceType()==WaypointSourceType.MANAGED_ANIMAL)==animals,"Catalogue rows belong to the selected section");
+            if(animals&&record.getCoordinate()==null){
+                WButton nav=findButton((FlexComponent)rows.components.get(i),Messages.text("Nav"));
+                check(nav!=null&&nav.isEnabled(),"Unknown animal position keeps Nav available without tracking first");
+            }
+        }
         TableHeaderProbe.verify(headers);
-        for(Object row:rows.components)check(row instanceof WurmArrayPanel&&((WurmArrayPanel<?>)row).height==32,"Targets use one compact table row without cards");
+        for(Object row:rows.components)check(row instanceof WurmArrayPanel&&((WurmArrayPanel<?>)row).height==28,"Targets use one compact table row without cards");
         WurmScrollPanel scroll=(WurmScrollPanel)field(panel,"scroll");
         check(headers.parent==scroll.parent&&headers.y+headers.height<=scroll.y,"Headers are fixed above the scroll area");
         List<Object> columns=new ArrayList<Object>(((Map<WButton,?>)field(panel,"sortActions")).values());
         for(Object column:columns)for(int click=0;click<3;click++){
             WButton header=null;for(Map.Entry<WButton,?> entry:((Map<WButton,?>)field(panel,"sortActions")).entrySet())if(entry.getValue()==column)header=entry.getKey();
-            check(header instanceof WaypointerTableHeader&&header.height==32&&header.text==header.textBold,"All sortable headings use common Bold typography");
+            check(header instanceof WaypointerTableHeader&&header.height==28&&header.text==header.textBold,"All sortable headings use common Bold typography");
             header.leftPressed(header.x+8,header.y+8,0);header.leftReleased(header.x+8,header.y+8);
             Object active=field(panel,"sortColumn");check(click==2?active==null:active==column,"Native heading click cycles sort column");
             check(click!=1||!(Boolean)field(panel,"ascending"),"Second click sorts descending");
@@ -188,16 +207,16 @@ public final class HubLayoutProbe {
         try{
             WaypointRecord template=records.get(0);records.clear();
             for(int i=0;i<80;i++)records.add(WaypointRecord.copyOf(template).id(UUID.randomUUID()).name(String.format(Locale.ROOT,"Target %02d",i)).build());
-            WaypointerHubWindow hub=new WaypointerHubWindow(controller);hub.setSize(hub.minimumWindowWidth(),500);hub.select(WaypointerSection.MY_MANAGED);
-            TrackedTargetsPanel panel=(TrackedTargetsPanel)panels(hub).get(WaypointerSection.MY_MANAGED);
-            WurmScrollPanel scroll=(WurmScrollPanel)field(panel,"scroll");((ChamomiloUiV1ScrollPanel)scroll).scrollTo(0,32*10+7);
+            WaypointerHubWindow hub=new WaypointerHubWindow(controller);hub.setSize(hub.minimumWindowWidth(),500);hub.select(WaypointerSection.MY_ANIMALS);
+            TrackedTargetsPanel panel=(TrackedTargetsPanel)panels(hub).get(WaypointerSection.MY_ANIMALS);
+            WurmScrollPanel scroll=(WurmScrollPanel)field(panel,"scroll");((ChamomiloUiV1ScrollPanel)scroll).scrollTo(0,28*10+7);
             WurmArrayPanel<?> headers=(WurmArrayPanel<?>)field(panel,"headers");int headingY=headers.y;
             TableHeaderProbe.verifyFixed(headers,scroll,headingY);
-            check(scroll.yo==32*10+7,"Fixture scrolls inside a long catalogue through the SDK bar: offset="+scroll.yo+", bar="+((ChamomiloUiV1ScrollPanel)scroll).verticalBar().value()+", max="+((ChamomiloUiV1ScrollPanel)scroll).verticalBar().maximum()+", content="+scroll.content.height+", viewport="+((FlexComponent)field(scroll,"offs")).height+", rows="+((WurmArrayPanel<?>)field(panel,"rows")).components.size());
-            int offset=scroll.yo;List<UUID> order=new ArrayList<UUID>((List<UUID>)field(panel,"displayOrder"));UUID visible=order.get(offset/32);
+            check(scroll.yo==28*10+7,"Fixture scrolls inside a long catalogue through the SDK bar: offset="+scroll.yo+", bar="+((ChamomiloUiV1ScrollPanel)scroll).verticalBar().value()+", max="+((ChamomiloUiV1ScrollPanel)scroll).verticalBar().maximum()+", content="+scroll.content.height+", viewport="+((FlexComponent)field(scroll,"offs")).height+", rows="+((WurmArrayPanel<?>)field(panel,"rows")).components.size());
+            int offset=scroll.yo;List<UUID> order=new ArrayList<UUID>((List<UUID>)field(panel,"displayOrder"));UUID visible=order.get(offset/28);
             verifyScrolledActions(scroll.content);
             records.remove(0);Collections.reverse(records);trackingRevision++;Field nextRefresh=TrackedTargetsPanel.class.getDeclaredField("nextRefresh");nextRefresh.setAccessible(true);nextRefresh.setLong(panel,0L);panel.gameTick();
-            List<UUID> after=(List<UUID>)field(panel,"displayOrder");check(after.get(scroll.yo/32).equals(visible)&&scroll.yo%32==offset%32,"Background updates preserve visible UUID and intra-row scroll offset");
+            List<UUID> after=(List<UUID>)field(panel,"displayOrder");check(after.get(scroll.yo/28).equals(visible)&&scroll.yo%28==offset%28,"Background updates preserve visible UUID and intra-row scroll offset");
             verifyScrolledActions(scroll.content);
             List<UUID> expected=new ArrayList<UUID>(order);expected.remove(order.get(0));check(expected.equals(after),"Background catalogue order cannot reshuffle the table");
             TableHeaderProbe.verifyFixed(headers,scroll,headingY);
@@ -247,7 +266,7 @@ public final class HubLayoutProbe {
         WButton option=findButton(filter.getComponent(),Messages.text("Normal"));check(option!=null,"Condition choice exists");
         WurmArrayPanel<?> choiceRow=(WurmArrayPanel<?>)option.parent;
         WaypointerFilterCheck checkbox=(WaypointerFilterCheck)choiceRow.components.get(0);
-        check(!checkbox.checked()&&checkbox.width==32&&checkbox.height==32,"Separate square checkbox: "+checkbox.width+"x"+checkbox.height+", checked="+checkbox.checked());
+        check(!checkbox.checked()&&checkbox.width==28&&checkbox.height==28,"Separate square checkbox: "+checkbox.width+"x"+checkbox.height+", checked="+checkbox.checked());
         verifyFilterChoices(filter.getComponent());
         option.leftPressed(option.x+5,option.y+5,0);option.leftReleased(option.x+5,option.y+5);
         check(checkbox.checked()&&option.getLabel().equals(Messages.text("Normal")),"Caption click updates separate checkbox without changing text");
@@ -322,28 +341,6 @@ public final class HubLayoutProbe {
         check(((WaypointerLayoutProbe.ProbeFont)field.text).awtFont().equals(UiTypography.font(group.fontPixels,false,UiDensity.HIGH)),"Editable topographic digits use the footer font");
         check(number.y+digits.y>=input.y+2&&number.y+digits.y+digits.height<=input.y+input.height-2,"Topographic digits clear both field rails");
     }
-    private static void verifyFriendFilter(WaypointerHubWindow hub,TrackedTargetsPanel panel,String output,String language)throws Exception {
-        WurmDropDown filter=(WurmDropDown)field(panel,"onlineFilter");
-        check(((List<?>)field(panel,"displayOrder")).size()==4,"All includes friends with unknown presence");
-        filter.setValue(1);panel.gameTick();
-        check(((List<?>)field(panel,"displayOrder")).size()==2,"Online uses server status, ignoring offline text in notes");
-        WurmInputField plus=(WurmInputField)field(panel,"search"),minus=(WurmInputField)field(panel,"minus");
-        plus.setText("Alice");panel.handleInputChanged(plus,"Alice");
-        check(((List<?>)field(panel,"displayOrder")).size()==1,"Online combines with the inclusion filter");
-        minus.setText("Alice");panel.handleInputChanged(minus,"Alice");
-        check(((List<?>)field(panel,"displayOrder")).isEmpty(),"Online combines with the exclusion filter");
-        plus.setText("");minus.setText("");panel.handleInputChanged(plus,"");
-        int beforeRefresh=friendRefreshes;
-        panel.buttonClicked((WButton)field(panel,"refreshButton"));manualFriendRefreshes++;
-        check(friendRefreshes==beforeRefresh+1,"Explicit Refresh requests the friend catalogue exactly once");
-        check(filter.getValue()==1&&((List<?>)field(panel,"displayOrder")).size()==2,"Refresh preserves the Online selection");
-        hub.select(WaypointerSection.ALL_WAYPOINTS);hub.select(WaypointerSection.MY_FRIENDS);
-        check(field(panel,"onlineFilter")==filter&&filter.getValue()==1,"Section switching preserves the Online selection");
-        WaypointerLayoutProbe.savePreview(hub,Paths.get(output,"friends-"+language+"-online.png").toString());
-        filter.setValue(2);panel.gameTick();
-        check(((List<?>)field(panel,"displayOrder")).size()==1,"Offline ignores online text in notes and unknown presence");
-        filter.setValue(0);panel.gameTick();
-    }
     private static void verifyMonitorFooter(SurroundingsMonitoringWindow monitor)throws Exception{
         WurmArrayPanel<?> table=(WurmArrayPanel<?>)field(monitor,"table");
         TableHeaderProbe.verify((WurmArrayPanel<?>)field(monitor,"tableHeader"));
@@ -354,7 +351,7 @@ public final class HubLayoutProbe {
         verifyTypographyGroup("monitoring.footer",back,refresh);
         check(((WaypointerLayoutProbe.ProbeFont)count.text).awtFont().equals(UiTypography.font(WaypointerButtonGroup.fontPixels(back.text),false,UiDensity.HIGH)),"Counter shares the footer font size and family");
         FlexComponent title=(FlexComponent)field(monitor,"titleHeader");
-        check(((WaypointerLayoutProbe.ProbeFont)title.text).awtFont().equals(UiTypography.font(18,true,UiDensity.HIGH)),"Monitoring title uses branded Bold typography");
+        check(((WaypointerLayoutProbe.ProbeFont)title.text).awtFont().equals(UiTypography.font(16,true,UiDensity.HIGH)),"Monitoring title uses branded Bold typography");
         check(count.width>=count.textWidth()&&count.x+count.width<=monitor.x+monitor.width-8,"Monitoring count fits the footer");
         for(String name:new String[]{"surroundingsButton","refreshButton"}){
             WButton button=(WButton)field(monitor,name);
@@ -366,7 +363,7 @@ public final class HubLayoutProbe {
         SurroundingsScrollPanel scroll=(SurroundingsScrollPanel)field(monitor,"scrollPanel");
         FlexComponent viewport=(FlexComponent)(Object)scroll.offs;
         WButton back=(WButton)field(monitor,"surroundingsButton");
-        check(viewport.height%32==0&&scroll.yo%32==0,"Monitoring viewport and scrolling fit complete rows");
+        check(viewport.height%28==0&&scroll.yo%28==0,"Monitoring viewport and scrolling fit complete rows");
         check(back.y-viewport.y-viewport.height>=8,"Monitoring reserves space before the footer");
         for(FlexComponent row:((WurmArrayPanel<?>)scroll.content).components) {
             if(row.y<viewport.y+viewport.height&&row.y+row.height>viewport.y)
@@ -429,23 +426,32 @@ public final class HubLayoutProbe {
             WurmScrollPanel scroll=(WurmScrollPanel)component;
             FlexComponent viewport=(FlexComponent)(Object)scroll.offs;
             check(scroll.horizontalScrollBar==null,"No horizontal scrollbar: "+component.getClass().getSimpleName());
-            check(scroll.content.width<=viewport.width,"Content fits viewport: "+component.getClass().getSimpleName()+" content="+scroll.content.width+" viewport="+viewport.width);
+            check(scroll.content.width<=viewport.width,"Content fits viewport: "+component.getClass().getSimpleName()+" content="+scroll.content.width+" viewport="+viewport.width+" children="+scrollChildren(scroll.content));
         }
         if(component instanceof WurmArrayPanel)for(FlexComponent child:((WurmArrayPanel<?>)component).components)verifyScrollWidths(child);
         else if(component instanceof WurmBorderPanel){Field f=WurmBorderPanel.class.getDeclaredField("components");f.setAccessible(true);for(FlexComponent child:(FlexComponent[])f.get(component))if(child!=null)verifyScrollWidths(child);}
         else if(component instanceof WurmDecorator)verifyScrollWidths(((WurmDecorator)component).component);
+    }
+    private static String scrollChildren(FlexComponent content){
+        StringBuilder result=new StringBuilder();
+        if(content instanceof WurmArrayPanel)for(FlexComponent row:((WurmArrayPanel<?>)content).components){
+            result.append(row.getClass().getSimpleName()).append('=').append(row.width).append('[');
+            if(row instanceof WurmArrayPanel)for(FlexComponent cell:((WurmArrayPanel<?>)row).components)result.append(cell.width).append(',');
+            result.append(']');
+        }
+        return result.toString();
     }
     private static void verifySurroundings(SurroundingsWindow panel,WaypointerSection view)throws Exception{
         Method activeQuery=SurroundingsWindow.class.getDeclaredMethod("query");activeQuery.setAccessible(true);
         check(((SurroundingsQuery)activeQuery.invoke(panel)).getShortName().isEmpty(),"No hidden Short name filter in any surroundings view");
         verifySurroundingsGroups(panel);
         WButton monitor=(WButton)field(panel,"monitoringButton");
-        check(monitor.width==monitor.height,"ADD TO MONITOR is square");
-        check(monitor.getLabel().equals("ADD TO MONITOR"),"Requested monitor caption");
-        check(((ChamomiloUiV1Button)monitor).density()==UiDensity.LOW,"Primary monitor action has low density");
+        check(monitor.height==28&&monitor.width>monitor.height,"Monitor uses one compact action row");
+        check(monitor.getLabel().equals(Messages.text("ADD TO MONITOR")),"Requested monitor caption");
+        check(((ChamomiloUiV1Button)monitor).density()==UiDensity.HIGH,"Monitor has toolbar density");
         check(!((ChamomiloUiV1Button)monitor).captionShortened(),"Primary action preserves three full rows");
         WurmArrayPanel<?> pinnedHeader=(WurmArrayPanel<?>)field(panel,"tableHeader");
-        check(monitor.x+monitor.width<=panel.x+panel.width&&monitor.y==pinnedHeader.y&&monitor.x>=pinnedHeader.x+pinnedHeader.width+16,"Monitor sits beside the fixed table heading");
+        check(monitor.x+monitor.width<=panel.x+panel.width&&monitor.y+monitor.height<=pinnedHeader.y,"Monitor stays in the summary above the table");
         WButton previous=null;for(String name:new String[]{"waypointFiltered","clearFiltered","clearAll","refreshButton"}){
             WButton button=(WButton)field(panel,name);check(button.x+button.width<=panel.x+panel.width,"Footer inside panel");
             check(((ChamomiloUiV1Button)button).density()==UiDensity.HIGH,"Crowded footer action has high density");
@@ -501,11 +507,11 @@ public final class HubLayoutProbe {
     static void verifyTableAction(WButton button) {
         check(button.parent instanceof WaypointerTableActionCell,"Action has a padded table cell");
         WaypointerTableActionCell cell=(WaypointerTableActionCell)button.parent;
-        check(cell.height==32&&button.height==28&&button.y==cell.y+2
+        check(cell.height==28&&button.height==24&&button.y==cell.y+2
                 &&button.y+button.height==cell.y+cell.height-2,"Table actions leave a 4 px gap between rows: "+button.getLabel()+" cell="+cell.y+"/"+cell.height+" button="+button.y+"/"+button.height);
         int center=button.x+button.width/2;
         check(cell.getComponentAt(center,button.y+button.height/2)==button,"Native action hit testing survives padding");
-        check(cell.getComponentAt(center,cell.y)!=button&&cell.getComponentAt(center,cell.y+31)!=button,
+        check(cell.getComponentAt(center,cell.y)!=button&&cell.getComponentAt(center,cell.y+27)!=button,
                 "Padding cannot activate a neighbouring action");
     }
     static void verifyScrolledActions(FlexComponent component) {
@@ -520,7 +526,7 @@ public final class HubLayoutProbe {
         for(WButton button:buttons){
             check(WaypointerButtonGroup.id(button.text).equals(id)&&WaypointerButtonGroup.id(button.textBold).equals(id),"Recorded group membership: "+id);
             check(WaypointerButtonGroup.fontPixels(button.text)==pixels&&WaypointerButtonGroup.fontPixels(button.textBold)==pixels,"One shared size in normal/hover: "+id);
-            check(button.height==32,"Standard group height: "+id);
+            check(button.height==28,"Standard group height: "+id+" "+button.getLabel()+" actual="+button.height+" font="+button.text.getHeight());
             ChamomiloUiV1Button nativeButton=(ChamomiloUiV1Button)button;nativeButton.setAnimationsEnabled(false);
             String[] rows=(String[])field(button,"captionRows");String caption=rows==null?button.getLabel():rows[0];
             for(boolean hover:new boolean[]{false,true}){
@@ -534,11 +540,11 @@ public final class HubLayoutProbe {
     }
     private static void verifyMonitorCaption(WButton monitor)throws Exception{
         com.wurmonline.client.renderer.gui.text.TextFont font=monitor.hovered?monitor.textBold:monitor.text;
-        String[] rows={"ADD","TO","MONITOR"};
+        String[] rows={monitor.getLabel()};
         for(int i=0;i<rows.length;i++)verifyPaintedCaption(monitor,rows[i],font,i,rows.length);
     }
     private static void verifyPaintedCaption(WButton button,String caption,com.wurmonline.client.renderer.gui.text.TextFont font,int row,int rows)throws Exception{
-        caption = field(button,"captionLayout")==null?caption.toUpperCase(Locale.ROOT):UiTypography.caption(caption,((ChamomiloUiV1Button)button).density());
+        caption = UiTypography.caption(caption,((ChamomiloUiV1Button)button).density());
         java.awt.Point point=WaypointerLayoutProbe.paintedLabel(caption);
         check(point!=null,"Enlarged caption is painted: "+caption);
         ChamomiloUiV1Button nativeButton=(ChamomiloUiV1Button)button;
@@ -546,14 +552,14 @@ public final class HubLayoutProbe {
         boolean bold=button.isEnabled()&&button.hovered;
         if(layout==null){
             int pixels=WaypointerButtonGroup.fontPixels(font);
-            check(pixels>=20&&WaypointerButtonGroup.fontPixels(button.textBold)==pixels,"Shared regular/bold font size");
-            check(WaypointerButtonGroup.id(font).equals(rows==1?"hub.navigation":"surroundings.monitor-primary"),"Recorded typography group");
+            check(pixels>=16&&WaypointerButtonGroup.fontPixels(button.textBold)==pixels,"Shared regular/bold font size");
+            check((WaypointerButtonGroup.id(font).equals("hub.navigation")||WaypointerButtonGroup.id(font).equals("surroundings.monitor")),"Recorded typography group");
             check(button.text.getAscent()==button.textBold.getAscent(),"Selector baseline is shared across weights");
             check(point.x==button.x+(button.width-font.getWidth(caption))/2,"Shared caption is horizontally centered: "+caption);
             check(point.y==button.y+(button.height-rows*font.getHeight())/2+row*font.getHeight()+font.getAscent(),"Shared caption baseline: "+caption);
             java.awt.Rectangle ink=UiTypography.ink(caption,pixels,bold,nativeButton.density());
-            check(point.x+ink.x>=button.x+18&&point.x+ink.x+ink.width<=button.x+button.width-18,"Low density side spacing: "+caption);
-            check(point.y+ink.y>=button.y+12&&point.y+ink.y+ink.height<=button.y+button.height-12,"Low density vertical spacing: "+caption);
+            check(point.x+ink.x>=button.x+12&&point.x+ink.x+ink.width<=button.x+button.width-12,"Caption side spacing: "+caption);
+            check(point.y+ink.y>=button.y+3&&point.y+ink.y+ink.height<=button.y+button.height-3,"Caption vertical spacing: "+caption);
             return;
         }
         java.awt.Rectangle ink=UiTypography.ink(caption,layout.fontPixels,bold,((ChamomiloUiV1Button)button).density());
@@ -567,8 +573,8 @@ public final class HubLayoutProbe {
         check(!(component instanceof WurmScrollPanel),"Complete filter choice list has no internal scrolling");
         if(component instanceof ChamomiloUiV1Button){
             WButton button=(WButton)component;
-            check(button.height==32&&WaypointerButtonGroup.id(button.text).equals("surroundings.filter-choices"),"Every choice/action has standard height and group");
-            check(WaypointerButtonGroup.fontPixels(button.text)==20&&button.text.getAscent()==button.textBold.getAscent(),"Filter choices have shared size and baseline");
+            check(button.height==28&&WaypointerButtonGroup.id(button.text).equals("surroundings.filter-choices"),"Every choice/action has standard height and group");
+            check(WaypointerButtonGroup.fontPixels(button.text)==16&&button.text.getAscent()==button.textBold.getAscent(),"Filter choices have shared size and baseline");
         }
         if(component instanceof WurmBorderPanel){for(FlexComponent child:(FlexComponent[])field(component,"components"))if(child!=null)verifyFilterChoices(child);}
         else if(component instanceof WurmArrayPanel){for(FlexComponent child:((WurmArrayPanel<?>)component).components)verifyFilterChoices(child);}

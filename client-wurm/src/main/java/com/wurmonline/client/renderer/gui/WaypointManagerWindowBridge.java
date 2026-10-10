@@ -43,8 +43,8 @@ public final class WaypointManagerWindowBridge {
             owner = hud;
             if (window == null) {
                 window = new WaypointerHubWindow(controller);
-                window.setInitialSize(Math.min(1380, Math.max(1100, hud.getWidth() - 40)),
-                        Math.min(680, Math.max(430, hud.getHeight() - 100)), true);
+                window.setInitialSize(Math.min(1120, Math.max(940, hud.getWidth() - 40)),
+                        Math.min(480, Math.max(380, hud.getHeight() - 100)), true);
                 window.setPosition(Math.max(20, (hud.getWidth() - window.width) / 2),
                         Math.max(20, (hud.getHeight() - window.height) / 2));
                 add(hud, window);
@@ -153,7 +153,9 @@ public final class WaypointManagerWindowBridge {
         Field field = ReflectionUtil.getField(HeadsUpDisplay.class, "savePosManager");
         SavePosManager positions = ReflectionUtil.getPrivateField(hud, field);
         if (positions != null) {
-            positions.registerAndRefresh(value, "wurm-waypointer.manager");
+            // Start the compact layout at its new opening size instead of
+            // restoring the wide sidebar-era bounds. Later resizes still persist.
+            positions.registerAndRefresh(value, "wurm-waypointer.manager.compact");
         }
     }
 

@@ -24,7 +24,7 @@ public final class ManagedBmlParser {
     private int pos, nodes;
     private ManagedBmlParser(String source) { this.source = source; }
     public static Result parse(String title, String text, ManagedKind kind) {
-        if (text == null || text.length() > MAX_BYTES || kind == null || kind == ManagedKind.PLAYER) return null;
+        if (text == null || text.length() > MAX_BYTES || kind == null) return null;
         try {
             ManagedBmlParser parser = new ManagedBmlParser(text);
             List<Node> roots = parser.sequence(0, false);
@@ -57,8 +57,21 @@ public final class ManagedBmlParser {
                 if (selector.type.equals("radio")) {
                     if (!selector.get("group").equals("sel")) return null;
                     objectId = Long.parseLong(selector.get("id"));
-                    if (objectId <= 0L || !ids.add(objectId)) return null;
+                    if (objectId <= 0L) return null;
                 } else if (!selector.type.equals("label")) return null;
+                if (kind == ManagedKind.ANIMAL) {
+                    // Animals without permission controls have no radio selector.
+                    // Their native care/brand/tame buttons still carry the same
+                    // creature ID. Read those IDs without executing the actions.
+                    String[] prefixes = {"uncarefor", "unbrand", "untame"};
+                    for (int i=0;i<prefixes.length;i++) {
+                        long actionId = actionObjectId(table.children.get(start+5+i), prefixes[i]);
+                        if (actionId == 0L) continue;
+                        if (objectId > 0L && objectId != actionId) return null;
+                        objectId = actionId;
+                    }
+                }
+                if (objectId > 0L && !ids.add(objectId)) return null;
                 String name = value(table.children.get(start+1)), type = value(table.children.get(start+2));
                 if (name.isEmpty() || name.length()>256 || type.length()>256) return null;
                 List<String> details = new ArrayList<String>();
@@ -67,6 +80,22 @@ public final class ManagedBmlParser {
             }
             return new Result(id, entries, find && kind == ManagedKind.ANIMAL);
         } catch (RuntimeException invalid) { return null; }
+    }
+    private static long actionObjectId(Node node, String prefix) {
+        long id = 0L;
+        if (node.type.equals("button") && node.get("id").startsWith(prefix)) {
+            String suffix = node.get("id").substring(prefix.length());
+            if (!suffix.matches("[0-9]{1,19}")) throw new IllegalArgumentException("animal action ID");
+            id = Long.parseLong(suffix);
+            if (id <= 0L) throw new IllegalArgumentException("animal action ID");
+        }
+        for (Node child : node.children) {
+            long childId = actionObjectId(child, prefix);
+            if (childId == 0L) continue;
+            if (id > 0L && id != childId) throw new IllegalArgumentException("conflicting animal IDs");
+            id = childId;
+        }
+        return id;
     }
     private static String value(Node n) {
         String v=n.get("text");

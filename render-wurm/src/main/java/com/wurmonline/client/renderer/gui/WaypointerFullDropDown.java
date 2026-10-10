@@ -21,7 +21,7 @@ final class WaypointerFullDropDown extends WurmDropDown {
         textBold=field.textBold=WaypointerFonts.body(true);
         field.parent = this;
         sizeFlags = 0;
-        setSize(Math.max(64, width), 32);
+        setSize(Math.max(64, width), 28);
         sizeFlags = FIXED_HEIGHT;
     }
 
@@ -43,7 +43,7 @@ final class WaypointerFullDropDown extends WurmDropDown {
 
     @Override protected void leftPressed(int mx, int my, int clicks) {
         if (hud == null || labels.length == 0 || !contains(mx, my)) return;
-        int rowHeight = Math.max(32, text.getHeight() + 8);
+        int rowHeight = Math.max(28, text.getHeight() + 8);
         int maxRows = Math.max(1, (hud.getHeight() - 20 - 6) / rowHeight);
         int columns = (labels.length + maxRows - 1) / maxRows;
         int rows = (labels.length + columns - 1) / columns;

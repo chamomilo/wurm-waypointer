@@ -6,7 +6,7 @@ public final class WaypointManagerTableLayout {
     public static final int WINDOW_CHROME = 38;
 
     private static final int[] MINIMUM = {
-            42, 52, 128, 62, 76, 72, 82, 66, 82, 50, 56, 50, 64
+            42, 48, 128, 56, 60, 58, 68, 66, 70, 46, 52, 48, 60
     };
     private static final int[] PREFERRED = {
             44, 58, 208, 74, 108, 92, 104, 72, 106, 52, 58, 52, 68

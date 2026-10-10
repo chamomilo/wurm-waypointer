@@ -3,8 +3,6 @@ ALL WAYPOINTS	ALLE WEGPUNKTE
 MOBS AROUND	KREATUREN IN DER NÄHE
 CONTAINERS AROUND	BEHÄLTER IN DER NÄHE
 OBJECTS AND ITEMS AROUND	OBJEKTE UND GEGENSTÄNDE
-MY VEHICLES AND ANIMALS	MEINE FAHRZEUGE UND TIERE
-MY FRIENDS	MEINE FREUNDE
 SETTINGS	EINSTELLUNGEN
 General	Allgemein
 Language	Sprache
@@ -90,7 +88,6 @@ Approximate area	Ungefähres Gebiet
 {0} readings	{0} Messungen
 Last seen {0} ago	Zuletzt vor {0} gesehen
 Last seen {0}	Zuletzt gesehen: {0}
-No friends received from the client.	Keine Freunde vom Client empfangen.
 No Manage catalogue yet. Press Refresh.	Noch keine Manage-Liste. Aktualisieren drücken.
 Press Refresh to request your Manage lists.	Aktualisieren drücken, um Manage-Listen anzufordern.
 Manage request timed out. Native forms remain available.	Manage-Zeitüberschreitung. Native Formulare bleiben verfügbar.
@@ -233,8 +230,8 @@ Name asc	Name aufsteigend
 Delete {0} permanently?	{0} dauerhaft löschen?
 This cannot be undone.	Dies kann nicht rückgängig gemacht werden.
 now	jetzt
-+ filter	+ filter
-- filter	- filter
++ filter	+ Filter
+- filter	- Filter
 Example: horse, wolf	Beispiel: horse, wolf
 {0} of {1}; {2} tracked	{0} von {1}; {2} verfolgt
 Tracked target cache could not be read. Existing file preserved.	Zielcache konnte nicht gelesen werden. Vorhandene Datei bleibt erhalten.
@@ -375,7 +372,7 @@ Friendly	Freundlich
 Developer	Entwickler
 Open Monitoring with the current filters.	Monitoring mit den aktuellen Filtern öffnen.
 Breeding traits are not supplied in the nearby creature stream.	Zuchtmerkmale werden im Datenstrom naher Kreaturen nicht übertragen.
-ADD TO MONITOR	ADD TO MONITOR
+ADD TO MONITOR	Zur Überwachung
 Unmark	Markierung entfernen
 Delete this waypoint immediately.	Diesen Wegpunkt sofort löschen.
 Clear this text filter.	Diesen Textfilter leeren.
@@ -383,12 +380,10 @@ Click: ascending, descending, then original order. ^ ascending; v descending.	Kl
 Toggle this value. Multiple selected values are combined with OR.	Diesen Wert umschalten. Mehrere ausgewählte Werte werden mit ODER verknüpft.
 Clear all selections in this filter; allow every value.	Alle Auswahlen in diesem Filter löschen; alle Werte zulassen.
 Close this list. Selection changes already apply immediately.	Diese Liste schließen. Die Auswahl wird bereits sofort angewendet.
-Refresh the friends received from the client.	Die vom Client empfangene Freundesliste aktualisieren.
 Request your animals, land vehicles and ships from the server and show them here.	Deine Tiere, Landfahrzeuge und Schiffe vom Server abrufen und hier anzeigen.
 Position	Position
 Updated	Aktualisiert
 Click: ascending, descending, then original order.	Klicken: aufsteigend, absteigend, dann ursprüngliche Reihenfolge.
-Friend status received from the client.	Vom Client empfangener Freundesstatus.
 Managed object type received from the server.	Vom Server empfangener Typ des verwalteten Objekts.
 Position state. Visible now follows received movement; last known position is saved history; approximate direction has no exact coordinates.	Positionszustand. Sichtbare Ziele folgen empfangenen Bewegungen; die letzte Position ist gespeichert; eine ungefähre Richtung liefert keine exakten Koordinaten.
 Age of the last received position or direction observation.	Alter der letzten empfangenen Positions- oder Richtungsmessung.
@@ -403,3 +398,26 @@ Bearing {0}° ± {1}°; range {2}–{3} m from the observation point. {4} readin
 Back to Waypointer	Zurück zu Waypointer
 Return to the Waypointer window.	Zum Waypointer-Fenster zurückkehren.
  (last observed)	 (zuletzt beobachtet)
+VEHICLES	FAHRZEUGE
+MY ANIMALS	MEINE TIERE
+Animal search point	Tier-Suchpunkt
+Request your animals from the server.	Deine Tiere vom Server abrufen.
+Request your land vehicles and ships from the server.	Deine Landfahrzeuge und Schiffe vom Server abrufen.
+No managed animals to display.	Keine verwalteten Tiere vorhanden.
+No managed vehicles or ships to display.	Keine verwalteten Fahrzeuge oder Schiffe vorhanden.
+Navigate to this animal. If its position is unknown, start a waypoint race with automatic checks within 10 tiles of each search point.	Zu diesem Tier navigieren. Bei unbekannter Position startet eine Suche mit automatischen Abfragen unter 10 Tiles vor jedem Suchpunkt.
+Navigate to this vehicle's confirmed or last known position.	Zur bestätigten oder zuletzt bekannten Position dieses Fahrzeugs navigieren.
+Animal waypoint race: {0}	Tier-Wegpunktsuche: {0}
+Animal waypoint race started: {0}	Tier-Wegpunktsuche gestartet: {0}
+Animal search stopped: direction is unavailable.	Tiersuche gestoppt: Richtung nicht verfügbar.
+Animal search stopped: no direction response after three checks.	Tiersuche gestoppt: keine Antwort nach drei Abfragen.
+Animal found: {0}. Navigation now follows its received position.	Tier gefunden: {0}. Die Navigation folgt jetzt seiner empfangenen Position.
+
+Mobs	Kreaturen
+Objects / items	Objekte / Gegenstände
+ALL MAPS ON SERVER	ALLE SERVERKARTEN
+Show all five server maps	Alle fünf Serverkarten anzeigen
+Choose a map to view	Eine Karte zur Ansicht auswählen
+Wheel: zoom | drag: pan | CENTER: return to your character	Mausrad: Zoom | ziehen: verschieben | CENTER: zurück zur Spielfigur
+Add this animal to ALL WAYPOINTS and automatically start a waypoint race if it is out of sight.	Dieses Tier zu ALL WAYPOINTS hinzufügen und automatisch die Wegpunktsuche starten, wenn es außer Sicht ist.
+Loading full map...	Vollständige Karte wird geladen...

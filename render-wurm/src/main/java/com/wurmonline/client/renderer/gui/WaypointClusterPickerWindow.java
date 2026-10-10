@@ -11,8 +11,8 @@ import java.util.List;
 import java.util.Map;
 
 /** Compact native selector shown when several waypoint bearings overlap. */
-final class WaypointClusterPickerWindow extends WWindow implements ButtonListener {
-    private static final int ROW_HEIGHT = 25;
+final class WaypointClusterPickerWindow extends WaypointerUiWindow implements ButtonListener {
+    private static final int ROW_HEIGHT = 32;
     private static final int MIN_CONTENT_WIDTH = 330;
     private static final int MAX_CONTENT_WIDTH = 520;
     private final Map<WButton, NavigationTargetKey> choices =
@@ -26,7 +26,7 @@ final class WaypointClusterPickerWindow extends WWindow implements ButtonListene
         setTitle("Wurm Waypointer - Choose Waypoint");
         resizable = false;
 
-        WurmLabel prompt = new WurmLabel(targets.size()
+        WurmLabel prompt = new WaypointerLabel(targets.size()
                 + " overlapping waypoints. Choose one:");
         int contentWidth = Math.max(MIN_CONTENT_WIDTH, prompt.width);
         WurmArrayPanel<FlexComponent> rows = new WurmArrayPanel<FlexComponent>(
@@ -42,7 +42,7 @@ final class WaypointClusterPickerWindow extends WWindow implements ButtonListene
                     + WaypointDistanceLabel.format(target.getName(), distance)
                     + (compassOnly ? " - Compass only"
                     : target.isWorldBeamVisible() ? " - World on" : " - World off");
-            WButton button = new WButton(label, this);
+            WButton button = WaypointerUi.button(label,this,330);
             button.setHoverString(compassOnly
                     ? "Select this compass-only waypoint."
                     : "Select this waypoint and toggle only its world marker.");
@@ -58,17 +58,17 @@ final class WaypointClusterPickerWindow extends WWindow implements ButtonListene
 
         WurmBorderPanel root = new WurmBorderPanel("waypointer.cluster.root");
         root.setComponent(prompt, WurmBorderPanel.NORTH);
-        root.setComponent(new WurmScrollPanel(
+        root.setComponent(new ChamomiloUiV1ScrollPanel(
                 "waypointer.cluster.scroll", rows, false, true),
                 WurmBorderPanel.CENTER);
-        cancel = new WButton("Cancel", this);
+        cancel = WaypointerUi.button(org.waypoints.next.i18n.Messages.text("Cancel"),this,330);
         cancel.setInitialSize(contentWidth, ROW_HEIGHT, false);
         root.setComponent(cancel, WurmBorderPanel.SOUTH);
         setComponent(root);
 
-        preferredWidth = contentWidth + 24;
+        preferredWidth = contentWidth + 48;
         preferredHeight = Math.min(360,
-                58 + ROW_HEIGHT * (targets.size() + 1));
+                90 + ROW_HEIGHT * (targets.size() + 1));
         setInitialSize(preferredWidth, preferredHeight, false);
     }
 

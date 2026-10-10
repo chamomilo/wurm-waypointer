@@ -11,18 +11,19 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 /** Read-only native details for a published deed selected on the M-map. */
-final class DeedInformationWindow extends WWindow implements ButtonListener {
+final class DeedInformationWindow extends WaypointerUiWindow implements ButtonListener {
     private static final int ROW_WIDTH = 430;
     private static final int ROW_HEIGHT = 23;
     private final Deed deed;
     private WButton trackButton;
     private WButton navigationButton;
+    private int minimumHeight;
 
     DeedInformationWindow(Deed deed) {
         super("wurm-waypointer.deed-information", true);
         if (deed == null) throw new IllegalArgumentException("deed is required");
         this.deed = deed;
-        setTitle(deed.getName());
+        setTitle(org.waypoints.next.i18n.Messages.text(deed.getName()));
         WurmArrayPanel<FlexComponent> content =
                 new WurmArrayPanel<FlexComponent>(
                         "waypointer.deed-information.content", 0, true);
@@ -40,22 +41,25 @@ final class DeedInformationWindow extends WWindow implements ButtonListener {
             List<String> lines = wrap("\"" + motto + "\"", 56);
             for (String line : lines) add(content, line);
         }
-        trackButton = new WButton("Track deed waypoint", this);
+        trackButton = WaypointerUi.button(org.waypoints.next.i18n.Messages.text("Track deed waypoint"), this, 90);
         trackButton.setInitialSize(ROW_WIDTH, ROW_HEIGHT, false);
-        trackButton.setHoverString(
-                "Create or update this provider-managed DEED waypoint.");
+        trackButton.setHoverString(org.waypoints.next.i18n.Messages.text(
+                "Create or update this provider-managed DEED waypoint."));
         content.addComponent(trackButton);
-        navigationButton = new WButton("Nav to deed", this);
+        navigationButton = WaypointerUi.button(org.waypoints.next.i18n.Messages.text("Nav to deed"), this, 90);
         navigationButton.setInitialSize(ROW_WIDTH, ROW_HEIGHT, false);
-        navigationButton.setHoverString(
-                "Track this deed waypoint and start the navigator.");
+        navigationButton.setHoverString(org.waypoints.next.i18n.Messages.text(
+                "Track this deed waypoint and start the navigator."));
         content.addComponent(navigationButton);
         setComponent(content);
+        minimumHeight = content.calcHeight() + 80;
     }
+
+    @Override void setSize(int width,int height) { super.setSize(Math.max(470,width),minimized?height:Math.max(minimumHeight,height)); }
 
     private static void add(WurmArrayPanel<FlexComponent> content,
                             String text) {
-        WurmLabel label = new WurmLabel(text, text, false);
+        WurmLabel label = new WaypointerLabel(text, text, false);
         label.setInitialSize(ROW_WIDTH, ROW_HEIGHT, false);
         content.addComponent(label);
     }
@@ -114,11 +118,11 @@ final class DeedInformationWindow extends WWindow implements ButtonListener {
     @Override public void buttonClicked(WButton button) {
         if (button == trackButton) {
             WurmWaypointerRuntime.serverMapDeedWaypointRequested(deed);
-            trackButton.setLabel("Tracked", false);
+            trackButton.setLabel(org.waypoints.next.i18n.Messages.text("Tracked"), false);
         } else if (button == navigationButton) {
             WurmWaypointerRuntime.serverMapDeedNavigationRequested(deed);
-            trackButton.setLabel("Tracked", false);
-            navigationButton.setLabel("Navigating", false);
+            trackButton.setLabel(org.waypoints.next.i18n.Messages.text("Tracked"), false);
+            navigationButton.setLabel(org.waypoints.next.i18n.Messages.text("Navigating"), false);
         }
     }
 }

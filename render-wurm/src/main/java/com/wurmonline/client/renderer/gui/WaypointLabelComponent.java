@@ -4,6 +4,7 @@ import com.wurmonline.client.game.World;
 import com.wurmonline.client.renderer.WaypointScreenProjector;
 import com.wurmonline.client.renderer.backend.Queue;
 import com.wurmonline.client.renderer.gui.text.TextFont;
+import com.wurmonline.client.renderer.gui.text.WaypointerFonts;
 import org.waypoints.next.render.WaypointDistanceLabel;
 import org.waypoints.next.render.WaypointGroundHeight;
 import org.waypoints.next.render.WaypointLabelOpacity;
@@ -75,7 +76,7 @@ public final class WaypointLabelComponent extends StaticComponent {
         // Labels are navigation UI, not part of the translucent world effect.
         // Keep them fully legible regardless of the marker's configured alpha.
         this.textAlpha = WaypointLabelOpacity.textAlpha(alpha);
-        this.font = TextFont.getFixedSizeText();
+        this.font = WaypointerFonts.body();
         this.displayText = waypointName;
     }
 

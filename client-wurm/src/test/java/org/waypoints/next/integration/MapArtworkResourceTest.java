@@ -12,14 +12,10 @@ import static org.junit.Assert.assertTrue;
 
 public final class MapArtworkResourceTest {
     @Test
-    public void mainMapFrameHasARealTransparentOpening() throws Exception {
-        BufferedImage frame = resource(
-                "/org/waypoints/next/map/main-map-frame.png");
-        assertTrue(frame.getColorModel().hasAlpha());
-        assertEquals(0, alpha(frame, frame.getWidth() / 2,
-                frame.getHeight() / 2));
-        assertEquals(0, alpha(frame, 0, 0));
-        assertTrue(alpha(frame, 40, 40) > 240);
+    public void mapChromeUsesOnlyTheCompactStandardKit() throws Exception {
+        assertEquals(null, MapArtworkResourceTest.class.getResource("/org/waypoints/next/map/main-map-frame.png"));
+        BufferedImage frame = resource("/org/chamomilo/wurm/ui/v1/frame.png");
+        assertEquals(176, frame.getWidth());assertEquals(176, frame.getHeight());
     }
 
     @Test

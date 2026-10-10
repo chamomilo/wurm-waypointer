@@ -1,7 +1,7 @@
 apply plugin: 'java'
 
 configurations {
-    bundled
+    bundled { transitive = false }
 }
 
 dependencies {
@@ -28,6 +28,17 @@ def expectedUpdateMetadata = [
         updateRepo: 'chamomilo/wurm-waypointer',
         updateAsset: 'wurm-waypointer-{version}.zip'
 ]
+def updaterProject = project(':client-wurm')
+def updaterReference = new File(updaterProject.chamomiloUpdaterReference.toString())
+def updaterVersionInfo = new Properties()
+new File(updaterReference, 'version.properties').withInputStream { updaterVersionInfo.load(it) }
+def updaterVersion = updaterVersionInfo.getProperty('version')
+expectedUpdateMetadata.updateModuleVersion = updaterVersion
+def verifyEmbeddedUpdater = { File artifact ->
+    updaterProject.chamomiloUpdaterVerify(updaterProject.chamomiloUpdaterReadEntries(artifact),
+            updaterProject.chamomiloUpdaterReadEntries(new File(updaterReference, 'dist/chamomilo-updater.jar')),
+            updaterVersion)
+}
 
 def verifyUpdateMetadata = { Properties metadata ->
     expectedUpdateMetadata.each { key, expected ->
@@ -42,25 +53,27 @@ jar {
             ':feature-map:jar', ':feature-deeds:jar', ':feature-surroundings:jar',
             ':render-wurm:jar', ':client-wurm:jar'
     archiveFileName = "wurm-waypointer-${project.version}.jar"
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    duplicatesStrategy = DuplicatesStrategy.FAIL
     from {
         configurations.bundled.collect { dependency ->
             dependency.isDirectory() ? dependency : zipTree(dependency)
         }
-    }
+    } { exclude 'META-INF/MANIFEST.MF' }
     exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
 }
 
-task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
+task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries', ':client-wurm:verifyChamomiloUpdater']) {
     doLast {
+        verifyEmbeddedUpdater(jar.archiveFile.get().asFile)
         def contents = zipTree(jar.archiveFile.get().asFile)
         ['SharedUpdateCoordinator', 'GitHubReleaseClient', 'ModUpdate', 'UpdateTarget', 'ModCatalog', 'SharedUpdateHooks', 'UpdatePreferences'].each { name ->
             if (contents.matching { include "org/chamomilo/wurm/update/${name}.class" }.files.empty)
                 throw new GradleException('Missing shared updater class: ' + name)
         }
         ['com/wurmonline/client/resources/ChamomiloResourceUrl.class',
-         'org/chamomilo/wurm/update/update-frame.png',
-         'org/chamomilo/wurm/update/update-button.png'].each { required ->
+         'com/wurmonline/client/renderer/gui/ChamomiloSkinnedButton.class',
+         'com/wurmonline/client/renderer/gui/WaypointerUi.class',
+         'com/wurmonline/client/renderer/gui/WaypointerUiWindow.class'].each { required ->
             if (contents.matching { include required }.files.empty)
                 throw new GradleException('Missing shared updater resource: ' + required)
         }
@@ -75,6 +88,7 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
                     include 'org/chamomilo/wurm/update/*.class'
                     include 'com/wurmonline/client/renderer/gui/ChamomiloUpdateWindow*.class'
                     include 'com/wurmonline/client/renderer/gui/ChamomiloUpdateBridge*.class'
+                    include 'com/wurmonline/client/renderer/gui/ChamomiloSkinnedButton*.class'
                 }
         updaterClasses.visit { entry ->
             if (!entry.directory && contents.matching { include entry.relativePath.pathString }.files.empty) {
@@ -85,6 +99,26 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
         rootProject.file('mods/wurm-waypointer.properties').withInputStream { updateMetadata.load(it) }
         verifyUpdateMetadata(updateMetadata)
         def requiredClasses = [
+                'com/wurmonline/client/renderer/gui/WaypointerHubWindow.class',
+                'com/wurmonline/client/renderer/gui/WaypointerContentPanel.class',
+                'com/wurmonline/client/renderer/gui/WaypointerFilterRow.class',
+                'com/wurmonline/client/renderer/gui/WaypointerSettingsPanel.class',
+                'com/wurmonline/client/renderer/gui/TrackedTargetsPanel.class',
+                'com/wurmonline/client/renderer/gui/WaypointerTableHeader.class',
+                'com/wurmonline/client/renderer/gui/WaypointerTableActionCell.class',
+                'com/wurmonline/client/renderer/gui/text/WaypointerFonts.class',
+                'com/wurmonline/client/renderer/gui/WaypointerFullDropDown.class',
+                'com/wurmonline/client/renderer/gui/TrackedBearingPanel.class',
+                'com/wurmonline/client/renderer/gui/ChamomiloUiV1Window.class',
+                'org/waypoints/next/integration/TrackedTargetsRuntime.class',
+                'org/waypoints/next/integration/ManagedCatalogueGateway.class',
+                'org/waypoints/next/integration/TrackedTargetStore.class',
+                'org/waypoints/next/integration/HubSettings.class',
+                'org/waypoints/next/tracking/TrackingCatalog.class',
+                'org/waypoints/next/tracking/ManagedBmlParser.class',
+                'org/waypoints/next/tracking/BearingRegion.class',
+                'org/waypoints/next/i18n/Messages.class',
+                'org/waypoints/next/service/TextFilter.class',
                 'org/waypoints/api/WaypointerApi.class',
                 'org/waypoints/api/ObjectMarkRequest.class',
                 'org/waypoints/api/WurmObjectSnapshot.class',
@@ -131,7 +165,7 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
                 'org/waypoints/next/surroundings/SurroundingsCatalog.class',
                 'org/waypoints/next/surroundings/SurroundingsClassifier.class',
                 'org/waypoints/next/surroundings/SurroundingsQuery.class',
-                'org/waypoints/next/surroundings/SurroundingsMonitoringFilters.class',
+                'org/waypoints/next/surroundings/CreatureHostility.class',
                 'org/waypoints/next/surroundings/SurroundingsMonitoringView.class',
                 'org/waypoints/next/surroundings/ScannerProfiles.class',
                 'org/waypoints/next/surroundings/ScannerProfile.class',
@@ -211,6 +245,7 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
                 'com/wurmonline/client/renderer/gui/SurroundingsWindowBridge.class',
                 'com/wurmonline/client/renderer/gui/CompassSurroundingsPopupBridge.class',
                 'com/wurmonline/client/renderer/gui/WaypointColorPicker.class',
+                'com/wurmonline/client/renderer/gui/WaypointerFilterCheck.class',
                 'com/wurmonline/client/renderer/gui/WaypointStyleSlider.class',
                 'com/wurmonline/client/renderer/WaypointScreenProjector.class',
                 'com/wurmonline/client/renderer/gui/WaypointCompassMarkerBridge.class',
@@ -235,42 +270,36 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
                                 requiredClass)
             }
         }
+        ['en','pt-BR','de','ru'].each { language ->
+            if(contents.matching { include "org/waypoints/next/i18n/${language}.tsv" }.files.empty)
+                throw new GradleException('Missing Waypointer language: '+language)
+        }
         def markerAsset = 'org/waypoints/next/markers/archaeology-report-scroll.png'
         if (contents.matching { include markerAsset }.files.empty) {
             throw new GradleException(
                     'Installable Wurm Waypointer artifact is missing ' + markerAsset)
         }
-        def mapWordmark = 'org/waypoints/next/map/sklotopolis-wordmark.png'
-        if (contents.matching { include mapWordmark }.files.empty) {
-            throw new GradleException(
-                    'Installable Wurm Waypointer artifact is missing ' + mapWordmark)
-        }
         [
-                'org/waypoints/next/map/mini-map-frame.png',
-                'org/waypoints/next/map/mini-map-background.png',
-                'org/waypoints/next/map/mini-map-nameplate.png',
-                'org/waypoints/next/map/main-map-frame.png',
                 'org/waypoints/next/map/gallery/liberty.png',
                 'org/waypoints/next/map/gallery/novus.png',
                 'org/waypoints/next/map/gallery/caza.png',
                 'org/waypoints/next/map/gallery/infinity-r5.png',
-                'org/waypoints/next/map/gallery/old-infinity.png'
+                'org/waypoints/next/map/gallery/old-infinity.png',
+                'org/waypoints/next/compass/compass-hud-base.png',
+                'org/waypoints/next/compass/compass-hud-needle.png'
         ].each { mapAsset ->
             if (contents.matching { include mapAsset }.files.empty) {
                 throw new GradleException(
                         'Installable Wurm Waypointer artifact is missing ' + mapAsset)
             }
         }
-        [
-                'org/waypoints/next/compass/compass-hud-base.png',
-                'org/waypoints/next/compass/compass-hud-needle.png'
-        ].each { compassAsset ->
-            if (contents.matching { include compassAsset }.files.empty) {
-                throw new GradleException(
-                        'Installable Wurm Waypointer artifact is missing ' + compassAsset)
-            }
-        }
         def forbidden = contents.matching {
+            include 'org/waypoints/next/map/sklotopolis-wordmark.png'
+            include 'org/waypoints/next/map/mini-map-frame.png'
+            include 'org/waypoints/next/map/mini-map-background.png'
+            include 'org/waypoints/next/map/mini-map-nameplate.png'
+            include 'org/waypoints/next/map/main-map-frame.png'
+
             include 'com/hypercore/**'
             include 'com/wurmonline/client/renderer/gui/WaypointComponent.class'
             include 'com/wurmonline/client/renderer/gui/WindowWaypointManager.class'
@@ -283,7 +312,7 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries']) {
     }
 }
 
-task dist(type: Zip, dependsOn: [test, verifyArtifact, ':client-wurm:verifyUpdaterUi']) {
+task dist(type: Zip, dependsOn: [test, verifyArtifact, ':client-wurm:verifyChamomiloUpdater', ':client-wurm:verifyWaypointerUi']) {
     archiveFileName = "wurm-waypointer-${project.version}.zip"
     destinationDirectory = file("${buildDir}/distributions")
 
@@ -294,16 +323,10 @@ task dist(type: Zip, dependsOn: [test, verifyArtifact, ':client-wurm:verifyUpdat
         from rootProject.file('LICENSE')
         into('docs') {
             from rootProject.file('docs/wurm-waypointer-banner.png')
-        }
-        into('assets') {
-            from(rootProject.file(
-                    'client-wurm/src/main/resources/org/waypoints/next/map')) {
-                include 'sklotopolis-wordmark.png'
-                include 'mini-map-frame.png'
-                include 'mini-map-background.png'
-                include 'mini-map-nameplate.png'
-                include 'main-map-frame.png'
-            }
+            from rootProject.file('docs/UPDATER_BUTTONS.md')
+            from rootProject.file('docs/WAYPOINTER_HUB.md')
+            from rootProject.file('docs/RENDER_DIAGNOSTICS.md')
+            from rootProject.file('docs/button-groups.json')
         }
         into('assets/gallery') {
             from(rootProject.file(
@@ -312,12 +335,11 @@ task dist(type: Zip, dependsOn: [test, verifyArtifact, ':client-wurm:verifyUpdat
             }
         }
         into('assets/compass') {
-            from(rootProject.file(
-                    'render-wurm/src/main/resources/org/waypoints/next/compass')) {
-                include 'compass-hud-base.png'
-                include 'compass-hud-needle.png'
+            from(rootProject.file('render-wurm/src/main/resources/org/waypoints/next/compass')) {
+                include 'compass-hud-base.png', 'compass-hud-needle.png'
             }
         }
+
     }
     into('mods') {
         from rootProject.file('mods/wurm-waypointer.properties')
@@ -338,6 +360,15 @@ task dist(type: Zip, dependsOn: [test, verifyArtifact, ':client-wurm:verifyUpdat
             def packagedMetadata = new Properties()
             archive.getInputStream(metadataEntry).withCloseable { packagedMetadata.load(it) }
             verifyUpdateMetadata(packagedMetadata)
+            def packagedJar = archive.getEntry("mods/wurm-waypointer/wurm-waypointer-${project.version}.jar")
+            if (packagedJar == null) throw new GradleException('ZIP is missing the mod JAR')
+            def temporary = java.nio.file.Files.createTempFile(buildDir.toPath(), 'updater-zip-audit-', '.jar')
+            try {
+                archive.getInputStream(packagedJar).withCloseable {
+                    java.nio.file.Files.copy(it, temporary, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                }
+                verifyEmbeddedUpdater(temporary.toFile())
+            } finally { java.nio.file.Files.deleteIfExists(temporary) }
         } finally {
             archive.close()
         }
@@ -349,11 +380,10 @@ task dist(type: Zip, dependsOn: [test, verifyArtifact, ':client-wurm:verifyUpdat
                 'mods/wurm-waypointer/THIRD_PARTY_NOTICES.md',
                 'mods/wurm-waypointer/LICENSE',
                 'mods/wurm-waypointer/docs/wurm-waypointer-banner.png',
-                'mods/wurm-waypointer/assets/sklotopolis-wordmark.png',
-                'mods/wurm-waypointer/assets/mini-map-frame.png',
-                'mods/wurm-waypointer/assets/mini-map-background.png',
-                'mods/wurm-waypointer/assets/mini-map-nameplate.png',
-                'mods/wurm-waypointer/assets/main-map-frame.png',
+                'mods/wurm-waypointer/docs/UPDATER_BUTTONS.md',
+                'mods/wurm-waypointer/docs/WAYPOINTER_HUB.md',
+                'mods/wurm-waypointer/docs/RENDER_DIAGNOSTICS.md',
+                'mods/wurm-waypointer/docs/button-groups.json',
                 'mods/wurm-waypointer/assets/gallery/liberty.png',
                 'mods/wurm-waypointer/assets/gallery/novus.png',
                 'mods/wurm-waypointer/assets/gallery/caza.png',
@@ -371,3 +401,11 @@ task dist(type: Zip, dependsOn: [test, verifyArtifact, ':client-wurm:verifyUpdat
 }
 
 build.dependsOn verifyArtifact
+
+task verifyUiKit(type: Exec, dependsOn: jar) {
+    commandLine 'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+            '-File', 'C:/projects/interface items/tools/Verify-UiKitEmbedding.ps1',
+            '-ModJar', jar.archiveFile.get().asFile.absolutePath,
+            '-ReferenceJar', 'C:/projects/updater/dependencies/chamomilo-ui-0.4.4.jar'
+}
+dist.dependsOn verifyUiKit

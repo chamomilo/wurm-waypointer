@@ -274,7 +274,8 @@ public final class StaticNavigationRegistry {
                 && record.getSourceType() != WaypointSourceType.DEED
                 && record.getSourceType() != WaypointSourceType.ARCHAEOLOGY_REPORT
                 && record.getSourceType() != WaypointSourceType.MANAGED_ANIMAL
-                && record.getSourceType() != WaypointSourceType.MANAGED_ITEM)
+                && record.getSourceType() != WaypointSourceType.MANAGED_ITEM
+                && record.getSourceType() != WaypointSourceType.PLAYER)
                 || !renderableResolution(record)
                 || record.getCoordinate() == null || record.getMarkerStyle() == null
                 || record.getMarkerStyle().getWorldStyle() == MarkerStyle.WorldStyle.HIDDEN) {
@@ -296,6 +297,9 @@ public final class StaticNavigationRegistry {
             // the manager exposes the stale state and data age to the player.
             return resolution == WaypointResolution.LIVE_EXACT
                     || resolution == WaypointResolution.STALE;
+        }
+        if (org.waypoints.next.tracking.TrackingCatalog.isTracked(record)) {
+            return resolution == WaypointResolution.LIVE_EXACT || resolution == WaypointResolution.LAST_SEEN;
         }
         return resolution == WaypointResolution.STATIC_EXACT;
     }
@@ -379,7 +383,8 @@ public final class StaticNavigationRegistry {
 
     private static String navigationName(WaypointRecord record) {
         if (record.getSourceType() != WaypointSourceType.VANILLA_SYSTEM) {
-            return record.getName();
+            return record.getResolution() == WaypointResolution.LAST_SEEN
+                    ? record.getName() + " (" + org.waypoints.next.i18n.Messages.text("Last known position") + ")" : record.getName();
         }
         VanillaLandmarkKind kind = VanillaLandmarkKind.fromSourceKey(
                 record.getSourceKey());
@@ -388,6 +393,9 @@ public final class StaticNavigationRegistry {
 
     private static MarkerStyle renderedStyle(WaypointRecord record) {
         MarkerStyle style = record.getMarkerStyle();
+        if (org.waypoints.next.tracking.TrackingCatalog.isTracked(record) && record.getResolution() == WaypointResolution.LAST_SEEN) {
+            return new MarkerStyle(MarkerStyle.WorldStyle.COMPASS_ONLY,.65f,.65f,.65f,.7f,style.getMarkerSize(),style.getBeamWidth(),true,true);
+        }
         if (record.getSourceType() == WaypointSourceType.MANAGED_ANIMAL
                 || record.getSourceType() == WaypointSourceType.MANAGED_ITEM) {
             if (isExternalApiMarker(record)) {

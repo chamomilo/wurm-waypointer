@@ -12,6 +12,8 @@ public final class WaypointFilter {
     public enum ServerMode { CURRENT, ALL, SPECIFIC, UNASSIGNED }
 
     private final String text;
+    private final String excludedText;
+    private final TextFilter textFilter;
     private final ServerMode serverMode;
     private final ServerIdentity currentServer;
     private final String specificServerFingerprint;
@@ -21,6 +23,8 @@ public final class WaypointFilter {
 
     private WaypointFilter(Builder builder) {
         text = clean(builder.text);
+        excludedText=clean(builder.excludedText);
+        textFilter=new TextFilter(text,excludedText);
         serverMode = builder.serverMode;
         currentServer = builder.currentServer;
         specificServerFingerprint = clean(builder.specificServerFingerprint);
@@ -35,12 +39,8 @@ public final class WaypointFilter {
         if (record == null || !matchesServer(record) || !matchesUser(record)
                 || (sourceType != null && sourceType != record.getSourceType())
                 || (resolution != null && resolution != record.getResolution())) return false;
-        if (text.isEmpty()) return true;
-        String needle = text.toLowerCase(Locale.ENGLISH);
-        if (contains(record.getName(), needle) || contains(record.getDescription(), needle)
-                || contains(record.getGroup(), needle)) return true;
-        for (String tag : record.getTags()) if (contains(tag, needle)) return true;
-        return false;
+        String haystack=record.getName()+" "+record.getDescription()+" "+record.getGroup()+" "+String.join(" ",record.getTags())+" "+record.getSourceType()+" "+record.getResolution();
+        return textFilter.matches(haystack);
     }
 
     private boolean matchesServer(WaypointRecord record) {
@@ -74,6 +74,7 @@ public final class WaypointFilter {
 
     public static final class Builder {
         private String text = "";
+        private String excludedText = "";
         private ServerMode serverMode = ServerMode.ALL;
         private ServerIdentity currentServer;
         private String specificServerFingerprint = "";
@@ -82,6 +83,7 @@ public final class WaypointFilter {
         private WaypointResolution resolution;
 
         public Builder text(String value) { text = value; return this; }
+        public Builder excludedText(String value) { excludedText = value; return this; }
         public Builder currentServer(ServerIdentity value) {
             serverMode = ServerMode.CURRENT;
             currentServer = value;

@@ -11,6 +11,7 @@ public final class WaypointManagerQuery {
     }
 
     private final String text;
+    private final String excludedText;
     private final WaypointFilter.ServerMode serverMode;
     private final ServerIdentity currentServer;
     private final String specificServerFingerprint;
@@ -24,6 +25,7 @@ public final class WaypointManagerQuery {
 
     private WaypointManagerQuery(Builder builder) {
         text = clean(builder.text);
+        excludedText=clean(builder.excludedText);
         serverMode = builder.serverMode;
         currentServer = builder.currentServer;
         specificServerFingerprint = clean(builder.specificServerFingerprint);
@@ -51,7 +53,7 @@ public final class WaypointManagerQuery {
     public Double getOriginTileY() { return originTileY; }
 
     WaypointFilter filter() {
-        WaypointFilter.Builder result = WaypointFilter.builder().text(text).user(user)
+        WaypointFilter.Builder result = WaypointFilter.builder().text(text).excludedText(excludedText).user(user)
                 .sourceType(sourceType).resolution(resolution);
         switch (serverMode) {
             case CURRENT: result.currentServer(currentServer); break;
@@ -69,6 +71,7 @@ public final class WaypointManagerQuery {
 
     public static final class Builder {
         private String text = "";
+        private String excludedText = "";
         private WaypointFilter.ServerMode serverMode = WaypointFilter.ServerMode.ALL;
         private ServerIdentity currentServer;
         private String specificServerFingerprint = "";
@@ -81,6 +84,7 @@ public final class WaypointManagerQuery {
         private Double originTileY;
 
         public Builder text(String value) { text = value; return this; }
+        public Builder excludedText(String value) { excludedText = value; return this; }
         public Builder currentServer(ServerIdentity value) {
             serverMode = WaypointFilter.ServerMode.CURRENT;
             currentServer = value;

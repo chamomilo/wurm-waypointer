@@ -32,7 +32,7 @@ public final class CompassSurroundingsPopupBridge {
             extends WurmPopup.WPopupLiveButton {
         private SurroundingsButton(WurmPopup owner) {
             owner.super("Surroundings");
-            setHoverString("Open the live catalog of nearby animals, containers and items.");
+            setHoverString(org.waypoints.next.i18n.Messages.text("Open the live catalog of nearby animals, containers and items."));
         }
 
         @Override protected void handleLeftClick() {

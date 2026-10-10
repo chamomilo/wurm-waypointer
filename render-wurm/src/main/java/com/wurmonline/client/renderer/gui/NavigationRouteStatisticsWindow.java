@@ -5,10 +5,10 @@ import org.waypoints.next.navigation.NavigationRouteVisualStyle;
 import org.waypoints.next.render.StaticNavigationController;
 
 /** Compact statistics window for the active navigator route. */
-final class NavigationRouteStatisticsWindow extends WWindow
+final class NavigationRouteStatisticsWindow extends WaypointerUiWindow
         implements ButtonListener {
     static final int PREFERRED_WIDTH = 410;
-    static final int PREFERRED_HEIGHT = 254;
+    static final int PREFERRED_HEIGHT = 286;
     private static final int ROW_HEIGHT = 22;
     private static final int CONTENT_WIDTH = PREFERRED_WIDTH - 28;
 
@@ -20,9 +20,7 @@ final class NavigationRouteStatisticsWindow extends WWindow
     private final WurmLabel destination = label("Plan: planning...");
     private final WurmLabel lootMap = label("");
     private final StaticNavigationController navigation;
-    private final WButton pulse;
-    private final WButton solid;
-    private final WButton moving;
+    private final WurmLabel signal=label("Navigation signal:");
     private NavigationRouteVisualStyle visualStyle;
 
     NavigationRouteStatisticsWindow(StaticNavigationController navigation) {
@@ -30,7 +28,7 @@ final class NavigationRouteStatisticsWindow extends WWindow
         if (navigation == null) throw new IllegalArgumentException(
                 "navigation controller is required");
         this.navigation = navigation;
-        setTitle("Wurm Waypointer - Route Statistics");
+        setTitle(org.waypoints.next.i18n.Messages.text("Wurm Waypointer - Route Statistics"));
         resizable = false;
         closeable = true;
 
@@ -45,22 +43,6 @@ final class NavigationRouteStatisticsWindow extends WWindow
         rows.addComponent(endpoint);
         rows.addComponent(destination);
         rows.addComponent(lootMap);
-        WurmArrayPanel<FlexComponent> signal =
-                new WurmArrayPanel<FlexComponent>(
-                        "waypointer.route-statistics.signal", 1);
-        signal.setInitialSize(CONTENT_WIDTH, ROW_HEIGHT, false);
-        WurmLabel signalLabel = new WurmLabel("Navigation signal:");
-        signalLabel.setInitialSize(126, ROW_HEIGHT, false);
-        signal.addComponent(signalLabel);
-        pulse = button("Pulse", 82,
-                "Send a recurring light pulse along the route.");
-        solid = button("Solid", 82,
-                "Show a continuous line above the route tiles.");
-        moving = button("Moving", 82,
-                "Show moving dashed light along the route.");
-        signal.addComponent(pulse);
-        signal.addComponent(solid);
-        signal.addComponent(moving);
         rows.addComponent(signal);
         rows.addComponent(label("Speed model: off-road 8 / road 16 / Highway 24 km/h"));
         setComponent(rows);
@@ -73,27 +55,10 @@ final class NavigationRouteStatisticsWindow extends WWindow
                 ? NavigationRouteVisualStyle.MOVING_DASHES : style;
         if (visualStyle == selected) return;
         visualStyle = selected;
-        pulse.setLabel(optionLabel("Pulse",
-                selected == NavigationRouteVisualStyle.PULSE), false);
-        solid.setLabel(optionLabel("Solid",
-                selected == NavigationRouteVisualStyle.SOLID), false);
-        moving.setLabel(optionLabel("Moving",
-                selected == NavigationRouteVisualStyle.MOVING_DASHES), false);
+        signal.setLabel(org.waypoints.next.i18n.Messages.text("Navigation signal")+": "+org.waypoints.next.i18n.Messages.text(selected.name()));
     }
-
-    @Override public void buttonPressed(WButton button) {
-    }
-
-    @Override public void buttonClicked(WButton button) {
-        NavigationRouteVisualStyle selected = button == pulse
-                ? NavigationRouteVisualStyle.PULSE
-                : button == solid ? NavigationRouteVisualStyle.SOLID
-                : button == moving ? NavigationRouteVisualStyle.MOVING_DASHES
-                : null;
-        if (selected == null) return;
-        navigation.selectNavigationRouteVisualStyle(selected);
-        updateVisualStyle(navigation.getNavigationRouteVisualStyle());
-    }
+    @Override public void buttonPressed(WButton button) { }
+    @Override public void buttonClicked(WButton button) { }
 
     void update(String waypointName, NavigationRouteStatistics statistics,
                 String lootMapSummary) {
@@ -129,20 +94,9 @@ final class NavigationRouteStatisticsWindow extends WWindow
     }
 
     private static WurmLabel label(String text) {
-        WurmLabel result = new WurmLabel(text);
+        WurmLabel result = new WaypointerLabel(text);
         result.setInitialSize(CONTENT_WIDTH, ROW_HEIGHT, false);
         return result;
-    }
-
-    private WButton button(String text, int width, String hover) {
-        WButton result = new WButton(text, this);
-        result.setInitialSize(width, ROW_HEIGHT, false);
-        result.setHoverString(hover + " The choice is saved in Waypointer settings.");
-        return result;
-    }
-
-    private static String optionLabel(String text, boolean selected) {
-        return selected ? "[" + text + "]" : text;
     }
 
     private static String clipped(String value, int maximum) {

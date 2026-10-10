@@ -9,6 +9,7 @@ import com.wurmonline.client.renderer.cell.PlayerCellRenderable;
 import com.wurmonline.shared.util.MaterialUtilities;
 import org.gotti.wurmunlimited.modloader.ReflectionUtil;
 import org.waypoints.next.surroundings.CreatureModifier;
+import org.waypoints.next.surroundings.CreatureHostility;
 import org.waypoints.next.surroundings.SurroundingEntry;
 import org.waypoints.next.surroundings.SurroundingKind;
 import org.waypoints.next.surroundings.SurroundingsClassifier;
@@ -20,6 +21,7 @@ import java.time.Instant;
 final class SurroundingsRenderableAdapter {
     private static final Field GROUND_ITEM_DATA = groundItemDataField();
     private static final Field OBJECT_RAW_NAME = objectRawNameField();
+    private static final Field CREATURE_ATTITUDE = creatureAttitudeField();
 
     private SurroundingsRenderableAdapter() { }
 
@@ -74,13 +76,21 @@ final class SurroundingsRenderableAdapter {
         if (data == null) return null;
         return projectCreatureData(data, renderable.isItem(), renderable.getId(),
                 renderable.getHoverName(), renderable.getLayer(), worldX,
-                worldY, height, now);
+                worldY, height, now, attitude(renderable));
     }
 
     static SurroundingEntry projectCreatureData(
             CreatureData data, boolean item, long wurmId, String hoverName,
             int layer, double worldX, double worldY, double height, Instant now)
             throws ReflectiveOperationException {
+        return projectCreatureData(data, item, wurmId, hoverName, layer, worldX,
+                worldY, height, now, -1);
+    }
+
+    static SurroundingEntry projectCreatureData(
+            CreatureData data, boolean item, long wurmId, String hoverName,
+            int layer, double worldX, double worldY, double height, Instant now,
+            int attitude) throws ReflectiveOperationException {
         if (data == null) return null;
         String name = displayName(data.getName(), hoverName);
         String model = string(data.getModelName());
@@ -107,6 +117,8 @@ final class SurroundingsRenderableAdapter {
                 .material(material(data.getMaterialId()))
                 .creatureModifier(CreatureModifier.fromWurmData(
                         data.getModifier(), name, hoverName))
+                .traits(receivedTraits(data.getDescription(), data.getHoverText()))
+                .hostility(CreatureHostility.fromAttitude(attitude))
                 .uniqueCreature(SurroundingsClassifier.isUniqueCreature(
                         data.getName(), model))
                 .rarity(data.getRarity()).layer(layer)
@@ -131,6 +143,37 @@ final class SurroundingsRenderableAdapter {
         } catch (ReflectiveOperationException failure) {
             throw new ExceptionInInitializerError(failure);
         }
+    }
+
+    private static Field creatureAttitudeField() {
+        try {
+            return ReflectionUtil.getField(CreatureCellRenderable.class, "attitude");
+        } catch (ReflectiveOperationException failure) {
+            return null;
+        }
+    }
+
+    private static int attitude(CreatureCellRenderable renderable) {
+        if (CREATURE_ATTITUDE == null) return -1;
+        try {
+            Integer value = ReflectionUtil.getPrivateField(renderable, CREATURE_ATTITUDE);
+            return value == null ? -1 : value.intValue();
+        } catch (ReflectiveOperationException failure) {
+            // Optional hostility must never hide an otherwise valid creature.
+            return -1;
+        }
+    }
+
+    // Only an explicit trait field is usable. Modifiers and model names are
+    // not breeding traits, and an empty client stream does not mean "none".
+    static String receivedTraits(String... descriptions) {
+        for (String description : descriptions) {
+            if (description == null) continue;
+            java.util.regex.Matcher match = java.util.regex.Pattern.compile(
+                    "(?im)^\\s*traits\\s*:\\s*([^\\r\\n]+)").matcher(description);
+            if (match.find()) return match.group(1).trim();
+        }
+        return "";
     }
 
     private static Field objectRawNameField() {

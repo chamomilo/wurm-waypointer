@@ -106,7 +106,9 @@ final class StaticWaypointRuntime {
     }
 
     synchronized void configureAndLoad(WaypointClientConfiguration value) {
-        configuration = value == null ? WaypointClientConfiguration.defaults() : value;
+        WaypointClientConfiguration next = value == null ? WaypointClientConfiguration.defaults() : value;
+        if (store != null) { configuration = next; transferStore = new WaypointStore(next.getTransferFile(), codec); return; }
+        configuration = next;
         migrateLegacyWaypointStore();
         store = new WaypointStore(configuration.getDataFile(), codec);
         transferStore = new WaypointStore(configuration.getTransferFile(), codec);

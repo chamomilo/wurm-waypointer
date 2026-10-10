@@ -1,7 +1,10 @@
 package com.wurmonline.client.renderer.gui;
 
+import org.chamomilo.wurm.ui.v1.*;
+
 import com.wurmonline.client.renderer.backend.Queue;
 import com.wurmonline.client.renderer.gui.text.TextFont;
+import com.wurmonline.client.renderer.gui.text.WaypointerFonts;
 import org.waypoints.next.ui.HsvColor;
 import org.waypoints.next.ui.WaypointColorPickerState;
 
@@ -43,7 +46,7 @@ final class WaypointColorPicker extends FlexComponent {
     String hexText() { return state.getHex(); }
 
     @Override protected void renderComponent(Queue queue, float ignoredAlpha) {
-        fillRect(queue, 0.10f, 0.08f, 0.05f, 1.0f, x, y, width, height);
+        UiPainter.background(WaypointerUi.canvas(this, queue), UiBackground.SOLID, 1, x, y, width, height);
         int svLeft = x + MARGIN;
         int svTop = y + MARGIN;
         int svWidth = saturationWidth();
@@ -97,7 +100,7 @@ final class WaypointColorPicker extends FlexComponent {
                 swatchLeft + 2, swatchTop + 2,
                 Math.max(1, swatchWidth - 4), Math.max(1, swatchHeight - 4));
         paintBorder(queue, swatchLeft, swatchTop, swatchWidth, swatchHeight);
-        TextFont font = TextFont.getFixedSizeText();
+        TextFont font = WaypointerFonts.body();
         font.moveTo(swatchLeft, swatchTop + swatchHeight + font.getAscent() + 5);
         font.paint(queue, state.getHex(), 0.95f, 0.88f, 0.70f, 1.0f);
         font.moveTo(swatchLeft, swatchTop + swatchHeight + font.getAscent()
@@ -162,14 +165,8 @@ final class WaypointColorPicker extends FlexComponent {
         fillRect(queue, 1.0f, 1.0f, 1.0f, 1.0f, centerX, centerY - 5, 1, 11);
     }
 
-    private void paintBorder(Queue queue, int left, int top, int drawWidth,
-                             int drawHeight) {
-        fillRect(queue, 0.50f, 0.43f, 0.30f, 1.0f, left, top, drawWidth, 1);
-        fillRect(queue, 0.50f, 0.43f, 0.30f, 1.0f,
-                left, top + drawHeight - 1, drawWidth, 1);
-        fillRect(queue, 0.50f, 0.43f, 0.30f, 1.0f, left, top, 1, drawHeight);
-        fillRect(queue, 0.50f, 0.43f, 0.30f, 1.0f,
-                left + drawWidth - 1, top, 1, drawHeight);
+    private void paintBorder(Queue queue, int left, int top, int drawWidth, int drawHeight) {
+        UiPainter.frame(WaypointerUi.canvas(this, queue), 2, 1, left, top, drawWidth, drawHeight);
     }
 
     private void paintCheckerboard(Queue queue, int left, int top,

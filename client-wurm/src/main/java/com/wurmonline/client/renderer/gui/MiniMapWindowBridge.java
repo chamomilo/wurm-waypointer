@@ -65,6 +65,7 @@ public final class MiniMapWindowBridge {
 
     public static synchronized void toggle(HeadsUpDisplay hud) {
         enabled = !enabled;
+        LOGGER.info("Mini-map enabled="+enabled);
         reconcile(hud);
     }
 
@@ -146,8 +147,6 @@ public final class MiniMapWindowBridge {
             }
             if (window == null) {
                 window = new MiniMapWindow(SETTINGS);
-                window.setInitialSize(MiniMapWindow.WINDOW_WIDTH,
-                        MiniMapWindow.WINDOW_HEIGHT, false);
                 window.setPosition(Math.max(20,
                                 hud.getWidth() - window.width - 25),
                         Math.max(35, hud.getHeight() - window.height - 120));

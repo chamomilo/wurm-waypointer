@@ -1,16 +1,20 @@
 package com.wurmonline.client.renderer.gui;
 
+import org.chamomilo.wurm.ui.v1.*;
+
 import com.wurmonline.client.resources.WaypointerFileResourceUrl;
 import com.wurmonline.client.resources.textures.ResourceTexture;
 import com.wurmonline.client.resources.textures.Texture;
 import com.wurmonline.client.resources.textures.ResourceTextureLoader;
 import com.wurmonline.client.resources.textures.WaypointerTextureFilters;
+import com.wurmonline.client.resources.textures.WaypointerCaveTexture;
 import com.wurmonline.client.renderer.Matrix;
 import com.wurmonline.client.renderer.PickData;
 import com.wurmonline.client.renderer.backend.Primitive;
 import com.wurmonline.client.renderer.backend.Queue;
 import com.wurmonline.client.renderer.effects.GroundNavigationRouteEffect;
 import com.wurmonline.client.renderer.gui.text.TextFont;
+import com.wurmonline.client.renderer.gui.text.WaypointerFonts;
 import com.wurmonline.client.renderer.gui.text.WaypointerMiniMapFonts;
 import org.waypoints.next.integration.WurmWaypointerRuntime;
 import org.waypoints.next.map.Deed;
@@ -21,6 +25,7 @@ import org.waypoints.next.map.ServerMapProfile;
 import org.waypoints.next.map.ServerMapSnapshot;
 import org.waypoints.next.map.SklotopolisMapProfiles;
 import org.waypoints.next.map.SurfaceTileIndex;
+import org.waypoints.next.map.LocalSurfaceMap;
 import org.waypoints.next.model.MarkerStyle;
 import org.waypoints.next.model.ServerIdentity;
 import org.waypoints.next.model.WaypointCoordinate;
@@ -41,6 +46,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.WeakHashMap;
+import java.util.HashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -49,6 +55,8 @@ import java.util.logging.Logger;
 
 /** Replaces only the native WorldMap content while preserving its M-window lifecycle. */
 public final class ServerMapWindowBridge {
+    private static final Map<Long,LocalSurfaceTexture> LOCAL_TEXTURES=new HashMap<Long,LocalSurfaceTexture>();
+    private static List<LocalSurfaceMap.Chunk> lastLocalSnapshot;
     private static final Logger LOGGER = Logger.getLogger("WurmWaypointer.Map");
     private static final int CONTENT_OFFSET_X = 3;
     private static final int CONTENT_OFFSET_Y = 21;
@@ -83,16 +91,6 @@ public final class ServerMapWindowBridge {
     private static final float MAP_WATER_RED = 55.0f / 255.0f;
     private static final float MAP_WATER_GREEN = 63.0f / 255.0f;
     private static final float MAP_WATER_BLUE = 111.0f / 255.0f;
-    private static final Path WORDMARK_FILE = Paths.get("mods",
-            "wurm-waypointer", "assets", "sklotopolis-wordmark.png");
-    private static final Path MINI_MAP_FRAME_FILE = Paths.get("mods",
-            "wurm-waypointer", "assets", "mini-map-frame.png");
-    private static final Path MINI_MAP_BACKGROUND_FILE = Paths.get("mods",
-            "wurm-waypointer", "assets", "mini-map-background.png");
-    private static final Path MINI_MAP_NAMEPLATE_FILE = Paths.get("mods",
-            "wurm-waypointer", "assets", "mini-map-nameplate.png");
-    private static final Path MAIN_MAP_FRAME_FILE = Paths.get("mods",
-            "wurm-waypointer", "assets", "main-map-frame.png");
     private static final Path[] MAP_GALLERY_FILES = {
             galleryFile("liberty.png"), galleryFile("novus.png"),
             galleryFile("caza.png"), galleryFile("infinity-r5.png"),
@@ -121,11 +119,6 @@ public final class ServerMapWindowBridge {
                 }
             });
     private static PreparedSurface prepared;
-    private static PreparedArtwork wordmark;
-    private static PreparedArtwork miniMapFrame;
-    private static PreparedArtwork miniMapBackground;
-    private static PreparedArtwork miniMapNameplate;
-    private static PreparedArtwork mainMapFrame;
     private static final PreparedArtwork[] mapGallery =
             new PreparedArtwork[MAP_GALLERY_FILES.length];
 
@@ -137,6 +130,7 @@ public final class ServerMapWindowBridge {
 
     /** Called instead of ClusterMap.render; false means render vanilla content. */
     public static boolean render(Queue queue) {
+        long renderStart=System.nanoTime();
         try {
             HeadsUpDisplay hud = WurmComponent.hud;
             WorldMap map = hud == null ? null : hud.getWorldMap();
@@ -151,12 +145,6 @@ public final class ServerMapWindowBridge {
             if (surface == null || !surface.ready || surface.failed) {
                 renderLoadingGallery(map, queue, profile, left, top);
                 return true;
-            }
-            if (surface.texture == null) {
-                surface.texture = WaypointerTextureFilters
-                        .useCrispMagnification(
-                                ResourceTextureLoader.getPreparedTexture(
-                                        surface.url, surface.request));
             }
             scheduleSurfaceIndex(surface, profile);
             if (surface.texture == null) {
@@ -179,6 +167,7 @@ public final class ServerMapWindowBridge {
             try {
                 drawWaterBacking(map, queue, left, top);
                 drawSurface(queue, surface.texture, state.viewport, left, top);
+                drawLocalSurface(queue,state.viewport,left,top,CONTENT_WIDTH,CONTENT_HEIGHT);
                 if (!state.firstFrameLogged) {
                     state.firstFrameLogged = true;
                     LOGGER.info("Native server map rendered its first frame: profile="
@@ -217,6 +206,9 @@ public final class ServerMapWindowBridge {
         } catch (Throwable failure) {
             reportOnce("surface", "Server map surface render failed open", failure);
             return false;
+        } finally {
+            org.waypoints.next.render.WaypointRenderProfiler.recordMap(System.nanoTime()-renderStart,
+                    queue==null?0:queue.getQueueCount());
         }
     }
 
@@ -237,10 +229,10 @@ public final class ServerMapWindowBridge {
         if (profile == null) return;
         String display = profile.getDisplayName() == null ? ""
                 : profile.getDisplayName().trim().replace(' ', '-');
-        drawNameplate(queue, miniMapNameplateTexture(),
+        drawNameplate(map, queue,
                 map.x + CONTENT_OFFSET_X + 3, map.y,
                 Math.max(54, Math.min(CONTENT_WIDTH - 5,
-                        MAIN_TITLE_TEXT.getWidth("Map of: " + display) + 30)),
+                        MAIN_TITLE_TEXT.getWidth("Map of: " + display) + 48)),
                 "Map of: " + display);
     }
 
@@ -250,7 +242,7 @@ public final class ServerMapWindowBridge {
                                  ServerMapSnapshot snapshot,
                                  boolean showDeeds,
                                  boolean showTileBorders,
-                                 Texture contours,
+                                 MiniMapContourOverlay contours,
                                  int left, int top, int size) {
         try {
             if (map == null || queue == null || viewport == null
@@ -258,12 +250,6 @@ public final class ServerMapWindowBridge {
                     || !snapshot.hasSurface() || size < 1) return false;
             PreparedSurface surface = prepare(snapshot);
             if (!surface.ready || surface.failed) return false;
-            if (surface.texture == null) {
-                surface.texture = WaypointerTextureFilters
-                        .useCrispMagnification(
-                                ResourceTextureLoader.getPreparedTexture(
-                                        surface.url, surface.request));
-            }
             scheduleSurfaceIndex(surface, snapshot.getProfile());
             if (surface.texture == null
                     || (!surface.texture.isValid()
@@ -275,6 +261,7 @@ public final class ServerMapWindowBridge {
                         MAP_WATER_BLUE, 1.0f, left, top, size, size);
                 drawSurface(queue, surface.texture, viewport,
                         left, top, size, size);
+                drawLocalSurface(queue,viewport,left,top,size,size);
                 drawTopographicContours(queue, contours, left, top, size);
                 if (showTileBorders) drawTileBorders(map, queue, viewport,
                         left, top, size, size);
@@ -304,7 +291,7 @@ public final class ServerMapWindowBridge {
 
     static void renderCaveMiniMapOverlays(WurmComponent map, Queue queue,
                                          MapViewport viewport, boolean showTileBorders,
-                                         Texture contours,
+                                         MiniMapContourOverlay contours,
                                          int left, int top, int size) {
         drawTopographicContours(queue, contours, left, top, size);
         if (showTileBorders) drawTileBorders(map, queue, viewport,
@@ -653,15 +640,10 @@ public final class ServerMapWindowBridge {
 
     public static synchronized void resetAll() {
         STATES.clear();
-        prepared = null;
-        wordmark = null;
-        miniMapFrame = null;
-        miniMapBackground = null;
-        miniMapNameplate = null;
-        mainMapFrame = null;
-        for (int index = 0; index < mapGallery.length; index++) {
-            mapGallery[index] = null;
-        }
+        for(LocalSurfaceTexture value:LOCAL_TEXTURES.values())value.texture.dispose();
+        LOCAL_TEXTURES.clear();lastLocalSnapshot=null;
+        // The published image and its terrain index are independent of the HUD/world session.
+        // Keep one revision across reconnects; prepare() replaces it when its identity changes.
         REPORTED_FAILURES.clear();
     }
 
@@ -685,8 +667,14 @@ public final class ServerMapWindowBridge {
         TEXTURE_WORKER.execute(new Runnable() {
             @Override public void run() {
                 try {
+                    if (!isCurrentSurface(next)) return;
                     ResourceTextureLoader.prepareTexture(next.url,
                             next.request, false);
+                    // Consume the native request on this CPU worker even if the HUD changed.
+                    // Otherwise abandoned requests retain decoded pixels or a texture indefinitely.
+                    ResourceTexture texture = WaypointerTextureFilters.useCrispMagnification(
+                            ResourceTextureLoader.getPreparedTexture(next.url, next.request));
+                    if (isCurrentSurface(next)) next.texture = texture;
                     next.ready = true;
                 } catch (Throwable failure) {
                     next.failed = true;
@@ -699,6 +687,10 @@ public final class ServerMapWindowBridge {
         return next;
     }
 
+    private static synchronized boolean isCurrentSurface(PreparedSurface surface) {
+        return prepared == surface;
+    }
+
     private static void scheduleSurfaceIndex(final PreparedSurface surface,
                                              final ServerMapProfile profile) {
         synchronized (surface) {
@@ -708,6 +700,7 @@ public final class ServerMapWindowBridge {
         TEXTURE_WORKER.execute(new Runnable() {
             @Override public void run() {
                 try {
+                    if (!isCurrentSurface(surface)) return;
                     surface.tileIndex = SurfaceTileIndex.load(surface.file,
                             profile.getMapWidth(), profile.getMapHeight());
                     LOGGER.info("Server map terrain hover index ready: profile="
@@ -719,69 +712,6 @@ public final class ServerMapWindowBridge {
                 }
             }
         });
-    }
-
-    private static synchronized ResourceTexture wordmarkTexture() {
-        try {
-            if (wordmark == null) {
-                final PreparedArtwork next = new PreparedArtwork(
-                        new WaypointerFileResourceUrl(WORDMARK_FILE, 1L),
-                        "Sklotopolis wordmark");
-                wordmark = next;
-                TEXTURE_WORKER.execute(new Runnable() {
-                    @Override public void run() {
-                        try {
-                            ResourceTextureLoader.prepareTexture(next.url,
-                                    next.request, false);
-                            next.ready = true;
-                        } catch (Throwable failure) {
-                            next.failed = true;
-                            next.ready = true;
-                            reportOnce("wordmark-prepare",
-                                    next.label + " could not be prepared",
-                                    failure);
-                        }
-                    }
-                });
-            }
-            if (!wordmark.ready || wordmark.failed) return null;
-            if (wordmark.texture == null) {
-                wordmark.texture = ResourceTextureLoader.getPreparedTexture(
-                        wordmark.url, wordmark.request);
-            }
-            ResourceTexture texture = wordmark.texture;
-            return texture != null && (texture.isValid() || texture.needReinit())
-                    ? texture : null;
-        } catch (Throwable failure) {
-            reportOnce("wordmark", "Sklotopolis wordmark failed open", failure);
-            return null;
-        }
-    }
-
-    static synchronized ResourceTexture miniMapFrameTexture() {
-        miniMapFrame = prepareArtwork(miniMapFrame, MINI_MAP_FRAME_FILE,
-                "Mini-map frame", "mini-map-frame-prepare");
-        return readyArtwork(miniMapFrame, "mini-map-frame");
-    }
-
-    static synchronized ResourceTexture miniMapBackgroundTexture() {
-        miniMapBackground = prepareArtwork(miniMapBackground,
-                MINI_MAP_BACKGROUND_FILE, "Mini-map background",
-                "mini-map-background-prepare");
-        return readyArtwork(miniMapBackground, "mini-map-background");
-    }
-
-    static synchronized ResourceTexture miniMapNameplateTexture() {
-        miniMapNameplate = prepareArtwork(miniMapNameplate,
-                MINI_MAP_NAMEPLATE_FILE, "Mini-map nameplate",
-                "mini-map-nameplate-prepare");
-        return readyArtwork(miniMapNameplate, "mini-map-nameplate");
-    }
-
-    private static synchronized ResourceTexture mainMapFrameTexture() {
-        mainMapFrame = prepareArtwork(mainMapFrame, MAIN_MAP_FRAME_FILE,
-                "Main-map frame", "main-map-frame-prepare");
-        return readyArtwork(mainMapFrame, "main-map-frame");
     }
 
     private static synchronized ResourceTexture mapGalleryTexture(int index) {
@@ -805,6 +735,7 @@ public final class ServerMapWindowBridge {
                 try {
                     ResourceTextureLoader.prepareTexture(next.url,
                             next.request, false);
+                    next.texture = ResourceTextureLoader.getPreparedTexture(next.url, next.request);
                     next.ready = true;
                 } catch (Throwable failure) {
                     next.failed = true;
@@ -821,10 +752,6 @@ public final class ServerMapWindowBridge {
                                                  String failureKey) {
         try {
             if (artwork == null || !artwork.ready || artwork.failed) return null;
-            if (artwork.texture == null) {
-                artwork.texture = ResourceTextureLoader.getPreparedTexture(
-                        artwork.url, artwork.request);
-            }
             ResourceTexture texture = artwork.texture;
             return texture != null && (texture.isValid() || texture.needReinit())
                     ? texture : null;
@@ -868,6 +795,41 @@ public final class ServerMapWindowBridge {
                 CONTENT_WIDTH, CONTENT_HEIGHT);
     }
 
+    private static void drawLocalSurface(Queue queue,MapViewport viewport,int left,int top,int width,int height) {
+        List<LocalSurfaceMap.Chunk> chunks=WurmWaypointerRuntime.localSurfaceMap();
+        if(chunks!=lastLocalSnapshot){
+            Set<Long> retained=new HashSet<Long>();for(LocalSurfaceMap.Chunk chunk:chunks)retained.add(chunk.getKey());
+            java.util.Iterator<Map.Entry<Long,LocalSurfaceTexture>> entries=LOCAL_TEXTURES.entrySet().iterator();
+            while(entries.hasNext()){
+                Map.Entry<Long,LocalSurfaceTexture> entry=entries.next();
+                if(!retained.contains(entry.getKey())){entry.getValue().texture.dispose();entries.remove();}
+            }
+            lastLocalSnapshot=chunks;
+        }
+        for(LocalSurfaceMap.Chunk chunk:chunks){
+            MapPoint start=viewport.mapToScreen(chunk.getOriginX(),chunk.getOriginY());
+            MapPoint end=viewport.mapToScreen(chunk.getOriginX()+LocalSurfaceMap.CHUNK_SIZE,chunk.getOriginY()+LocalSurfaceMap.CHUNK_SIZE);
+            double size=end.getX()-start.getX();
+            double x=Math.max(0,start.getX()),y=Math.max(0,start.getY());
+            double right=Math.min(width,end.getX()),bottom=Math.min(height,end.getY());
+            if(right<=x||bottom<=y)continue;
+            LocalSurfaceTexture cached=LOCAL_TEXTURES.get(chunk.getKey());
+            if(cached==null){cached=new LocalSurfaceTexture();LOCAL_TEXTURES.put(chunk.getKey(),cached);}
+            if(cached.revision!=chunk.getRevision()){
+                cached.texture.update(chunk.image());cached.revision=chunk.getRevision();
+            }
+            Renderer.texturedQuadAlphaBlend(queue,cached.texture.get(),1,1,1,1,
+                    (float)(left+x),(float)(top+y),(float)(right-x),(float)(bottom-y),
+                    (float)((x-start.getX())/size),(float)((y-start.getY())/size),
+                    (float)((right-x)/size),(float)((bottom-y)/size));
+        }
+    }
+
+    private static final class LocalSurfaceTexture {
+        final WaypointerCaveTexture texture=new WaypointerCaveTexture();
+        long revision=Long.MIN_VALUE;
+    }
+
     private static void drawSurface(Queue queue, ResourceTexture texture,
                                     MapViewport viewport, int left, int top,
                                     int viewportWidth, int viewportHeight) {
@@ -898,8 +860,7 @@ public final class ServerMapWindowBridge {
         try {
             map.fillRect(queue, 0.075f, 0.050f, 0.030f, 1.0f,
                     left, top, CONTENT_WIDTH, CONTENT_HEIGHT);
-            drawArtwork(queue, miniMapBackgroundTexture(), left, top,
-                    CONTENT_WIDTH, CONTENT_HEIGHT, 0.92f);
+            UiPainter.background(WaypointerUi.canvas(map, queue), UiBackground.SOLID, 1, left, top, CONTENT_WIDTH, CONTENT_HEIGHT);
 
             int cardSize = 164;
             int rowGap = 30;
@@ -919,8 +880,8 @@ public final class ServerMapWindowBridge {
             }
 
             drawMainMapEdgeGuard(map, queue, left, top);
-            drawMainMapFrame(queue, left, top);
-            drawBranding(queue, wordmarkTexture(), left, top);
+            drawMainMapFrame(map, queue, left, top);
+
             String loading = "LOADING " + mapWorldName(profile) + " MAP...";
             int loadingX = left
                     + (CONTENT_WIDTH - MAIN_TITLE_TEXT.getWidth(loading)) / 2;
@@ -973,15 +934,9 @@ public final class ServerMapWindowBridge {
                                           int left, int top) {
         try {
             drawMainMapEdgeGuard(map, queue, left, top);
-            drawMainMapFrame(queue, left, top);
+            drawMainMapFrame(map, queue, left, top);
         } catch (Throwable failure) {
             reportOnce("main-map-frame", "Server map frame failed open",
-                    failure);
-        }
-        try {
-            drawBranding(queue, wordmarkTexture(), left, top);
-        } catch (Throwable failure) {
-            reportOnce("main-map-branding", "Server map branding failed open",
                     failure);
         }
         try {
@@ -1021,67 +976,11 @@ public final class ServerMapWindowBridge {
                 MAIN_MAP_EDGE_GUARD, CONTENT_HEIGHT);
     }
 
-    private static void drawMainMapFrame(Queue queue, int left, int top) {
-        ResourceTexture texture = mainMapFrameTexture();
-        if (texture == null) return;
-        int frameLeft = left - MAIN_MAP_FRAME_OVERSCAN;
-        int frameTop = top - MAIN_MAP_FRAME_OVERSCAN;
-        int frameWidth = CONTENT_WIDTH + MAIN_MAP_FRAME_OVERSCAN * 2;
-        int frameHeight = CONTENT_HEIGHT + MAIN_MAP_FRAME_OVERSCAN * 2;
-        int border = MAIN_MAP_FRAME_INSET + MAIN_MAP_FRAME_OVERSCAN;
-        float textureWidth = Math.max(1.0f, texture.getWidth());
-        float textureHeight = Math.max(1.0f, texture.getHeight());
-        float outerLeft = 20.0f / textureWidth;
-        float outerTop = 24.0f / textureHeight;
-        float innerLeft = 96.0f / textureWidth;
-        float innerTop = 96.0f / textureHeight;
-        float innerRight = (textureWidth - 96.0f) / textureWidth;
-        float innerBottom = (textureHeight - 96.0f) / textureHeight;
-        float outerRight = (textureWidth - 19.0f) / textureWidth;
-        float outerBottom = (textureHeight - 22.0f) / textureHeight;
-        int middleWidth = frameWidth - border * 2;
-        int middleHeight = frameHeight - border * 2;
-        drawFramePiece(queue, texture, frameLeft, frameTop, border, border,
-                outerLeft, outerTop,
-                innerLeft - outerLeft, innerTop - outerTop);
-        drawFramePiece(queue, texture, frameLeft + border, frameTop,
-                middleWidth, border, innerLeft, outerTop,
-                innerRight - innerLeft, innerTop - outerTop);
-        drawFramePiece(queue, texture, frameLeft + frameWidth - border,
-                frameTop,
-                border, border, innerRight, outerTop,
-                outerRight - innerRight, innerTop - outerTop);
-        drawFramePiece(queue, texture, frameLeft, frameTop + border,
-                border, middleHeight, outerLeft, innerTop,
-                innerLeft - outerLeft, innerBottom - innerTop);
-        drawFramePiece(queue, texture, frameLeft + frameWidth - border,
-                frameTop + border, border, middleHeight,
-                innerRight, innerTop,
-                outerRight - innerRight, innerBottom - innerTop);
-        drawFramePiece(queue, texture, frameLeft,
-                frameTop + frameHeight - border,
-                border, border, outerLeft, innerBottom,
-                innerLeft - outerLeft, outerBottom - innerBottom);
-        drawFramePiece(queue, texture, frameLeft + border,
-                frameTop + frameHeight - border, middleWidth, border,
-                innerLeft, innerBottom,
-                innerRight - innerLeft, outerBottom - innerBottom);
-        drawFramePiece(queue, texture,
-                frameLeft + frameWidth - border,
-                frameTop + frameHeight - border, border, border,
-                innerRight, innerBottom,
-                outerRight - innerRight, outerBottom - innerBottom);
+    private static void drawMainMapFrame(WorldMap map, Queue queue, int left, int top) {
+        UiPainter.frame(WaypointerUi.canvas(map, queue), MAIN_MAP_FRAME_INSET, 1, left, top, CONTENT_WIDTH, CONTENT_HEIGHT);
     }
 
-    private static void drawFramePiece(Queue queue, ResourceTexture texture,
-                                       int left, int top, int width, int height,
-                                       float u, float v,
-                                       float uScale, float vScale) {
-        Renderer.texturedQuadAlphaBlend(queue, texture,
-                1.0f, 1.0f, 1.0f, 1.0f,
-                left, top, width, height,
-                u, v, uScale, vScale);
-    }
+
 
     private static void drawArtwork(Queue queue, ResourceTexture texture,
                                     int left, int top, int width, int height,
@@ -1093,30 +992,12 @@ public final class ServerMapWindowBridge {
                 0.0f, 0.0f, 1.0f, 1.0f);
     }
 
-    private static void drawNameplate(Queue queue, ResourceTexture texture,
-                                      int left, int top, int width,
-                                      String label) {
-        if (texture == null || label == null) return;
-        int height = 22;
-        int leftCap = 12;
-        int rightCap = 24;
-        float leftCapU = leftCap / 128.0f;
-        float rightCapU = rightCap / 128.0f;
-        Renderer.texturedQuadAlphaBlend(queue, texture,
-                1.0f, 1.0f, 1.0f, 1.0f,
-                left, top, leftCap, height,
-                0.0f, 0.0f, leftCapU, 1.0f);
-        Renderer.texturedQuadAlphaBlend(queue, texture,
-                1.0f, 1.0f, 1.0f, 1.0f,
-                left + leftCap, top, width - leftCap - rightCap, height,
-                leftCapU, 0.0f, 1.0f - leftCapU - rightCapU, 1.0f);
-        Renderer.texturedQuadAlphaBlend(queue, texture,
-                1.0f, 1.0f, 1.0f, 1.0f,
-                left + width - rightCap, top, rightCap, height,
-                1.0f - rightCapU, 0.0f, rightCapU, 1.0f);
-        MAIN_TITLE_TEXT.moveTo(left + 8, top + 20);
-        MAIN_TITLE_TEXT.paint(queue, label,
-                0.97f, 0.92f, 0.78f, 1.0f);
+    private static void drawNameplate(WorldMap map, Queue queue, int x, int y, int width, String label) {
+        ChamomiloUiV1Canvas canvas = WaypointerUi.canvas(map, queue);
+        UiHudPainter.nameplate(canvas, false, UiScale.BASE, 1, x, y, width);
+        MAIN_TITLE_TEXT.moveTo(x + 12 + (width - 36 - MAIN_TITLE_TEXT.getWidth(label)) / 2, y + 15);
+        MAIN_TITLE_TEXT.paint(queue, label, UiColor.TEXT.red, UiColor.TEXT.green, UiColor.TEXT.blue, 1);
+        UiHudPainter.nameplate(canvas, true, UiScale.BASE, 1, x, y, width);
     }
 
     private static String mapWorldName(ServerMapProfile profile) {
@@ -1131,15 +1012,7 @@ public final class ServerMapWindowBridge {
         return world.isEmpty() ? "SKLOTOPOLIS" : world;
     }
 
-    private static void drawBranding(Queue queue, ResourceTexture logo,
-                                     int left, int top) {
-        if (logo != null) {
-            Renderer.texturedQuadAlphaBlend(queue, logo,
-                    1.0f, 1.0f, 1.0f, 0.96f,
-                    left + 28.0f, top + 28.0f, 188.0f, 43.0f,
-                    0.0f, 0.0f, 1.0f, 1.0f);
-        }
-    }
+
 
     /** Seamless surround matching Sklotopolis open water (#373F6F). */
     private static void drawWaterBacking(WorldMap map, Queue queue,
@@ -1286,6 +1159,8 @@ public final class ServerMapWindowBridge {
         List<HighwayTileIndex.Segment> segments = index.getSegments();
         int maximum = viewport.getPixelsPerTile() < OVERVIEW_PIXELS_PER_TILE
                 ? MAXIMUM_OVERVIEW_HIGHWAY_SEGMENTS : Integer.MAX_VALUE;
+        MapPoint visibleFirst=viewport.screenToMap(-3,-3);
+        MapPoint visibleLast=viewport.screenToMap(clipWidth+3,clipHeight+3);
         int selectionAccumulator = 0;
         for (HighwayTileIndex.Segment segment : segments) {
             if (segments.size() > maximum) {
@@ -1293,6 +1168,12 @@ public final class ServerMapWindowBridge {
                 if (selectionAccumulator < segments.size()) continue;
                 selectionAccumulator -= segments.size();
             }
+            // Most server roads are outside the tiny player-centred viewport.
+            // Reject them before allocating projected points and clip arrays.
+            if(Math.max(segment.getStartX(),segment.getEndX())+.5<visibleFirst.getX()
+                    || Math.min(segment.getStartX(),segment.getEndX())+.5>visibleLast.getX()
+                    || Math.max(segment.getStartY(),segment.getEndY())+.5<visibleFirst.getY()
+                    || Math.min(segment.getStartY(),segment.getEndY())+.5>visibleLast.getY())continue;
             MapPoint a = viewport.mapToScreen(segment.getStartX() + 0.5d,
                     segment.getStartY() + 0.5d);
             MapPoint b = viewport.mapToScreen(segment.getEndX() + 0.5d,
@@ -1517,11 +1398,11 @@ public final class ServerMapWindowBridge {
                 x - 1, y + 4, 3, 3);
     }
 
-    private static void drawTopographicContours(Queue queue, Texture contours,
+    private static void drawTopographicContours(Queue queue, MiniMapContourOverlay contours,
                                                  int left, int top, int size) {
         if (contours == null) return;
-        Renderer.texturedQuadAlphaBlend(queue, contours, 1, 1, 1, 1,
-                left, top, size, size, 0, 0, 1, 1);
+        Renderer.texturedQuadAlphaBlend(queue, contours.texture, 1, 1, 1, 1,
+                left+contours.x, top+contours.y, contours.size, contours.size, 0, 0, 1, 1);
     }
 
     private static void drawTileBorders(WurmComponent map, Queue queue,
@@ -1617,31 +1498,10 @@ public final class ServerMapWindowBridge {
                 1.0f, 0.92f, 0.72f, 1.0f, left, top);
     }
 
-    private static void drawLayerButtons(WorldMap map, Queue queue, State state,
-                                         int left, int top) {
-        for (MapOverlayVisibility.Layer layer : LAYER_BUTTONS) {
-            int x = layerButtonLeft(left, layer);
-            int y = top + SEARCH_BUTTON_TOP;
-            boolean visible = layerVisible(state, layer);
-            boolean hovered = state.hoveredLayerButton == layer;
-            boolean pressed = state.pressedLayerButton == layer && hovered;
-            float edge = pressed ? 1.0f : hovered ? 0.96f
-                    : visible ? 0.72f : 0.38f;
-            map.fillRect(queue, 0.10f, 0.055f, 0.02f, 0.94f,
-                    x, y, LAYER_BUTTON_WIDTH, LAYER_BUTTON_HEIGHT);
-            map.fillRect(queue, edge, edge * 0.79f, edge * 0.42f, 0.95f,
-                    x + 2, y + 2, LAYER_BUTTON_WIDTH - 4,
-                    LAYER_BUTTON_HEIGHT - 4);
-            float fill = visible ? 0.20f : 0.09f;
-            map.fillRect(queue, fill, visible ? 0.12f : 0.09f,
-                    visible ? 0.05f : 0.08f, 0.96f,
-                    x + 4, y + 4, LAYER_BUTTON_WIDTH - 8,
-                    LAYER_BUTTON_HEIGHT - 8);
-            text(queue, layerButtonLabel(layer), x + 7, y + 21,
-                    visible ? 1.0f : 0.58f,
-                    visible ? 0.92f : 0.55f,
-                    visible ? 0.72f : 0.52f, 1.0f, left, top);
-        }
+    private static void drawLayerButtons(WorldMap map, Queue queue, State state, int left, int top) {
+        for (MapOverlayVisibility.Layer layer : LAYER_BUTTONS)
+            WaypointerUi.paintButton(map, queue, "layer" + layer, layerButtonLabel(layer), state.hoveredLayerButton == layer,
+                    state.pressedLayerButton == layer, true, layerVisible(state, layer), layerButtonLeft(left, layer), top + SEARCH_BUTTON_TOP, LAYER_BUTTON_WIDTH, LAYER_BUTTON_HEIGHT);
     }
 
     private static boolean insideCenterButton(WorldMap map, int x, int y) {
@@ -1663,76 +1523,19 @@ public final class ServerMapWindowBridge {
     }
 
     private static void drawZoomFactorButton(WorldMap map, Queue queue, State state, int left, int top) {
-        int x = zoomFactorButtonLeft(left), y = top + SEARCH_BUTTON_TOP;
-        float edge = state.zoomFactorButtonPressed && state.zoomFactorButtonHover ? 1
-                : state.zoomFactorButtonHover ? 0.96f : 0.72f;
-        map.fillRect(queue, edge, edge * 0.79f, edge * 0.42f, 0.95f,
-                x, y, ZOOM_FACTOR_BUTTON_WIDTH, LAYER_BUTTON_HEIGHT);
-        map.fillRect(queue, 0.10f, 0.055f, 0.02f, 0.96f,
-                x + 2, y + 2, ZOOM_FACTOR_BUTTON_WIDTH - 4, LAYER_BUTTON_HEIGHT - 4);
-        text(queue, "Zoom speed: " + MiniMapWindowBridge.getZoomFactor() + "X",
-                x + 8, y + 21, 1, 0.92f, 0.72f, 1, left, top);
+        WaypointerUi.paintButton(map, queue, "ZoomFactor", "Zoom speed: " + MiniMapWindowBridge.getZoomFactor() + "X", state.zoomFactorButtonHover, state.zoomFactorButtonPressed, true, false, zoomFactorButtonLeft(left), top + SEARCH_BUTTON_TOP, ZOOM_FACTOR_BUTTON_WIDTH, LAYER_BUTTON_HEIGHT);
     }
 
     private static void drawCenterButton(WorldMap map, Queue queue, State state, int left, int top) {
-        int x = navigationLineButtonLeft(left) - LAYER_BUTTON_GAP - 72;
-        int y = top + SEARCH_BUTTON_TOP;
-        float edge = state.centerButtonHover ? 0.96f : 0.72f;
-        map.fillRect(queue, edge, edge * 0.79f, edge * 0.42f, 0.95f,
-                x, y, 72, LAYER_BUTTON_HEIGHT);
-        map.fillRect(queue, 0.10f, 0.055f, 0.02f, 0.96f,
-                x + 2, y + 2, 68, LAYER_BUTTON_HEIGHT - 4);
-        text(queue, "CENTER", x + 8, y + 21, 1.0f, 0.92f, 0.72f, 1.0f, left, top);
+        WaypointerUi.paintButton(map, queue, "Center", "CENTER", state.centerButtonHover, false, true, false, navigationLineButtonLeft(left) - LAYER_BUTTON_GAP - 72, top + SEARCH_BUTTON_TOP, 72, LAYER_BUTTON_HEIGHT);
     }
 
-    private static void drawMiniMapButton(WorldMap map, Queue queue,
-                                          State state, int left, int top) {
-        int x = miniMapButtonLeft(left);
-        int y = top + SEARCH_BUTTON_TOP;
-        boolean enabled = MiniMapWindowBridge.isEnabled();
-        boolean hovered = state.miniMapButtonHover;
-        boolean pressed = state.miniMapButtonPressed && hovered;
-        float edge = pressed ? 1.0f : hovered ? 0.96f
-                : enabled ? 0.72f : 0.38f;
-        map.fillRect(queue, 0.10f, 0.055f, 0.02f, 0.94f,
-                x, y, MINI_MAP_BUTTON_WIDTH, LAYER_BUTTON_HEIGHT);
-        map.fillRect(queue, edge, edge * 0.79f, edge * 0.42f, 0.95f,
-                x + 2, y + 2, MINI_MAP_BUTTON_WIDTH - 4,
-                LAYER_BUTTON_HEIGHT - 4);
-        float fill = enabled ? 0.20f : 0.09f;
-        map.fillRect(queue, fill, enabled ? 0.12f : 0.09f,
-                enabled ? 0.05f : 0.08f, 0.96f,
-                x + 4, y + 4, MINI_MAP_BUTTON_WIDTH - 8,
-                LAYER_BUTTON_HEIGHT - 8);
-        text(queue, "MINI MAP", x + 8, y + 21,
-                enabled ? 1.0f : 0.58f,
-                enabled ? 0.92f : 0.55f,
-                enabled ? 0.72f : 0.52f, 1.0f, left, top);
+    private static void drawMiniMapButton(WorldMap map, Queue queue, State state, int left, int top) {
+        WaypointerUi.paintButton(map, queue, "MiniMap", "MINI MAP", state.miniMapButtonHover, state.miniMapButtonPressed, true, MiniMapWindowBridge.isEnabled(), miniMapButtonLeft(left), top + SEARCH_BUTTON_TOP, MINI_MAP_BUTTON_WIDTH, LAYER_BUTTON_HEIGHT);
     }
 
-    private static void drawNavigationLineButton(
-            WorldMap map, Queue queue, State state, int left, int top) {
-        int x = navigationLineButtonLeft(left);
-        int y = top + SEARCH_BUTTON_TOP;
-        boolean enabled = MiniMapWindowBridge.isNavigationLineVisible();
-        boolean hovered = state.navigationLineButtonHover;
-        boolean pressed = state.navigationLineButtonPressed && hovered;
-        float edge = pressed ? 1.0f : hovered ? 0.96f
-                : enabled ? 0.72f : 0.38f;
-        map.fillRect(queue, 0.10f, 0.055f, 0.02f, 0.94f,
-                x, y, NAV_LINE_BUTTON_WIDTH, LAYER_BUTTON_HEIGHT);
-        map.fillRect(queue, edge, edge * 0.79f, edge * 0.42f, 0.95f,
-                x + 2, y + 2, NAV_LINE_BUTTON_WIDTH - 4,
-                LAYER_BUTTON_HEIGHT - 4);
-        float fill = enabled ? 0.20f : 0.09f;
-        map.fillRect(queue, fill, enabled ? 0.12f : 0.09f,
-                enabled ? 0.05f : 0.08f, 0.96f,
-                x + 4, y + 4, NAV_LINE_BUTTON_WIDTH - 8,
-                LAYER_BUTTON_HEIGHT - 8);
-        text(queue, "NAV LINE", x + 8, y + 21,
-                enabled ? 1.0f : 0.58f,
-                enabled ? 0.92f : 0.55f,
-                enabled ? 0.72f : 0.52f, 1.0f, left, top);
+    private static void drawNavigationLineButton(WorldMap map, Queue queue, State state, int left, int top) {
+        WaypointerUi.paintButton(map, queue, "NavigationLine", "NAV LINE", state.navigationLineButtonHover, state.navigationLineButtonPressed, true, MiniMapWindowBridge.isNavigationLineVisible(), navigationLineButtonLeft(left), top + SEARCH_BUTTON_TOP, NAV_LINE_BUTTON_WIDTH, LAYER_BUTTON_HEIGHT);
     }
 
     private static String layerButtonLabel(MapOverlayVisibility.Layer layer) {
@@ -1910,56 +1713,12 @@ public final class ServerMapWindowBridge {
                 : Character.toUpperCase(clean.charAt(0)) + clean.substring(1);
     }
 
-    private static void drawSearchButton(WorldMap map, Queue queue, State state,
-                                         int left, int top) {
-        int x = searchButtonLeft(left);
-        int y = top + SEARCH_BUTTON_TOP;
-        float edge = state.searchButtonHover ? 1.0f : 0.72f;
-        map.fillRect(queue, 0.10f, 0.055f, 0.02f, 0.94f,
-                x, y, SEARCH_BUTTON_SIZE, SEARCH_BUTTON_SIZE);
-        map.fillRect(queue, edge, edge * 0.79f, edge * 0.42f, 0.95f,
-                x + 2, y + 2, SEARCH_BUTTON_SIZE - 4, SEARCH_BUTTON_SIZE - 4);
-        map.fillRect(queue, 0.20f, 0.12f, 0.05f, 0.96f,
-                x + 4, y + 4, SEARCH_BUTTON_SIZE - 8, SEARCH_BUTTON_SIZE - 8);
-        float icon = state.searchButtonHover ? 1.0f : 0.90f;
-        int cx = x + 14;
-        int cy = y + 13;
-        line(queue, cx - 5, cy, cx - 3, cy - 5,
-                2.0f, icon, icon * 0.86f, icon * 0.55f, 1.0f);
-        line(queue, cx - 3, cy - 5, cx + 3, cy - 5,
-                2.0f, icon, icon * 0.86f, icon * 0.55f, 1.0f);
-        line(queue, cx + 3, cy - 5, cx + 5, cy,
-                2.0f, icon, icon * 0.86f, icon * 0.55f, 1.0f);
-        line(queue, cx + 5, cy, cx + 3, cy + 5,
-                2.0f, icon, icon * 0.86f, icon * 0.55f, 1.0f);
-        line(queue, cx + 3, cy + 5, cx - 3, cy + 5,
-                2.0f, icon, icon * 0.86f, icon * 0.55f, 1.0f);
-        line(queue, cx - 3, cy + 5, cx - 5, cy,
-                2.0f, icon, icon * 0.86f, icon * 0.55f, 1.0f);
-        line(queue, cx + 4, cy + 4, cx + 10, cy + 10,
-                3.0f, icon, icon * 0.86f, icon * 0.55f, 1.0f);
+    private static void drawSearchButton(WorldMap map, Queue queue, State state, int left, int top) {
+        WaypointerUi.paintButton(map, queue, "Search", "@search", state.searchButtonHover, false, true, false, searchButtonLeft(left), top + SEARCH_BUTTON_TOP, SEARCH_BUTTON_SIZE, LAYER_BUTTON_HEIGHT);
     }
 
-    private static void drawCloseButton(WorldMap map, Queue queue, State state,
-                                        int left, int top) {
-        int x = closeButtonLeft(left);
-        int y = top + SEARCH_BUTTON_TOP;
-        boolean hovered = state.closeButtonHover;
-        boolean pressed = state.closeButtonPressed && hovered;
-        float edge = pressed ? 1.0f : hovered ? 0.96f : 0.72f;
-        map.fillRect(queue, 0.10f, 0.055f, 0.02f, 0.94f,
-                x, y, SEARCH_BUTTON_SIZE, SEARCH_BUTTON_SIZE);
-        map.fillRect(queue, edge, edge * 0.64f, edge * 0.34f, 0.95f,
-                x + 2, y + 2, SEARCH_BUTTON_SIZE - 4,
-                SEARCH_BUTTON_SIZE - 4);
-        map.fillRect(queue, hovered ? 0.28f : 0.16f, 0.07f, 0.035f, 0.98f,
-                x + 4, y + 4, SEARCH_BUTTON_SIZE - 8,
-                SEARCH_BUTTON_SIZE - 8);
-        float icon = hovered ? 1.0f : 0.90f;
-        line(queue, x + 10, y + 10, x + 22, y + 22,
-                2.5f, icon, icon * 0.82f, icon * 0.58f, 1.0f);
-        line(queue, x + 22, y + 10, x + 10, y + 22,
-                2.5f, icon, icon * 0.82f, icon * 0.58f, 1.0f);
+    private static void drawCloseButton(WorldMap map, Queue queue, State state, int left, int top) {
+        WaypointerUi.paintButton(map, queue, "Close", "@close", state.closeButtonHover, state.closeButtonPressed, true, false, closeButtonLeft(left), top + SEARCH_BUTTON_TOP, SEARCH_BUTTON_SIZE, LAYER_BUTTON_HEIGHT);
     }
 
     private static void requestWaypoint(WorldMap map, State state,
@@ -2207,7 +1966,7 @@ public final class ServerMapWindowBridge {
                              int left, int top, int width, int height) {
         if (value == null || value.isEmpty() || x < left || y < top
                 || x >= left + width || y >= top + height) return;
-        TextFont font = TextFont.getFixedSizeText();
+        TextFont font = WaypointerFonts.body();
         font.moveTo(x, y);
         font.paint(queue, value, red, green, blue, alpha);
     }
@@ -2371,7 +2130,7 @@ public final class ServerMapWindowBridge {
         private volatile boolean indexScheduled;
         private volatile boolean indexFailed;
         private volatile SurfaceTileIndex tileIndex;
-        private ResourceTexture texture;
+        private volatile ResourceTexture texture;
 
         private PreparedSurface(String key, Path file,
                                 WaypointerFileResourceUrl url) {
@@ -2387,7 +2146,7 @@ public final class ServerMapWindowBridge {
         private final Object request = new Object();
         private volatile boolean ready;
         private volatile boolean failed;
-        private ResourceTexture texture;
+        private volatile ResourceTexture texture;
 
         private PreparedArtwork(WaypointerFileResourceUrl url, String label) {
             this.url = url;

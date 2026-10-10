@@ -11,6 +11,34 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class SurroundingsCatalogTest {
+    @Test public void everyColumnSortsInBothDirectionsAndNoneRestoresArrivalOrder(){
+        for(SurroundingKind kind:SurroundingKind.values()){
+            SurroundingsCatalog catalog=new SurroundingsCatalog();
+            SurroundingEntry z=SurroundingEntry.builder().kind(kind).wurmId(7).name("Zulu").shortName("zebra").category("zebra").material("wood").rarity(3)
+                    .creatureModifier(CreatureModifier.RAGING).hostility(CreatureHostility.NEUTRAL).uniqueCreature(true).deedStatus(DeedStatus.ON_DEED).position(40,0,0).build();
+            SurroundingEntry a=SurroundingEntry.builder().kind(kind).wurmId(3).name("Alpha").shortName("apple").category("apple").material("iron").rarity(1)
+                    .creatureModifier(CreatureModifier.NONE).hostility(CreatureHostility.FRIEND).uniqueCreature(false).deedStatus(DeedStatus.OFF_DEED).position(8,0,0).build();
+            catalog.upsert(z);catalog.upsert(a);catalog.setWaypoint(z.getKey(),true);
+            for(SurroundingsQuery.SortColumn column:SurroundingsQuery.SortColumn.values()){
+                if(column==SurroundingsQuery.SortColumn.NONE)continue;
+                assertEquals("Ascending "+kind+" "+column,3L,catalog.snapshot(SurroundingsQuery.builder().kind(kind).sort(column,true).build(),0,0).getRows().get(0).getEntry().getWurmId());
+                assertEquals("Descending "+kind+" "+column,7L,catalog.snapshot(SurroundingsQuery.builder().kind(kind).sort(column,false).build(),0,0).getRows().get(0).getEntry().getWurmId());
+            }
+            SurroundingsQuery original=SurroundingsQuery.builder().kind(kind).sort(SurroundingsQuery.SortColumn.NONE,true).build();
+            assertEquals(7L,catalog.snapshot(original,0,0).getRows().get(0).getEntry().getWurmId());
+            catalog.upsert(SurroundingEntry.builder().kind(kind).wurmId(7).name("Zulu").category("zebra").position(1,0,0).build());
+            assertEquals("Movement preserves original order",7L,catalog.snapshot(original,0,0).getRows().get(0).getEntry().getWurmId());
+        }
+    }
+
+    @Test public void markedCountIncludesOnlyTheDisplayedKind(){
+        SurroundingsCatalog catalog=new SurroundingsCatalog();
+        for(SurroundingKind kind:SurroundingKind.values()){
+            SurroundingEntry entry=SurroundingEntry.builder().kind(kind).wurmId(kind.ordinal()+1).name("target").category(kind.name()).build();
+            catalog.upsert(entry);catalog.setWaypoint(entry.getKey(),true);
+        }
+        for(SurroundingKind kind:SurroundingKind.values())assertEquals(1,catalog.snapshot(SurroundingsQuery.builder().kind(kind).build(),0,0).getMarkedCount());
+    }
     @Test public void filtersAnimalsByChampionModifier() {
         SurroundingsCatalog catalog = new SurroundingsCatalog();
         catalog.upsert(animal(1L, "brown bear", CreatureModifier.NONE, 12.0, 0.0));

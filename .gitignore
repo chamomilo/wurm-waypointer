@@ -22,3 +22,8 @@ hs_err_pid*
 # Retained local drafting and superseded artwork
 README.DRAFT.md
 docs/wurm-waypointer-forum-banner*.png
+
+# Local investigation captures and temporary probes
+research/
+.tmp-*
+*.class

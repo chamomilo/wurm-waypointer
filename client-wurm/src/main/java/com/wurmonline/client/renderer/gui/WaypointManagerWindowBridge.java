@@ -10,12 +10,14 @@ import java.lang.reflect.Method;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
 
 /** Owns exactly one native manager window for the active HUD. */
 public final class WaypointManagerWindowBridge {
     private static final Logger LOGGER = Logger.getLogger("WurmWaypointer.Manager");
     private static HeadsUpDisplay owner;
-    private static WaypointManagerWindow window;
+    private static WaypointerHubWindow window;
 
     private WaypointManagerWindowBridge() {
     }
@@ -40,9 +42,9 @@ public final class WaypointManagerWindowBridge {
             if (owner != hud) detach(owner, "HUD replacement");
             owner = hud;
             if (window == null) {
-                window = new WaypointManagerWindow(controller);
-                window.setInitialSize(Math.min(1120, Math.max(900, hud.getWidth() - 120)),
-                        Math.min(560, Math.max(360, hud.getHeight() - 140)), true);
+                window = new WaypointerHubWindow(controller);
+                window.setInitialSize(Math.min(1380, Math.max(1100, hud.getWidth() - 40)),
+                        Math.min(680, Math.max(430, hud.getHeight() - 100)), true);
                 window.setPosition(Math.max(20, (hud.getWidth() - window.width) / 2),
                         Math.max(20, (hud.getHeight() - window.height) / 2));
                 add(hud, window);
@@ -89,19 +91,44 @@ public final class WaypointManagerWindowBridge {
 
     public static synchronized void detach(HeadsUpDisplay hud, String reason) {
         if (window == null) return;
-        HeadsUpDisplay target = hud == null ? owner : hud;
+        WaypointerHubWindow closing = window;
+        HeadsUpDisplay target = owner == null ? hud : owner;
+        boolean ownedFocus = false;
         try {
-            window.prepareDetach();
-            if (target != null) remove(target, window);
-            LOGGER.info("Waypoint Manager detached: reason=" + oneLine(reason));
+            if (target != null) {
+                WurmComponent focus = ReflectionUtil.getPrivateField(target,
+                        ReflectionUtil.getField(HeadsUpDisplay.class, "kbFocusComponent"));
+                ownedFocus = closing.ownsHudComponent(focus);
+                if (ownedFocus) target.stopTyping();
+                List<WurmDropdownPopup> popups = ReflectionUtil.getPrivateField(target,
+                        ReflectionUtil.getField(HeadsUpDisplay.class, "dropdownPopups"));
+                popups.removeIf(popup -> closing.ownsHudComponent(popup.dropDown));
+            }
         } catch (Throwable failure) {
-            LOGGER.log(Level.FINE, "Waypoint Manager detach failed open", failure);
+            LOGGER.log(Level.WARNING, "Unable to clear manager input/popups", failure);
         }
+        try { closing.prepareDetach(); }
+        catch (Throwable failure) { LOGGER.log(Level.WARNING, "Unable to finish manager cleanup", failure); }
+        if (target != null) {
+            // Also collect cached panels accidentally promoted by earlier focus code.
+            // Removing the frame alone would leave those panels drawing over the world.
+            for (WurmComponent component : new ArrayList<WurmComponent>(target.getComponents())) {
+                if (!closing.ownsHudComponent(component)) continue;
+                try { remove(target, component); }
+                catch (Throwable failure) { LOGGER.log(Level.WARNING, "Unable to remove manager component", failure); }
+            }
+            if (ownedFocus) {
+                try { ReflectionUtil.callPrivateMethod(target,
+                        ReflectionUtil.getMethod(HeadsUpDisplay.class, "resetKeyboardFocus", new Class<?>[0])); }
+                catch (Throwable failure) { LOGGER.log(Level.WARNING, "Unable to restore keyboard focus", failure); }
+            }
+        }
+        LOGGER.info("Waypoint Manager detached: reason=" + oneLine(reason));
         window = null;
         if (target == owner) owner = null;
     }
 
-    static synchronized void closed(WaypointManagerWindow value) {
+    static synchronized void closed(WaypointerHubWindow value) {
         if (value == null || value != window) return;
         detach(owner, "window close");
     }
@@ -121,7 +148,7 @@ public final class WaypointManagerWindowBridge {
     }
 
     private static void registerPosition(HeadsUpDisplay hud,
-                                         WaypointManagerWindow value)
+                                         WaypointerHubWindow value)
             throws ReflectiveOperationException {
         Field field = ReflectionUtil.getField(HeadsUpDisplay.class, "savePosManager");
         SavePosManager positions = ReflectionUtil.getPrivateField(hud, field);
@@ -133,6 +160,20 @@ public final class WaypointManagerWindowBridge {
     private static String identity(Object value) {
         return value == null ? "null" : value.getClass().getName() + "@"
                 + Integer.toHexString(System.identityHashCode(value));
+    }
+
+    public static synchronized void openSection(HeadsUpDisplay hud,
+            WaypointManagerController controller, org.waypoints.next.ui.WaypointerSection section) {
+        open(hud, controller);
+        if (window != null) window.select(section);
+    }
+
+    public static synchronized boolean mouseWheeled(HeadsUpDisplay hud,int x,int y,int delta) {
+        if (owner != hud || window == null || !hud.getComponents().contains(window)) return false;
+        java.util.List<WurmComponent> components=hud.getComponents();
+        for(int i=components.size()-1;i>=0;i--)if(components.get(i).contains(x,y)&&components.get(i).isAvailable())
+            return components.get(i)==window&&window.mouseWheeledAt(x,y,delta);
+        return false;
     }
 
     private static String oneLine(String value) {

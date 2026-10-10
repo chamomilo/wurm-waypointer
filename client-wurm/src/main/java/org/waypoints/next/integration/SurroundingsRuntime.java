@@ -315,7 +315,7 @@ final class SurroundingsRuntime implements DynamicWaypointProvider {
     }
 
     @Override public WaypointRevisionSnapshot combine(WaypointRevisionSnapshot base) {
-        // Mark now creates an ordinary persisted 15-minute manager waypoint.
+        // Nearby marks are persisted and exposed by TrackedTargetsRuntime.
         return base;
     }
 

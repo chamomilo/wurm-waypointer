@@ -22,6 +22,10 @@ requiredClientLibraries.each { library ->
 
 dependencies {
     api project(':core')
+    // The canonical updater embeds the complete reviewed SDK. Compile against
+    // that same module and let client-wurm embed it once in the final mod.
+    api files(project(':client-wurm').file('build/chamomilo-updater/chamomilo-updater.jar'))
+            .builtBy(':client-wurm:syncChamomiloUpdater')
     compileOnly files(requiredClientLibraries)
     testImplementation 'junit:junit:4.13.2'
     testImplementation files(requiredClientLibraries)
@@ -62,5 +66,6 @@ check.dependsOn verifyRendererBoundary
 // This module is bundled into the one installable mod. Its standalone jar is
 // an internal build input and must never be installed by hand.
 jar {
+    manifest { attributes 'Chamomilo-UI-Version': '0.4.4' }
     archiveFileName = "wurm-waypointer-render-wurm-internal-${project.version}.jar"
 }

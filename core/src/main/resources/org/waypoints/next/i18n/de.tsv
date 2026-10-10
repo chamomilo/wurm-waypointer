@@ -1,0 +1,405 @@
+# Waypointer UI catalogue; UTF-8
+ALL WAYPOINTS	ALLE WEGPUNKTE
+MOBS AROUND	KREATUREN IN DER NÄHE
+CONTAINERS AROUND	BEHÄLTER IN DER NÄHE
+OBJECTS AND ITEMS AROUND	OBJEKTE UND GEGENSTÄNDE
+MY VEHICLES AND ANIMALS	MEINE FAHRZEUGE UND TIERE
+MY FRIENDS	MEINE FREUNDE
+SETTINGS	EINSTELLUNGEN
+General	Allgemein
+Language	Sprache
+Navigation	Navigation
+Maps	Karten
+Scanner	Scanner
+Tracking	Verfolgung
+Markers	Markierungen
+Advanced	Erweitert
+Data storage	Datenspeicherung
+Loot Map assistance	Schatzkartenhilfe
+Archaeology assistance	Archäologiehilfe
+Navigation signal	Navigationssignal
+Pulse distance (m)	Pulsentfernung (m)
+Maximum cart slope (dirt)	Maximale Wagensteigung
+Maximum cart water depth (m)	Maximale Wassertiefe für Wagen (m)
+Prefer published highways	Veröffentlichte Straßen bevorzugen
+Highway refresh interval (minutes)	Straßen aktualisieren (Minuten)
+Server map	Serverkarte
+Show deeds	Siedlungen anzeigen
+Show highways	Straßen anzeigen
+Map refresh interval (minutes)	Karte aktualisieren (Minuten)
+Deed providers	Siedlungsquellen
+Custom deed feeds	Eigene Siedlungsquellen
+Scanner profile	Scannerprofil
+Appearance notifications	Neue Erscheinungen melden
+Highlight matching models	Passende Modelle hervorheben
+Maximum highlighted objects	Maximal hervorgehobene Objekte
+Highlight distance (m)	Hervorhebungsentfernung (m)
+Excluded names	Ausgeschlossene Namen
+Keep last known positions (days)	Letzte Positionen speichern (Tage)
+Maximum compass markers	Maximale Kompassmarkierungen
+Maximum world markers	Maximale Weltmarkierungen
+World marker distance (m)	Entfernung der Weltmarkierungen (m)
+Maximum world labels	Maximale Weltbeschriftungen
+World label distance (m)	Entfernung der Beschriftungen (m)
+Map width (tiles)	Kartenbreite (Kacheln)
+Map height (tiles)	Kartenhöhe (Kacheln)
+Archaeology history limit	Grenze des Archäologieverlaufs
+Write navigation diagnostics	Navigationsdiagnose schreiben
+Diagnostic movement threshold (tiles)	Bewegung für Diagnose (Kacheln)
+Waypoint file	Wegpunktdatei
+Import/export file	Import-/Exportdatei
+Tracked target file	Datei verfolgter Ziele
+Landmark preferences file	Datei der Landmarkeneinstellungen
+Loot Map log folder	Ordner für Schatzkartenprotokolle
+Archaeology sessions file	Datei der Archäologiesitzungen
+Known archaeology locations file	Datei bekannter Fundorte
+Navigation log folder	Navigationsprotokollordner
+Highway cache folder	Straßencacheordner
+Map cache folder	Kartencacheordner
+Deed cache folder	Siedlungscacheordner
+Search	Suchen
+Search name / tag	Name / Tag suchen
+Search fields	Suchfelder
+Search all fields	Alle Felder durchsuchen
+Refresh	Aktualisieren
+Clear	Leeren
+Apply	Anwenden
+Apply filters	Filter anwenden
+Save	Speichern
+Cancel	Abbrechen
+Close	Schließen
+Save settings	Einstellungen speichern
+Reset draft	Entwurf zurücksetzen
+Check setting: {0}	Einstellung prüfen: {0}
+Saving settings…	Einstellungen werden gespeichert…
+Settings saved.	Einstellungen gespeichert.
+Settings saved. File paths take effect after restart.	Gespeichert. Dateipfade gelten nach Neustart.
+Settings could not be saved.	Einstellungen konnten nicht gespeichert werden.
+Track	Verfolgen
+Untrack	Verfolgung beenden
+Track filtered	Gefilterte verfolgen
+Clear filtered	Gefilterte entfernen
+Clear all marks	Alle Markierungen entfernen
+Direction	Richtung
+Clear last seen	Letzte Position löschen
+Visible now	Jetzt sichtbar
+Last known position	Letzte bekannte Position
+Position unknown	Position unbekannt
+Approximate direction	Ungefähre Richtung
+Approximate area	Ungefähres Gebiet
+{0} readings	{0} Messungen
+Last seen {0} ago	Zuletzt vor {0} gesehen
+Last seen {0}	Zuletzt gesehen: {0}
+No friends received from the client.	Keine Freunde vom Client empfangen.
+No Manage catalogue yet. Press Refresh.	Noch keine Manage-Liste. Aktualisieren drücken.
+Press Refresh to request your Manage lists.	Aktualisieren drücken, um Manage-Listen anzufordern.
+Manage request timed out. Native forms remain available.	Manage-Zeitüberschreitung. Native Formulare bleiben verfügbar.
+Manage request failed.	Manage-Anfrage fehlgeschlagen.
+Requesting Manage list…	Manage-Liste wird angefordert…
+Native Manage opened.	Natives Manage geöffnet.
+Manage list received.	Manage-Liste empfangen.
+Waiting for animal direction…	Warten auf Tierrichtung…
+Animal direction is unavailable for this list.	Tierrichtung für diese Liste nicht verfügbar.
+Animal position is unavailable.	Tierposition nicht verfügbar.
+Animal direction received.	Tierrichtung empfangen.
+On	An
+Off	Aus
+All	Alle
+Current	Aktuell
+Current (	Aktuell (
+Unassigned	Nicht zugewiesen
+Server	Server
+User	Charakter
+Type	Typ
+Status	Status
+All types	Alle Typen
+All statuses	Alle Status
+Name	Name
+Edit	Bearbeiten
+Share	Teilen
+Copy	Kopieren
+Delete	Löschen
+Fixed	Fest
+Nav	Nav
+Stop	Stopp
+Distance	Entfernung
+Style	Stil
+Temporary	Temporär
+Stale	Veraltet
+Live	Aktuell
+Pending	Ausstehend
+Last seen	Zuletzt gesehen
+Live exact	Aktuelle Position
+Static exact	Feste Position
+Server bearing	Serverrichtung
+Search step	Suchschritt
+Exact saved	Gespeicherte Position
+Static	Fest
+Vanilla system	Natives System
+Loot map	Schatzkarte
+Archaeology report	Archäologiebericht
+Managed animal	Verwaltetes Tier
+Managed item	Verwalteter Gegenstand
+Player	Spieler
+Deed	Siedlung
+Add...	Hinzufügen...
+Enable filtered	Gefilterte aktivieren
+Disable filtered	Gefilterte deaktivieren
+Export	Exportieren
+Import	Importieren
+Paste shared	Geteiltes einfügen
+All waypoints	Alle Wegpunkte
+Surroundings	Umgebung
+Waypoints	Wegpunkte
+Add Waypoint	Wegpunkt hinzufügen
+Add Here	Hier hinzufügen
+Add Coordinates	Koordinaten hinzufügen
+Edit Waypoint	Wegpunkt bearbeiten
+Here	Hier
+Coordinates	Koordinaten
+From coordinates	Aus Koordinaten
+At my position	An meiner Position
+Description	Beschreibung
+Group	Gruppe
+Tags	Tags
+World style	Weltstil
+Marker size	Markierungsgröße
+Beam width	Strahlbreite
+Label	Beschriftung
+Show label	Beschriftung anzeigen
+Show distance	Entfernung anzeigen
+Lifetime	Lebensdauer
+Permanent	Dauerhaft
+Arrival radius	Ankunftsradius
+Clipboard	Zwischenablage
+Paste	Einfügen
+Animals	Tiere
+Containers	Behälter
+Items	Gegenstände
+Mark	Markieren
+Category	Kategorie
+Trait	Eigenschaft
+Unique	Einzigartig
+Material	Material
+Rarity	Seltenheit
+Layer	Ebene
+Position / ID	Position / ID
+Short name	Kurzname
+Include	Einschließen
+Exclude	Ausschließen
+Exclude names	Namen ausschließen
+Example: catseyes, post	Beispiel: catseyes, post
+Matches the client's undecorated short name	Nutzt den unverzierten Kurznamen des Clients
+client short-name fragment	Teil des Kurznamens
+Monitoring	Überwachung
+Monitoring (	Überwachung (
+Detection	Erkennung
+Type / distance	Typ / Entfernung
+Surface	Oberfläche
+Cave	Höhle
+Normal	Normal
+Rare	Selten
+Supreme	Überragend
+Fantastic	Fantastisch
+Yes	Ja
+No	Nein
+Any	Beliebig
+None	Keine
+Marked	Markiert
+Unmarked	Unmarkiert
+Online	Online
+Offline	Offline
+Other server	Anderer Server
+Unknown	Unbekannt
+PULSE	PULS
+SOLID	DURCHGEHEND
+MOVING_DASHES	BEWEGTE STRICHE
+off	aus
+uniques	einzigartige
+treasure	Schatz
+animals	Tiere
+Colored beam	Farbiger Strahl
+Compass only	Nur Kompass
+Target	Ziel
+Hidden	Versteckt
+Exclamation	Ausrufezeichen
+Distance asc	Entfernung aufsteigend
+Name asc	Name aufsteigend
+{0} of {1} waypoints	{0} von {1} Wegpunkten
+{0} of {1} objects	{0} von {1} Objekten
+0 waypoints	0 Wegpunkte
+0 objects	0 Objekte
+0 detected	0 erkannt
+Delete {0} permanently?	{0} dauerhaft löschen?
+This cannot be undone.	Dies kann nicht rückgängig gemacht werden.
+now	jetzt
++ filter	+ filter
+- filter	- filter
+Example: horse, wolf	Beispiel: horse, wolf
+{0} of {1}; {2} tracked	{0} von {1}; {2} verfolgt
+Tracked target cache could not be read. Existing file preserved.	Zielcache konnte nicht gelesen werden. Vorhandene Datei bleibt erhalten.
+Tracked targets could not be saved.	Verfolgte Ziele konnten nicht gespeichert werden.
+Coordinates / map link	Koordinaten / Kartenlink
+Use Clipboard	Zwischenablage verwenden
+Choose a waypoint source.	Wegpunktquelle auswählen.
+Parsed coordinates: paste a /gps line, x/y pair, or map link.	Koordinaten: /gps-Zeile, x/y oder Kartenlink einfügen.
+Parsed coordinates	Erkannte Koordinaten
+Location	Position
+Edit Static Waypoint	Statischen Wegpunkt bearbeiten
+Hidden (Manager only)	Verborgen (nur in der Liste)
+Arrival radius (disabled)	Ankunftsradius (deaktiviert)
+Color	Farbe
+Beam alpha	Strahltransparenz
+Beam field size	Strahlgröße
+Beam thickness	Strahlbreite
+Circle alpha	Kreistransparenz
+Circle radius	Kreisradius
+Center beam thickness	Breite des Mittelstrahls
+Symbol alpha	Symboltransparenz
+Symbol size	Symbolgröße
+Stroke thickness	Strichbreite
+No world-effect sliders. Compass marker size follows the compass window.	Keine Regler für Welteffekte. Die Markergröße folgt dem Kompassfenster.
+No world-effect sliders while this waypoint is hidden.	Keine Regler für Welteffekte bei verborgenem Wegpunkt.
+Keep current ({0})	Aktuell beibehalten ({0})
+{0} minute	{0} Minute
+{0} minutes	{0} Minuten
+{0} hour	{0} Stunde
+{0} hours	{0} Stunden
+{0} day	{0} Tag
+expired	abgelaufen
+{0}m left	noch {0} Min.
+{0}h left	noch {0} Std.
+{0}h {1}m left	noch {0} Std. {1} Min.
+{0} s	{0} Sek.
+{0} min	{0} Min.
+{0} h	{0} Std.
+{0} d	{0} Tage
+Live {0}	Aktuell {0}
+Stale {0}	Veraltet {0}
+All (clear selection)	Alle (Auswahl löschen)
+Done	Fertig
+Chests	Truhen
+Crates	Kisten
+Barrels	Fässer
+Bulk storage	Schüttgutlager
+Vehicles	Fahrzeuge
+Ships	Schiffe
+{0} found; {1} tracked; {2} filters	{0} gefunden; {1} verfolgt; {2} Filter
+Custom map mark	Eigene Kartenmarkierung
+Text shown next to the mark	Text neben der Markierung
+Save custom mark	Markierung speichern
+Find deed on map	Siedlung auf Karte suchen
+Find deed on {0}	Siedlung auf {0} suchen
+0 deeds	0 Siedlungen
+Queued	In Warteschlange
+No provider	Kein Anbieter
+Loading provider...	Anbieter wird geladen...
+Provider error	Anbieterfehler
+unknown age	Alter unbekannt
+{0}, mayor - {1}, X={2} Y={3}	{0}, Bürgermeister - {1}, X={2} Y={3}
+Track deed waypoint	Siedlungswegpunkt verfolgen
+Nav to deed	Zur Siedlung navigieren
+Tracked	Verfolgt
+Navigating	Navigation aktiv
+Settlement	Siedlung
+Mayor	Bürgermeister
+Alliance	Allianz
+Guards	Wachen
+Citizens	Bürger
+Founder	Gründer
+Founded	Gegründet
+Active	Aktiv
+Waypoint	Wegpunkt
+Full plan points	Punkte im Gesamtplan
+Full route length	Gesamte Routenlänge
+Full estimated time	Geschätzte Gesamtdauer
+Full plan end	Ende des Gesamtplans
+Plan	Plan
+Route Statistics	Routenstatistik
+planning...	wird geplant...
+COMPLETE TO TARGET	VOLLSTÄNDIG BIS ZUM ZIEL
+PARTIAL (target {0}, {1})	TEILWEISE (Ziel {0}, {1})
+tile {0}, {1}	Feld {0}, {1}
+Speed model: off-road 8 / road 16 / Highway 24 km/h	Tempo: Gelände 8 / Straße 16 / Fernstraße 24 km/h
+Mini Map	Minikarte
+Mini Map of: {0}	Minikarte von: {0}
+FULL MAP	KARTE
+GROUND	OBERFLÄCHE
+CAVE	HÖHLE
+Cave data loading...	Höhlendaten werden geladen...
+Map loading...	Karte wird geladen...
+Open the full map	Große Karte öffnen
+Save a permanent labelled mark on this tile.	Dauerhafte beschriftete Markierung auf diesem Feld speichern.
+Create a standard tracked waypoint at this position.	Verfolgten Wegpunkt an dieser Position erstellen.
+Delete this Surroundings waypoint.	Diesen Umgebungswegpunkt entfernen.
+Create a standard tracked waypoint for every filtered row.	Für jede gefilterte Zeile einen verfolgten Wegpunkt erstellen.
+Delete Surroundings waypoints for every filtered row.	Umgebungswegpunkte aller gefilterten Zeilen entfernen.
+Delete every Surroundings tracked target.	Alle verfolgten Umgebungsziele entfernen.
+Create a waypoint at your current character position and layer.	Wegpunkt an aktueller Position und Ebene erstellen.
+Return to the waypoint list without creating anything.	Ohne neuen Wegpunkt zur Liste zurückkehren.
+Save this live draft as a new waypoint.	Diesen Entwurf als neuen Wegpunkt speichern.
+Save the current live draft as a new waypoint.	Aktuellen Entwurf als neuen Wegpunkt speichern.
+Commit the live draft to this waypoint.	Entwurf für diesen Wegpunkt übernehmen.
+Cancel creation and remove the temporary marker.	Erstellung abbrechen und temporären Marker entfernen.
+Discard the draft and restore the stored waypoint unchanged.	Entwurf verwerfen und gespeicherten Wegpunkt wiederherstellen.
+Apply the server, user, type and status filters.	Server-, Benutzer-, Typ- und Statusfilter anwenden.
+Filter by the character that owns the waypoint.	Nach dem Besitzer des Wegpunkts filtern.
+Filter by waypoint source type.	Nach dem Quelltyp des Wegpunkts filtern.
+Filter by coordinate resolution status.	Nach dem Koordinatenstatus filtern.
+Waypoint name shown in the Manager, compass hover, and world label.	Name in Liste, Kompass und Weltbeschriftung.
+Create a waypoint at your position or from coordinates/map link.	Wegpunkt an eigener Position oder aus Koordinaten/Kartenlink erstellen.
+Enable every waypoint currently matched by the filters.	Alle durch die Filter gefundenen Wegpunkte aktivieren.
+Disable every waypoint currently matched by the filters.	Alle durch die Filter gefundenen Wegpunkte deaktivieren.
+Export all waypoint records to the transfer file.	Alle Wegpunkte in die Austauschdatei exportieren.
+Import waypoint records from the transfer file.	Wegpunkte aus der Austauschdatei importieren.
+Enable or disable this waypoint's compass marker, label, and world effect.	Kompassmarker, Beschriftung und Welteffekt aktivieren oder deaktivieren.
+Stop the active on-ground navigation route.	Aktive Bodenroute stoppen.
+Navigate to this enabled current-server waypoint. Starting it stops the previous route.	Zu diesem aktiven Wegpunkt navigieren. Die vorige Route wird beendet.
+Sort the table by {0}. Click again to reverse the order.	Nach {0} sortieren. Erneut klicken, um die Reihenfolge umzukehren.
+Request a provider refresh in the background.	Anbieter im Hintergrund aktualisieren.
+Create or update this provider-managed DEED waypoint.	Diesen Siedlungswegpunkt erstellen oder aktualisieren.
+Track this deed waypoint and start the navigator.	Siedlungswegpunkt verfolgen und Navigation starten.
+Switch back to the full Surroundings filters.	Zu den vollständigen Umgebungsfiltern zurückkehren.
+Coordinates follow this tracked target automatically.	Die Koordinaten folgen diesem verfolgten Ziel automatisch.
+Remove this target from ALL WAYPOINTS. Track it again in its catalogue to add it back.	Dieses Ziel aus allen Wegpunkten entfernen. Im Katalog erneut verfolgen, um es wieder hinzuzufügen.
+Remove {0} from ALL WAYPOINTS?	{0} aus allen Wegpunkten entfernen?
+You can add it again with Track in its catalogue.	Du kannst es durch Verfolgen im Katalog wieder hinzufügen.
+Condition	Zustand
+Conditions	Zustände
+Traits	Merkmale
+Hostility	Feindseligkeit
+Neutral	Neutral
+Ally	Verbündet
+Hostile	Feindlich
+Friendly	Freundlich
+Developer	Entwickler
+Open Monitoring with the current filters.	Monitoring mit den aktuellen Filtern öffnen.
+Breeding traits are not supplied in the nearby creature stream.	Zuchtmerkmale werden im Datenstrom naher Kreaturen nicht übertragen.
+ADD TO MONITOR	ADD TO MONITOR
+Unmark	Markierung entfernen
+Delete this waypoint immediately.	Diesen Wegpunkt sofort löschen.
+Clear this text filter.	Diesen Textfilter leeren.
+Click: ascending, descending, then original order. ^ ascending; v descending.	Klicken: aufsteigend, absteigend, dann ursprüngliche Reihenfolge. ^ aufsteigend; v absteigend.
+Toggle this value. Multiple selected values are combined with OR.	Diesen Wert umschalten. Mehrere ausgewählte Werte werden mit ODER verknüpft.
+Clear all selections in this filter; allow every value.	Alle Auswahlen in diesem Filter löschen; alle Werte zulassen.
+Close this list. Selection changes already apply immediately.	Diese Liste schließen. Die Auswahl wird bereits sofort angewendet.
+Refresh the friends received from the client.	Die vom Client empfangene Freundesliste aktualisieren.
+Request your animals, land vehicles and ships from the server and show them here.	Deine Tiere, Landfahrzeuge und Schiffe vom Server abrufen und hier anzeigen.
+Position	Position
+Updated	Aktualisiert
+Click: ascending, descending, then original order.	Klicken: aufsteigend, absteigend, dann ursprüngliche Reihenfolge.
+Friend status received from the client.	Vom Client empfangener Freundesstatus.
+Managed object type received from the server.	Vom Server empfangener Typ des verwalteten Objekts.
+Position state. Visible now follows received movement; last known position is saved history; approximate direction has no exact coordinates.	Positionszustand. Sichtbare Ziele folgen empfangenen Bewegungen; die letzte Position ist gespeichert; eine ungefähre Richtung liefert keine exakten Koordinaten.
+Age of the last received position or direction observation.	Alter der letzten empfangenen Positions- oder Richtungsmessung.
+No managed animals, vehicles or ships to display.	Keine verwalteten Tiere, Fahrzeuge oder Schiffe zum Anzeigen.
+Remove this target from ALL WAYPOINTS; keep its catalogue entry and history.	Dieses Ziel aus ALL WAYPOINTS entfernen; Katalogeintrag und Verlauf behalten.
+Add this target to ALL WAYPOINTS and follow its received position.	Dieses Ziel zu ALL WAYPOINTS hinzufügen und seiner empfangenen Position folgen.
+Navigate to this target's confirmed or last known position. Approximate directions cannot start a route.	Zur bestätigten oder zuletzt bekannten Position navigieren. Ungefähre Richtungen erlauben keine Route.
+Request the native animal Find direction; this is an approximate bearing, not exact coordinates.	Die native Find-Richtung des Tiers abrufen; sie ist eine ungefähre Peilung, keine exakten Koordinaten.
+Forget this target's saved position while retaining its catalogue entry.	Die gespeicherte Position vergessen und den Katalogeintrag behalten.
+No targets match these filters.	Keine Ziele entsprechen diesen Filtern.
+Bearing {0}° ± {1}°; range {2}–{3} m from the observation point. {4} readings.	Peilung {0}° ± {1}°; Entfernung {2}–{3} m vom Beobachtungspunkt. {4} Messungen.
+Back to Waypointer	Zurück zu Waypointer
+Return to the Waypointer window.	Zum Waypointer-Fenster zurückkehren.
+ (last observed)	 (zuletzt beobachtet)

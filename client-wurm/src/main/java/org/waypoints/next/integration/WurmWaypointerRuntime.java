@@ -92,6 +92,7 @@ public final class WurmWaypointerRuntime {
             new SklotopolisHighwayService(LOGGER);
     private static final SklotopolisMapService SERVER_MAPS =
             new SklotopolisMapService(LOGGER);
+    private static final WurmLocalSurfaceMap LOCAL_SURFACE = new WurmLocalSurfaceMap();
     private static final StaticNavigationController STATIC_NAVIGATION =
             new StaticNavigationController(LOGGER, HIGHWAYS);
     private static final NavigationRouteVisualStyleSettings NAVIGATION_SETTINGS =
@@ -103,11 +104,15 @@ public final class WurmWaypointerRuntime {
             new ArchaeologyRuntime(LOGGER);
     private static final SurroundingsRuntime SURROUNDINGS =
             new SurroundingsRuntime(LOGGER);
+    private static final TrackedTargetsRuntime TRACKED = new TrackedTargetsRuntime(LOGGER);
+    private static volatile java.util.Properties pendingSettings;
+    private static final HubSettings HUB_SETTINGS = new HubSettings(
+            java.nio.file.Paths.get("mods", "wurm-waypointer.config"), p -> pendingSettings = p);
     private static final ConcurrentLinkedQueue<UUID> EXTERNAL_NAVIGATION_REQUESTS =
             new ConcurrentLinkedQueue<UUID>();
     private static final List<DynamicWaypointProvider> DYNAMIC_WAYPOINTS =
             Collections.unmodifiableList(Arrays.<DynamicWaypointProvider>asList(
-                    LOOT_MAPS, ARCHAEOLOGY, SURROUNDINGS));
+                    LOOT_MAPS, ARCHAEOLOGY, SURROUNDINGS, TRACKED));
     private static final ArchaeologyChimePlayer ARCHAEOLOGY_CHIMES =
             new ArchaeologyChimePlayer(LOGGER);
     private static final WaypointRenderRuntimeAccess RENDER_ACCESS =
@@ -218,7 +223,9 @@ public final class WurmWaypointerRuntime {
                     return active;
                 }
                 @Override public void setEnabled(UUID id, boolean enabled) {
-                    if (LOOT_MAPS.setEnabled(id, enabled)) {
+                    if (TRACKED.enabled(id, enabled)) {
+                        STATIC_NAVIGATION.managerEnabledChanged(id, enabled);
+                    } else if (LOOT_MAPS.setEnabled(id, enabled)) {
                         STATIC_NAVIGATION.managerEnabledChanged(id, enabled);
                         event((enabled ? "Enabled: " : "Disabled: ")
                                 + "active Loot Map waypoint. Hunt progress was kept.");
@@ -236,7 +243,9 @@ public final class WurmWaypointerRuntime {
                     int vanilla = 0;
                     int lootMaps = 0;
                     for (UUID id : ids) {
-                        if (LOOT_MAPS.setEnabled(id, enabled)) {
+                        if (TRACKED.enabled(id, enabled)) {
+                            STATIC_NAVIGATION.managerEnabledChanged(id, enabled);
+                        } else if (LOOT_MAPS.setEnabled(id, enabled)) {
                             lootMaps++;
                             STATIC_NAVIGATION.managerEnabledChanged(id, enabled);
                         } else if (VANILLA_LANDMARKS.setEnabled(id, enabled)) vanilla++;
@@ -259,7 +268,12 @@ public final class WurmWaypointerRuntime {
                     }
                 }
                 @Override public void delete(UUID id) {
-                    STATIC_WAYPOINTS.deleteFromManager(id, hud);
+                    if (TRACKED.delete(id)) {
+                        STATIC_NAVIGATION.managerEnabledChanged(id, false);
+                        event("Removed tracked waypoint [" + id.toString().substring(0, 8)
+                                + "] from ALL WAYPOINTS. Its catalogue entry remains available for Track.");
+                    }
+                    else STATIC_WAYPOINTS.deleteFromManager(id, hud);
                 }
                 @Override public void exportAll() {
                     STATIC_WAYPOINTS.exportFromManager(hud);
@@ -270,10 +284,13 @@ public final class WurmWaypointerRuntime {
                 @Override public void openSurroundings() {
                     WurmWaypointerRuntime.openSurroundings();
                 }
+                @Override public org.waypoints.next.ui.SurroundingsController surroundings() { return SURROUNDINGS_CONTROLLER; }
+                @Override public org.waypoints.next.ui.TrackingController tracking() { return TRACKED; }
+                @Override public org.waypoints.next.ui.SettingsController settings() { return HUB_SETTINGS; }
                 @Override public long revision() {
                     return (STATIC_WAYPOINTS.revision() * 31L
                             + VANILLA_LANDMARKS.revision()) * 31L
-                            + LOOT_MAPS.revision();
+                            + LOOT_MAPS.revision() + TRACKED.revision();
                 }
                 @Override public void reportFailure(String operation, Throwable failure) {
                     STATIC_WAYPOINTS.reportManagerFailure(operation, failure, hud);
@@ -286,13 +303,14 @@ public final class WurmWaypointerRuntime {
                 new ArrayList<org.waypoints.next.model.WaypointRecord>();
         records.addAll(VANILLA_LANDMARKS.records());
         records.addAll(LOOT_MAPS.records());
+        records.addAll(TRACKED.records());
         return records;
     }
     private static final SurroundingsController SURROUNDINGS_CONTROLLER =
             new SurroundingsController() {
                 @Override public SurroundingsSnapshot snapshot(SurroundingsQuery query) {
                     SURROUNDINGS.reconcileWaypoints(
-                            STATIC_WAYPOINTS.surroundingsWaypointKeys());
+                            allSurroundingsWaypointKeys());
                     World world = hud == null ? null : hud.getWorld();
                     double x = world == null ? 0.0d : world.getPlayerPosX();
                     double y = world == null ? 0.0d : world.getPlayerPosY();
@@ -301,28 +319,28 @@ public final class WurmWaypointerRuntime {
                 @Override public void setWaypoint(SurroundingKey key, boolean enabled) {
                     org.waypoints.next.surroundings.SurroundingEntry entry =
                             SURROUNDINGS.find(key);
-                    int changed = STATIC_WAYPOINTS.setSurroundingsWaypoints(
-                            entry == null ? Collections.<org.waypoints.next.surroundings.SurroundingEntry>emptyList()
-                                    : Collections.singletonList(entry),
-                            Collections.singletonList(key), enabled, hud, identity);
-                    SURROUNDINGS.reconcileWaypoints(
-                            STATIC_WAYPOINTS.surroundingsWaypointKeys());
-                    event((enabled ? "Created " : "Cleared ") + changed
-                            + " 15-minute surroundings waypoint(s).");
+                    if (enabled && entry != null) TRACKED.trackNearby(entry, true);
+                    if (!enabled) {
+                        TRACKED.unmark(key);
+                        STATIC_WAYPOINTS.setSurroundingsWaypoints(Collections.<SurroundingEntry>emptyList(),
+                                Collections.singletonList(key), false, hud, identity);
+                    }
+                    SURROUNDINGS.reconcileWaypoints(allSurroundingsWaypointKeys());
                 }
                 @Override public void setWaypoints(
                         java.util.Collection<SurroundingKey> keys, boolean enabled) {
-                    int changed = STATIC_WAYPOINTS.setSurroundingsWaypoints(
-                            SURROUNDINGS.findAll(keys), keys, enabled, hud, identity);
-                    SURROUNDINGS.reconcileWaypoints(
-                            STATIC_WAYPOINTS.surroundingsWaypointKeys());
-                    event((enabled ? "Created " : "Cleared ") + changed
-                            + " 15-minute surroundings waypoint(s).");
+                    if(enabled)for(SurroundingEntry entry:SURROUNDINGS.findAll(keys))TRACKED.trackNearby(entry,true);
+                    else {
+                        for(SurroundingKey key:keys)TRACKED.unmark(key);
+                        STATIC_WAYPOINTS.setSurroundingsWaypoints(Collections.<SurroundingEntry>emptyList(),keys,false,hud,identity);
+                    }
+                    SURROUNDINGS.reconcileWaypoints(allSurroundingsWaypointKeys());
                 }
                 @Override public void clearAllWaypoints() {
+                    TRACKED.unmarkAll();
                     int changed = STATIC_WAYPOINTS.clearSurroundingsWaypoints();
                     SURROUNDINGS.reconcileWaypoints(
-                            STATIC_WAYPOINTS.surroundingsWaypointKeys());
+                            allSurroundingsWaypointKeys());
                     event("Cleared " + changed + " surroundings waypoint(s).");
                 }
                 @Override public void openWaypointManager() {
@@ -330,7 +348,7 @@ public final class WurmWaypointerRuntime {
                 }
                 @Override public long revision() {
                     SURROUNDINGS.reconcileWaypoints(
-                            STATIC_WAYPOINTS.surroundingsWaypointKeys());
+                            allSurroundingsWaypointKeys());
                     return SURROUNDINGS.revision();
                 }
                 @Override public void reportFailure(String operation, Throwable failure) {
@@ -372,7 +390,7 @@ public final class WurmWaypointerRuntime {
                     request.getMaximumLifetimeSeconds(), currentHud, identity,
                     java.time.Instant.now());
             SURROUNDINGS.reconcileWaypoints(
-                    STATIC_WAYPOINTS.surroundingsWaypointKeys());
+                    allSurroundingsWaypointKeys());
             if (request.getNavigation() == NavigationRequest.ACTIVATE) {
                 EXTERNAL_NAVIGATION_REQUESTS.add(id);
             }
@@ -390,7 +408,7 @@ public final class WurmWaypointerRuntime {
             if (!removed) return false;
             STATIC_NAVIGATION.managerEnabledChanged(markerId, false);
             SURROUNDINGS.reconcileWaypoints(
-                    STATIC_WAYPOINTS.surroundingsWaypointKeys());
+                    allSurroundingsWaypointKeys());
             if (navigatorStopped) event("Navigator stopped: external marker removed.");
             return true;
         }
@@ -427,15 +445,7 @@ public final class WurmWaypointerRuntime {
         STATIC_NAVIGATION.setNavigationRouteVisualStyleSink(
                 new java.util.function.Consumer<NavigationRouteVisualStyle>() {
                     @Override public void accept(NavigationRouteVisualStyle style) {
-                        try {
-                            NAVIGATION_SETTINGS.save(style);
-                            LOGGER.info("Navigation route visual style saved: " + style);
-                        } catch (java.io.IOException | RuntimeException failure) {
-                            LOGGER.log(Level.WARNING,
-                                    "Unable to save navigation route visual style",
-                                    failure);
-                            event("Navigation signal changed, but the setting could not be saved; see client.log.");
-                        }
+                        java.util.Properties updated=HUB_SETTINGS.values();updated.setProperty("navigationRouteVisualStyle",style.name());HUB_SETTINGS.save(updated);
                     }
                 });
         SERVER_MAPS.configure(waypointConfiguration.isServerMapEnabled(),
@@ -470,6 +480,7 @@ public final class WurmWaypointerRuntime {
                 CustomMapMarkWindowBridge.detach(hud, "HUD replacement/init");
                 MiniMapWindowBridge.detach(hud, "HUD replacement/init");
                 ServerMapWindowBridge.resetAll();
+                LOCAL_SURFACE.clear();
             }
             hud = nextHud;
             identity = null;
@@ -487,6 +498,16 @@ public final class WurmWaypointerRuntime {
     public static void hudTick(HeadsUpDisplay currentHud) {
         try {
             if (currentHud == null) return;
+            java.util.Properties changedSettings = pendingSettings;
+            if (changedSettings != null) {
+                pendingSettings = null;
+                HUB_SETTINGS.configure(changedSettings);
+                TRACKED.configure(changedSettings);
+                configure(configuration, WaypointClientConfiguration.from(changedSettings));
+                String profile = changedSettings.getProperty("scannerProfile", "off");
+                if ("off".equals(profile)) SURROUNDINGS.deactivateScanner();
+                else SURROUNDINGS.activateScanner(profile);
+            }
             if (hud != currentHud) hudReady(currentHud);
             World world = currentHud.getWorld();
             if (world == null || awaitingServerInformation || confirmedWorld != world) return;
@@ -497,6 +518,8 @@ public final class WurmWaypointerRuntime {
             }
             VANILLA_LANDMARKS.bind(identity);
             SERVER_MAPS.activate(identity);
+            if (waypointConfiguration.isServerMapEnabled())
+                LOCAL_SURFACE.tick(world,identity,System.currentTimeMillis());
             MiniMapWindowBridge.tick(currentHud);
             DEEDS.bind(identity);
             SURROUNDINGS.updateDeeds(serverMapSnapshot());
@@ -521,6 +544,7 @@ public final class WurmWaypointerRuntime {
                     waypointConfiguration.getMapBounds());
             ARCHAEOLOGY.bind(archaeologyContext);
             SURROUNDINGS.bind(identity, world.getUsername());
+            TRACKED.tick(currentHud, identity, java.time.Instant.now());
             SURROUNDINGS.tick(System.currentTimeMillis());
             refreshScannerOutlineTargets(world);
             STATIC_NAVIGATION.tick(world, currentHud, identity,
@@ -858,6 +882,7 @@ public final class WurmWaypointerRuntime {
             HeadsUpDisplay currentHud = hud;
             World world = currentHud == null ? null : currentHud.getWorld();
             if (world == null) return;
+            TRACKED.event(tab, text, java.time.Instant.now());
             WaypointLayer playerLayer = world.getPlayerLayer() < 0
                     ? WaypointLayer.CAVE : WaypointLayer.SURFACE;
             LOOT_MAPS.observe(tab, text, new LootMapRuntime.EventContext(
@@ -889,6 +914,7 @@ public final class WurmWaypointerRuntime {
 
     public static void observeAction(long[] targets, PlayerAction action) {
         try {
+            TRACKED.nativeAction(action);
             String actionName = WurmPlayerActionName.resolve(action);
             for (DynamicWaypointProvider provider : DYNAMIC_WAYPOINTS) {
                 provider.observeAction(targets, actionName);
@@ -1078,6 +1104,7 @@ public final class WurmWaypointerRuntime {
             CustomMapMarkWindowBridge.detach(hud, "disconnect");
             MiniMapWindowBridge.detach(hud, "disconnect");
             SERVER_MAPS.deactivate();
+            LOCAL_SURFACE.clear();
             DEEDS.deactivate();
             ServerMapWindowBridge.resetAll();
             hud = null;
@@ -1110,6 +1137,7 @@ public final class WurmWaypointerRuntime {
             CustomMapMarkWindowBridge.detach(hud, "server transfer");
             MiniMapWindowBridge.detach(hud, "server transfer");
             SERVER_MAPS.deactivate();
+            LOCAL_SURFACE.clear();
             DEEDS.deactivate();
             ServerMapWindowBridge.resetAll();
             identity = null;
@@ -1183,6 +1211,10 @@ public final class WurmWaypointerRuntime {
         return DEEDS.overlay(SERVER_MAPS.current());
     }
 
+    public static List<org.waypoints.next.map.LocalSurfaceMap.Chunk> localSurfaceMap() {
+        return LOCAL_SURFACE.snapshot();
+    }
+
     public static HighwayTileIndex serverMapHighways() {
         return HIGHWAYS.current();
     }
@@ -1235,7 +1267,10 @@ public final class WurmWaypointerRuntime {
     /** Exact terrain name when the hovered tile is in Wurm's live buffer. */
     public static String serverMapLiveTileDescription(int tileX, int tileY) {
         World world = hud == null ? null : hud.getWorld();
-        return WurmSurfaceTileDescription.describe(world, tileX, tileY);
+        String live=WurmSurfaceTileDescription.describe(world, tileX, tileY);
+        if(!live.isEmpty())return live;
+        String observed=LOCAL_SURFACE.describe(tileX,tileY);
+        return observed.isEmpty()?"":observed+org.waypoints.next.i18n.Messages.text(" (last observed)");
     }
 
     public static void serverMapWaypointRequested(int tileX, int tileY,
@@ -1390,14 +1425,15 @@ public final class WurmWaypointerRuntime {
         HeadsUpDisplay current = hud;
         if (current == null) throw new IllegalStateException("HUD is not ready yet");
         WaypointClusterPickerWindowBridge.detach(current, "surroundings open");
-        WaypointManagerWindowBridge.detach(current, "surroundings open");
-        SurroundingsWindowBridge.open(current, SURROUNDINGS_CONTROLLER);
+        WaypointManagerWindowBridge.openSection(current, MANAGER_CONTROLLER,
+                org.waypoints.next.ui.WaypointerSection.MOBS_AROUND);
     }
 
     /** Called after a creature or ground item enters or changes in the client. */
     public static void surroundingsRenderableUpserted(Object renderable) {
         try {
             SurroundingEntry entry = SURROUNDINGS.upsertRenderable(renderable);
+            TRACKED.observe(renderable, null, null, null, entry, java.time.Instant.now());
             STATIC_WAYPOINTS.refreshExternalObjectWaypoints(
                     entry, java.time.Instant.now());
         }
@@ -1412,6 +1448,7 @@ public final class WurmWaypointerRuntime {
         try {
             SurroundingEntry entry = SURROUNDINGS.creatureMoved(
                     renderable, worldX, worldY, height);
+            TRACKED.observe(renderable, (double) worldX, (double) worldY, (double) height, entry, java.time.Instant.now());
             STATIC_WAYPOINTS.refreshExternalObjectWaypoints(
                     entry, java.time.Instant.now());
         }
@@ -1426,6 +1463,7 @@ public final class WurmWaypointerRuntime {
         try {
             SurroundingKey removed = SURROUNDINGS.removeRenderable(
                     renderable, removedFromWorld);
+            TRACKED.removed(renderable, removed, java.time.Instant.now());
             // In the pinned client true is used by authoritative server removals
             // (picked up, buried, destroyed, dead-animation completion, etc.).
             // false is also emitted by addRenderable's technical remove-before-add.
@@ -1452,7 +1490,7 @@ public final class WurmWaypointerRuntime {
 
     /** Called when Wurm clears the active cell renderer. */
     public static void surroundingsRenderablesCleared() {
-        try { SURROUNDINGS.clearRenderables(); }
+        try { TRACKED.clearLive(); SURROUNDINGS.clearRenderables(); }
         catch (Throwable failure) {
             LOGGER.log(Level.FINE, "Surroundings clear hook failed open", failure);
         }
@@ -1688,7 +1726,7 @@ public final class WurmWaypointerRuntime {
             STATIC_NAVIGATION.managerEnabledChanged(id, false);
         }
         SURROUNDINGS.reconcileWaypoints(
-                STATIC_WAYPOINTS.surroundingsWaypointKeys());
+                allSurroundingsWaypointKeys());
         event("Removed " + deleted.size()
                 + " object mark(s): target disappeared."
                 + (navigatorStopped ? " Navigator stopped." : ""));
@@ -1717,6 +1755,24 @@ public final class WurmWaypointerRuntime {
                 + ", host=\"" + oneLine(endpoint.getHost()) + "\""
                 + ", gamePort=" + endpoint.getGamePort()
                 + ", queryPort=" + (queryPort == null ? "unknown" : queryPort);
+    }
+
+    public static HeadsUpDisplay currentHud() { return hud; }
+    public static void setUserLanguage(String code) {
+        HUB_SETTINGS.setUserLanguage(code);
+    }
+    public static void configureHub(java.util.Properties properties) {
+        HUB_SETTINGS.configure(properties);
+        TRACKED.configure(properties);
+        pendingSettings=properties;
+    }
+    public static boolean interceptManagedBml(HeadsUpDisplay owner,String title,String text) {
+        try { return TRACKED.intercept(owner,title,text); }
+        catch(Throwable failure) { LOGGER.log(Level.WARNING,"Manage BML failed open",failure); return false; }
+    }
+    private static java.util.Collection<SurroundingKey> allSurroundingsWaypointKeys() {
+        java.util.Set<SurroundingKey> keys=new java.util.HashSet<SurroundingKey>(STATIC_WAYPOINTS.surroundingsWaypointKeys());
+        keys.addAll(TRACKED.markedKeys());return keys;
     }
 
     private static String describe(ServerIdentity value) {

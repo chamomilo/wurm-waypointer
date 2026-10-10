@@ -36,6 +36,9 @@ public interface WaypointManagerController {
     void exportAll();
     void importAll();
     void openSurroundings();
+    default SurroundingsController surroundings() { return null; }
+    default TrackingController tracking() { return null; }
+    default SettingsController settings() { return null; }
     long revision();
     void reportFailure(String operation, Throwable failure);
 }

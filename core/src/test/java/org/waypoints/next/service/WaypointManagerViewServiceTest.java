@@ -105,6 +105,24 @@ public class WaypointManagerViewServiceTest {
         assertTrue(row.isToggleOnlyManaged());
     }
 
+    @Test public void trackedTargetsSupportRemovalButKeepAutomaticCoordinates() {
+        for (WaypointSourceType type : Arrays.asList(WaypointSourceType.PLAYER,
+                WaypointSourceType.MANAGED_ANIMAL, WaypointSourceType.MANAGED_ITEM)) {
+            WaypointRecord target = WaypointRecord.copyOf(records.get(0))
+                    .sourceType(type).sourceKey("tracked:" + type + ":42").build();
+            WaypointManagerRow row = service.snapshot(Arrays.asList(target),
+                    WaypointManagerQuery.builder().allServers().build()).getRows().get(0);
+            assertTrue(row.isTrackedTarget());
+            assertFalse(row.isToggleOnlyManaged());
+        }
+        WaypointRecord temporary = WaypointRecord.copyOf(records.get(0))
+                .sourceType(WaypointSourceType.MANAGED_ANIMAL)
+                .expiresAt(Instant.ofEpochMilli(1_700_003_600_000L)).build();
+        assertFalse(service.snapshot(Arrays.asList(temporary),
+                WaypointManagerQuery.builder().allServers().build())
+                .getRows().get(0).isTrackedTarget());
+    }
+
     @Test public void vanillaRowsStayFirstFixedOrderAndIgnoreUserFilter() {
         WaypointRecord white = systemRecord(
                 "50000000-0000-0000-0000-000000000001", "Vanilla White Light",

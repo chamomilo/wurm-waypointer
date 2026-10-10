@@ -12,6 +12,8 @@ public final class SurroundingEntry {
     private final String category;
     private final String material;
     private final CreatureModifier creatureModifier;
+    private final String traits;
+    private final CreatureHostility hostility;
     private final DeedStatus deedStatus;
     private final boolean uniqueCreature;
     private final int rarity;
@@ -36,6 +38,8 @@ public final class SurroundingEntry {
                 ? CreatureModifier.NONE : builder.creatureModifier;
         creatureModifier = CreatureModifier.fromWurmData(
                 requestedModifier.getWurmCode(), name, description);
+        traits = clean(builder.traits);
+        hostility = builder.hostility == null ? CreatureHostility.UNKNOWN : builder.hostility;
         deedStatus = builder.deedStatus == null
                 ? DeedStatus.UNKNOWN : builder.deedStatus;
         uniqueCreature = builder.uniqueCreature;
@@ -60,6 +64,8 @@ public final class SurroundingEntry {
     public String getCategory() { return category; }
     public String getMaterial() { return material; }
     public CreatureModifier getCreatureModifier() { return creatureModifier; }
+    public String getTraits() { return traits; }
+    public CreatureHostility getHostility() { return hostility; }
     public DeedStatus getDeedStatus() { return deedStatus; }
     public boolean isUniqueCreature() { return uniqueCreature; }
     public int getRarity() { return rarity; }
@@ -74,7 +80,7 @@ public final class SurroundingEntry {
         return builder().kind(getKind()).wurmId(getWurmId()).name(name)
                 .shortName(shortName).modelName(modelName).description(description)
                 .category(category)
-                .material(material).creatureModifier(creatureModifier).rarity(rarity)
+                .material(material).creatureModifier(creatureModifier).traits(traits).hostility(hostility).rarity(rarity)
                 .deedStatus(deedStatus).uniqueCreature(uniqueCreature)
                 .layer(layer).position(worldX, worldY, height)
                 .firstSeenAt(value).updatedAt(updatedAt).build();
@@ -84,7 +90,7 @@ public final class SurroundingEntry {
         return builder().kind(getKind()).wurmId(getWurmId()).name(name)
                 .shortName(shortName).modelName(modelName).description(description)
                 .category(category)
-                .material(material).creatureModifier(creatureModifier).rarity(rarity)
+                .material(material).creatureModifier(creatureModifier).traits(traits).hostility(hostility).rarity(rarity)
                 .deedStatus(value).uniqueCreature(uniqueCreature)
                 .layer(layer).position(worldX, worldY, height)
                 .firstSeenAt(firstSeenAt).updatedAt(updatedAt).build();
@@ -123,6 +129,8 @@ public final class SurroundingEntry {
         private String category;
         private String material;
         private CreatureModifier creatureModifier;
+        private String traits;
+        private CreatureHostility hostility;
         private DeedStatus deedStatus;
         private boolean uniqueCreature;
         private int rarity;
@@ -146,6 +154,8 @@ public final class SurroundingEntry {
         public Builder creatureModifier(CreatureModifier value) {
             creatureModifier = value; return this;
         }
+        public Builder traits(String value) { traits = value; return this; }
+        public Builder hostility(CreatureHostility value) { hostility = value; return this; }
         public Builder deedStatus(DeedStatus value) { deedStatus = value; return this; }
         public Builder uniqueCreature(boolean value) {
             uniqueCreature = value; return this;

@@ -1,0 +1,7 @@
+// Updater implementation and release checks live in the standalone reference.
+ext.chamomiloUpdaterReference = project.findProperty('chamomiloUpdaterReference') ?:
+        System.getenv('CHAMOMILO_UPDATER_REFERENCE') ?: 'C:/projects/updater'
+def reference = file(chamomiloUpdaterReference)
+if (!new File(reference, 'version.properties').isFile())
+    throw new GradleException('Missing updater reference: ' + reference)
+apply from: new File(reference, 'gradle/chamomilo-updater.gradle')

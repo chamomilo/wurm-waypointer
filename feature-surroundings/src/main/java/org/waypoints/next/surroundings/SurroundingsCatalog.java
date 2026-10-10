@@ -157,8 +157,8 @@ public final class SurroundingsCatalog {
         List<SurroundingsRow> rows = new ArrayList<SurroundingsRow>();
         for (SurroundingEntry entry : entries.values()) {
             boolean selected = marked.contains(entry.getKey());
-            if (selected) markedLoaded++;
             if (entry.getKind() != query.getKind()) continue;
+            if (selected) markedLoaded++;
             total++;
             if (!query.matches(entry, selected)) continue;
             rows.add(new SurroundingsRow(entry, selected,
@@ -166,10 +166,28 @@ public final class SurroundingsCatalog {
                             entry.getWorldX(), entry.getWorldY())));
         }
         final SurroundingsQuery selectedQuery = query;
-        Collections.sort(rows, new Comparator<SurroundingsRow>() {
+        if (query.getSort() != SurroundingsQuery.SortColumn.NONE) Collections.sort(rows, new Comparator<SurroundingsRow>() {
             @Override public int compare(SurroundingsRow left, SurroundingsRow right) {
                 int compared;
                 switch (selectedQuery.getSort()) {
+                    case MARK:
+                        compared = Boolean.compare(left.isWaypointEnabled(), right.isWaypointEnabled());
+                        break;
+                    case SHORT_NAME:
+                        compared = left.getEntry().getShortName().compareToIgnoreCase(right.getEntry().getShortName());
+                        break;
+                    case CONDITION:
+                        compared = left.getEntry().getCreatureModifier().getLabel().compareToIgnoreCase(right.getEntry().getCreatureModifier().getLabel());
+                        break;
+                    case HOSTILITY:
+                        compared = left.getEntry().getHostility().getLabel().compareToIgnoreCase(right.getEntry().getHostility().getLabel());
+                        break;
+                    case UNIQUE:
+                        compared = Boolean.compare(left.getEntry().isUniqueCreature(), right.getEntry().isUniqueCreature());
+                        break;
+                    case DEED:
+                        compared = left.getEntry().getDeedStatus().getLabel().compareToIgnoreCase(right.getEntry().getDeedStatus().getLabel());
+                        break;
                     case NAME:
                         compared = left.getEntry().getName().compareToIgnoreCase(
                                 right.getEntry().getName());

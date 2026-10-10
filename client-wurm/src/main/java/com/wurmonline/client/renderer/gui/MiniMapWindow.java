@@ -7,8 +7,6 @@ import com.wurmonline.client.settings.WindowPosition;
 /** Always-on compact map with shared layers and a wheel-controlled range. */
 final class MiniMapWindow extends MiniMapCanvas implements WindowSerializer {
     static final int MAP_SIZE = 300;
-    static final int WINDOW_WIDTH = MAP_SIZE;
-    static final int WINDOW_HEIGHT = MAP_SIZE;
 
     private String profileId = "";
 

@@ -1,5 +1,9 @@
 # Third-party notices
 
+Button captions embed Alegreya Sans and Alegreya Sans SC Regular and Bold by the Alegreya Sans Project Authors,
+distributed under the SIL Open Font License 1.1. The unchanged fonts and license
+are included at `org/chamomilo/wurm/ui/v1/fonts/` inside the mod JAR.
+
 Wurm Waypointer is an independent clean-room implementation. No source code or
 history from the legacy Waypoints mod is present in this repository, compiled,
 or copied into the artifact.

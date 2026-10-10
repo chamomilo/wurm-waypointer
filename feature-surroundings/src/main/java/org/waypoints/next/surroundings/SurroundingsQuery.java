@@ -10,10 +10,12 @@ public final class SurroundingsQuery {
     public enum LayerFilter { ANY, SURFACE, CAVE }
     public enum MarkFilter { ANY, MARKED, UNMARKED }
     public enum ShortNameMode { INCLUDE, EXCLUDE }
-    public enum SortColumn { DISTANCE, NAME, CATEGORY, MATERIAL, RARITY }
+    public enum SortColumn { DISTANCE, NAME, CATEGORY, MATERIAL, RARITY, NONE, MARK, SHORT_NAME, CONDITION, HOSTILITY, UNIQUE, DEED }
 
     private final SurroundingKind kind;
     private final String text;
+    private final String excludedText;
+    private final org.waypoints.next.service.TextFilter textFilter;
     private final String shortName;
     private final ShortNameMode shortNameMode;
     private final Set<String> excludedNames;
@@ -31,6 +33,8 @@ public final class SurroundingsQuery {
     private SurroundingsQuery(Builder builder) {
         kind = builder.kind == null ? SurroundingKind.ANIMAL : builder.kind;
         text = clean(builder.text);
+        excludedText=clean(builder.excludedText);
+        textFilter=new org.waypoints.next.service.TextFilter(text,excludedText);
         shortName = clean(builder.shortName);
         shortNameMode = builder.shortNameMode == null
                 ? ShortNameMode.INCLUDE : builder.shortNameMode;
@@ -50,6 +54,7 @@ public final class SurroundingsQuery {
     public static Builder builder() { return new Builder(); }
     public SurroundingKind getKind() { return kind; }
     public String getText() { return text; }
+    public String getExcludedText(){return excludedText;}
     public String getShortName() { return shortName; }
     public ShortNameMode getShortNameMode() { return shortNameMode; }
     public Set<String> getExcludedNames() { return excludedNames; }
@@ -67,16 +72,8 @@ public final class SurroundingsQuery {
     boolean matches(SurroundingEntry entry, boolean marked) {
         if (entry.getKind() != kind) return false;
         if (matchesExcludedName(entry, excludedNames)) return false;
-        String normalizedText = SurroundingsClassifier.normalize(text);
-        if (!normalizedText.isEmpty()) {
-            String haystack = SurroundingsClassifier.normalize(entry.getName() + " "
-                    + entry.getShortName() + " " + entry.getModelName() + " "
-                    + entry.getDescription() + " "
-                    + entry.getCategory() + " " + entry.getMaterial() + " "
-                    + entry.getCreatureModifier().getLabel() + " "
-                    + entry.getDeedStatus().getLabel());
-            if (!haystack.contains(normalizedText)) return false;
-        }
+        String haystack=entry.getName()+" "+entry.getShortName()+" "+entry.getModelName()+" "+entry.getDescription()+" "+entry.getCategory()+" "+entry.getMaterial()+" "+entry.getCreatureModifier().getLabel()+" "+entry.getTraits()+" "+entry.getHostility().getLabel()+" "+entry.getDeedStatus().getLabel()+" "+entry.getKey().getWurmId();
+        if(!textFilter.matches(haystack))return false;
         String normalizedShortName = SurroundingsClassifier.normalize(shortName);
         if (!normalizedShortName.isEmpty()) {
             boolean contains = SurroundingsClassifier.normalize(
@@ -160,6 +157,7 @@ public final class SurroundingsQuery {
     public static final class Builder {
         private SurroundingKind kind;
         private String text;
+        private String excludedText;
         private String shortName;
         private ShortNameMode shortNameMode;
         private final Set<String> excludedNames = new LinkedHashSet<String>();
@@ -179,6 +177,7 @@ public final class SurroundingsQuery {
         private Builder() { }
         public Builder kind(SurroundingKind value) { kind = value; return this; }
         public Builder text(String value) { text = value; return this; }
+        public Builder excludedText(String value){excludedText=value;return this;}
         public Builder shortName(String value, ShortNameMode mode) {
             shortName = value; shortNameMode = mode; return this;
         }

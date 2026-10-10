@@ -1,7 +1,10 @@
 package com.wurmonline.client.renderer.gui;
 
+import org.chamomilo.wurm.ui.v1.*;
+
 import com.wurmonline.client.renderer.backend.Queue;
 import com.wurmonline.client.renderer.gui.text.TextFont;
+import com.wurmonline.client.renderer.gui.text.WaypointerFonts;
 
 import java.util.Locale;
 
@@ -49,28 +52,17 @@ final class WaypointStyleSlider extends FlexComponent {
         updateText();
     }
 
-    @Override protected void renderComponent(Queue queue, float ignoredAlpha) {
-        fillRect(queue, 0.10f, 0.08f, 0.05f, 1.0f, x, y, width, height);
-        int trackLeft = x + 8;
-        int trackWidth = Math.max(20, width - VALUE_WIDTH - 18);
-        int trackTop = y + height / 2 - 2;
-        fillRect(queue, 0.24f, 0.21f, 0.16f, 1.0f,
-                trackLeft, trackTop, trackWidth, 4);
-        int selectedWidth = Math.round(fraction() * trackWidth);
-        if (selectedWidth > 0) {
-            fillRect(queue, 0.82f, 0.67f, 0.30f, 1.0f,
-                    trackLeft, trackTop, selectedWidth, 4);
-        }
-        int knobX = trackLeft + Math.round(fraction() * Math.max(1, trackWidth - 1));
-        fillRect(queue, 0.06f, 0.05f, 0.04f, 1.0f,
-                knobX - 4, y + 4, 9, Math.max(8, height - 8));
-        fillRect(queue, 0.92f, 0.78f, 0.44f, 1.0f,
-                knobX - 2, y + 6, 5, Math.max(4, height - 12));
-        TextFont font = TextFont.getFixedSizeText();
-        int textLeft = x + width - VALUE_WIDTH + 4;
-        font.moveTo(textLeft, y + Math.max(font.getAscent(),
-                (height + font.getAscent()) / 2 - 1));
-        font.paint(queue, valueText, 0.95f, 0.88f, 0.70f, 1.0f);
+    @Override protected void renderComponent(Queue queue, float alpha) {
+        ChamomiloUiV1Canvas canvas = WaypointerUi.canvas(this, queue);
+        int trackLeft=x+8, trackWidth=Math.max(20,width-VALUE_WIDTH-18), trackTop=y+height/2-4;
+        UiPainter.background(canvas,UiBackground.LEATHER,alpha,trackLeft,trackTop,trackWidth,8);
+        UiHudPainter.value(canvas,UiAxis.HORIZONTAL,fraction(),UiColor.EDGE,alpha,new UiRect(trackLeft,trackTop,trackWidth,8));
+        UiPainter.frame(canvas,2,alpha,trackLeft,trackTop,trackWidth,8);
+        int knob=trackLeft+Math.round(fraction()*Math.max(1,trackWidth-1));
+        UiPainter.button(canvas,1,dragging?1:0,UiScale.BASE,alpha,knob-5,y+4,11,Math.max(8,height-8));
+        TextFont font=WaypointerFonts.body();
+        font.moveTo(x+width-VALUE_WIDTH+4,y+(height-font.getHeight())/2+font.getAscent());
+        font.paint(queue,valueText,UiColor.TEXT.red,UiColor.TEXT.green,UiColor.TEXT.blue,alpha);
     }
 
     @Override protected void leftPressed(int mouseX, int mouseY, int clickCount) {

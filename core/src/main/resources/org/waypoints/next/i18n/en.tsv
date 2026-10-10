@@ -1,0 +1,398 @@
+# Waypointer UI catalogue; UTF-8
+ALL WAYPOINTS	ALL WAYPOINTS
+MOBS AROUND	MOBS AROUND
+CONTAINERS AROUND	CONTAINERS AROUND
+OBJECTS AND ITEMS AROUND	OBJECTS AND ITEMS AROUND
+MY VEHICLES AND ANIMALS	MY VEHICLES AND ANIMALS
+MY FRIENDS	MY FRIENDS
+SETTINGS	SETTINGS
+General	General
+Language	Language
+Navigation	Navigation
+Maps	Maps
+Scanner	Scanner
+Tracking	Tracking
+Markers	Markers
+Advanced	Advanced
+Data storage	Data storage
+Loot Map assistance	Loot Map assistance
+Archaeology assistance	Archaeology assistance
+Navigation signal	Navigation signal
+Pulse distance (m)	Pulse distance (m)
+Maximum cart slope (dirt)	Maximum cart slope (dirt)
+Maximum cart water depth (m)	Maximum cart water depth (m)
+Prefer published highways	Prefer published highways
+Highway refresh interval (minutes)	Highway refresh interval (minutes)
+Server map	Server map
+Show deeds	Show deeds
+Show highways	Show highways
+Map refresh interval (minutes)	Map refresh interval (minutes)
+Deed providers	Deed providers
+Custom deed feeds	Custom deed feeds
+Scanner profile	Scanner profile
+Appearance notifications	Appearance notifications
+Highlight matching models	Highlight matching models
+Maximum highlighted objects	Maximum highlighted objects
+Highlight distance (m)	Highlight distance (m)
+Excluded names	Excluded names
+Keep last known positions (days)	Keep last known positions (days)
+Maximum compass markers	Maximum compass markers
+Maximum world markers	Maximum world markers
+World marker distance (m)	World marker distance (m)
+Maximum world labels	Maximum world labels
+World label distance (m)	World label distance (m)
+Map width (tiles)	Map width (tiles)
+Map height (tiles)	Map height (tiles)
+Archaeology history limit	Archaeology history limit
+Write navigation diagnostics	Write navigation diagnostics
+Diagnostic movement threshold (tiles)	Diagnostic movement threshold (tiles)
+Waypoint file	Waypoint file
+Import/export file	Import/export file
+Tracked target file	Tracked target file
+Landmark preferences file	Landmark preferences file
+Loot Map log folder	Loot Map log folder
+Archaeology sessions file	Archaeology sessions file
+Known archaeology locations file	Known archaeology locations file
+Navigation log folder	Navigation log folder
+Highway cache folder	Highway cache folder
+Map cache folder	Map cache folder
+Deed cache folder	Deed cache folder
+Search	Search
+Search name / tag	Search name / tag
+Search fields	Search fields
+Search all fields	Search all fields
+Refresh	Refresh
+Clear	Clear
+Apply	Apply
+Apply filters	Apply filters
+Save	Save
+Cancel	Cancel
+Close	Close
+Save settings	Save settings
+Reset draft	Reset draft
+Check setting: {0}	Check setting: {0}
+Saving settings…	Saving settings…
+Settings saved.	Settings saved.
+Settings saved. File paths take effect after restart.	Settings saved. File paths take effect after restart.
+Settings could not be saved.	Settings could not be saved.
+Track	Track
+Untrack	Untrack
+Track filtered	Track filtered
+Clear filtered	Clear filtered
+Clear all marks	Clear all marks
+Direction	Direction
+Clear last seen	Clear last seen
+Visible now	Visible now
+Last known position	Last known position
+Position unknown	Position unknown
+Approximate direction	Approximate direction
+Approximate area	Approximate area
+{0} readings	{0} readings
+Last seen {0} ago	Last seen {0} ago
+Last seen {0}	Last seen {0}
+No friends received from the client.	No friends received from the client.
+No Manage catalogue yet. Press Refresh.	No Manage catalogue yet. Press Refresh.
+Press Refresh to request your Manage lists.	Press Refresh to request your Manage lists.
+Manage request timed out. Native forms remain available.	Manage request timed out. Native forms remain available.
+Manage request failed.	Manage request failed.
+Requesting Manage list…	Requesting Manage list…
+Native Manage opened.	Native Manage opened.
+Manage list received.	Manage list received.
+Waiting for animal direction…	Waiting for animal direction…
+Animal direction is unavailable for this list.	Animal direction is unavailable for this list.
+Animal position is unavailable.	Animal position is unavailable.
+Animal direction received.	Animal direction received.
+On	On
+Off	Off
+All	All
+Current	Current
+Current (	Current (
+Unassigned	Unassigned
+Server	Server
+User	User
+Type	Type
+Status	Status
+All types	All types
+All statuses	All statuses
+Name	Name
+Edit	Edit
+Share	Share
+Copy	Copy
+Delete	Delete
+Fixed	Fixed
+Nav	Nav
+Stop	Stop
+Distance	Distance
+Style	Style
+Temporary	Temporary
+Stale	Stale
+Live	Live
+Pending	Pending
+Last seen	Last seen
+Live exact	Live exact
+Static exact	Static exact
+Server bearing	Server bearing
+Search step	Search step
+Exact saved	Exact saved
+Static	Static
+Vanilla system	Vanilla system
+Loot map	Loot map
+Archaeology report	Archaeology report
+Managed animal	Managed animal
+Managed item	Managed item
+Player	Player
+Deed	Deed
+Add...	Add...
+Enable filtered	Enable filtered
+Disable filtered	Disable filtered
+Export	Export
+Import	Import
+Paste shared	Paste shared
+All waypoints	All waypoints
+Surroundings	Surroundings
+Waypoints	Waypoints
+Add Waypoint	Add Waypoint
+Add Here	Add Here
+Add Coordinates	Add Coordinates
+Edit Waypoint	Edit Waypoint
+Here	Here
+Coordinates	Coordinates
+From coordinates	From coordinates
+At my position	At my position
+Description	Description
+Group	Group
+Tags	Tags
+World style	World style
+Marker size	Marker size
+Beam width	Beam width
+Label	Label
+Show label	Show label
+Show distance	Show distance
+Lifetime	Lifetime
+Permanent	Permanent
+Arrival radius	Arrival radius
+Clipboard	Clipboard
+Paste	Paste
+Animals	Animals
+Containers	Containers
+Items	Items
+Mark	Mark
+Category	Category
+Trait	Trait
+Unique	Unique
+Material	Material
+Rarity	Rarity
+Layer	Layer
+Position / ID	Position / ID
+Short name	Short name
+Include	Include
+Exclude	Exclude
+Exclude names	Exclude names
+Example: catseyes, post	Example: catseyes, post
+Matches the client's undecorated short name	Matches the client's undecorated short name
+client short-name fragment	client short-name fragment
+Monitoring	Monitoring
+Monitoring (	Monitoring (
+Detection	Detection
+Type / distance	Type / distance
+Surface	Surface
+Cave	Cave
+Normal	Normal
+Rare	Rare
+Supreme	Supreme
+Fantastic	Fantastic
+Yes	Yes
+No	No
+Any	Any
+None	None
+Marked	Marked
+Unmarked	Unmarked
+Online	Online
+Offline	Offline
+Other server	Other server
+Unknown	Unknown
+PULSE	PULSE
+SOLID	SOLID
+MOVING_DASHES	MOVING_DASHES
+off	off
+uniques	uniques
+treasure	treasure
+animals	animals
+Colored beam	Colored beam
+Compass only	Compass only
+Target	Target
+Hidden	Hidden
+Exclamation	Exclamation
+Distance asc	Distance asc
+Name asc	Name asc
+{0} of {1} waypoints	{0} of {1} waypoints
+{0} of {1} objects	{0} of {1} objects
+0 waypoints	0 waypoints
+0 objects	0 objects
+0 detected	0 detected
+Delete {0} permanently?	Delete {0} permanently?
+This cannot be undone.	This cannot be undone.
+now	now
++ filter	+ filter
+- filter	- filter
+Example: horse, wolf	Example: horse, wolf
+{0} of {1}; {2} tracked	{0} of {1}; {2} tracked
+Tracked target cache could not be read. Existing file preserved.	Tracked target cache could not be read. Existing file preserved.
+Tracked targets could not be saved.	Tracked targets could not be saved.
+Coordinates / map link	Coordinates / map link
+Use Clipboard	Use Clipboard
+Choose a waypoint source.	Choose a waypoint source.
+Parsed coordinates: paste a /gps line, x/y pair, or map link.	Parsed coordinates: paste a /gps line, x/y pair, or map link.
+Parsed coordinates	Parsed coordinates
+Location	Location
+Edit Static Waypoint	Edit Static Waypoint
+Hidden (Manager only)	Hidden (Manager only)
+Arrival radius (disabled)	Arrival radius (disabled)
+Color	Color
+Beam alpha	Beam alpha
+Beam field size	Beam field size
+Beam thickness	Beam thickness
+Circle alpha	Circle alpha
+Circle radius	Circle radius
+Center beam thickness	Center beam thickness
+Symbol alpha	Symbol alpha
+Symbol size	Symbol size
+Stroke thickness	Stroke thickness
+No world-effect sliders. Compass marker size follows the compass window.	No world-effect sliders. Compass marker size follows the compass window.
+No world-effect sliders while this waypoint is hidden.	No world-effect sliders while this waypoint is hidden.
+Keep current ({0})	Keep current ({0})
+{0} minute	{0} minute
+{0} minutes	{0} minutes
+{0} hour	{0} hour
+{0} hours	{0} hours
+{0} day	{0} day
+expired	expired
+{0}m left	{0}m left
+{0}h left	{0}h left
+{0}h {1}m left	{0}h {1}m left
+{0} s	{0} s
+{0} min	{0} min
+{0} h	{0} h
+{0} d	{0} d
+Live {0}	Live {0}
+Stale {0}	Stale {0}
+All (clear selection)	All (clear selection)
+Done	Done
+Chests	Chests
+Crates	Crates
+Barrels	Barrels
+Bulk storage	Bulk storage
+Vehicles	Vehicles
+Ships	Ships
+{0} found; {1} tracked; {2} filters	{0} found; {1} tracked; {2} filters
+Custom map mark	Custom map mark
+Text shown next to the mark	Text shown next to the mark
+Save custom mark	Save custom mark
+Find deed on map	Find deed on map
+Find deed on {0}	Find deed on {0}
+0 deeds	0 deeds
+Queued	Queued
+No provider	No provider
+Loading provider...	Loading provider...
+Provider error	Provider error
+unknown age	unknown age
+{0}, mayor - {1}, X={2} Y={3}	{0}, mayor - {1}, X={2} Y={3}
+Track deed waypoint	Track deed waypoint
+Nav to deed	Nav to deed
+Tracked	Tracked
+Navigating	Navigating
+Settlement	Settlement
+Mayor	Mayor
+Alliance	Alliance
+Guards	Guards
+Citizens	Citizens
+Founder	Founder
+Founded	Founded
+Active	Active
+Waypoint	Waypoint
+Full plan points	Full plan points
+Full route length	Full route length
+Full estimated time	Full estimated time
+Full plan end	Full plan end
+Plan	Plan
+Route Statistics	Route Statistics
+planning...	planning...
+COMPLETE TO TARGET	COMPLETE TO TARGET
+PARTIAL (target {0}, {1})	PARTIAL (target {0}, {1})
+tile {0}, {1}	tile {0}, {1}
+Speed model: off-road 8 / road 16 / Highway 24 km/h	Speed model: off-road 8 / road 16 / Highway 24 km/h
+Mini Map	Mini Map
+Mini Map of: {0}	Mini Map of: {0}
+FULL MAP	FULL MAP
+GROUND	GROUND
+CAVE	CAVE
+Cave data loading...	Cave data loading...
+Map loading...	Map loading...
+Open the full map	Open the full map
+Save a permanent labelled mark on this tile.	Save a permanent labelled mark on this tile.
+Create a standard tracked waypoint at this position.	Create a standard tracked waypoint at this position.
+Delete this Surroundings waypoint.	Delete this Surroundings waypoint.
+Create a standard tracked waypoint for every filtered row.	Create a standard tracked waypoint for every filtered row.
+Delete Surroundings waypoints for every filtered row.	Delete Surroundings waypoints for every filtered row.
+Delete every Surroundings tracked target.	Delete every Surroundings tracked target.
+Create a waypoint at your current character position and layer.	Create a waypoint at your current character position and layer.
+Return to the waypoint list without creating anything.	Return to the waypoint list without creating anything.
+Save this live draft as a new waypoint.	Save this live draft as a new waypoint.
+Save the current live draft as a new waypoint.	Save the current live draft as a new waypoint.
+Commit the live draft to this waypoint.	Commit the live draft to this waypoint.
+Cancel creation and remove the temporary marker.	Cancel creation and remove the temporary marker.
+Discard the draft and restore the stored waypoint unchanged.	Discard the draft and restore the stored waypoint unchanged.
+Apply the server, user, type and status filters.	Apply the server, user, type and status filters.
+Filter by the character that owns the waypoint.	Filter by the character that owns the waypoint.
+Filter by waypoint source type.	Filter by waypoint source type.
+Filter by coordinate resolution status.	Filter by coordinate resolution status.
+Waypoint name shown in the Manager, compass hover, and world label.	Waypoint name shown in the Manager, compass hover, and world label.
+Create a waypoint at your position or from coordinates/map link.	Create a waypoint at your position or from coordinates/map link.
+Enable every waypoint currently matched by the filters.	Enable every waypoint currently matched by the filters.
+Disable every waypoint currently matched by the filters.	Disable every waypoint currently matched by the filters.
+Export all waypoint records to the transfer file.	Export all waypoint records to the transfer file.
+Import waypoint records from the transfer file.	Import waypoint records from the transfer file.
+Enable or disable this waypoint's compass marker, label, and world effect.	Enable or disable this waypoint's compass marker, label, and world effect.
+Stop the active on-ground navigation route.	Stop the active on-ground navigation route.
+Navigate to this enabled current-server waypoint. Starting it stops the previous route.	Navigate to this enabled current-server waypoint. Starting it stops the previous route.
+Sort the table by {0}. Click again to reverse the order.	Sort the table by {0}. Click again to reverse the order.
+Request a provider refresh in the background.	Request a provider refresh in the background.
+Create or update this provider-managed DEED waypoint.	Create or update this provider-managed DEED waypoint.
+Track this deed waypoint and start the navigator.	Track this deed waypoint and start the navigator.
+Switch back to the full Surroundings filters.	Switch back to the full Surroundings filters.
+Coordinates follow this tracked target automatically.	Coordinates follow this tracked target automatically.
+Remove this target from ALL WAYPOINTS. Track it again in its catalogue to add it back.	Remove this target from ALL WAYPOINTS. Track it again in its catalogue to add it back.
+Remove {0} from ALL WAYPOINTS?	Remove {0} from ALL WAYPOINTS?
+You can add it again with Track in its catalogue.	You can add it again with Track in its catalogue.
+Condition	Condition
+Conditions	Conditions
+Traits	Traits
+Hostility	Hostility
+Neutral	Neutral
+Ally	Ally
+Hostile	Hostile
+Friendly	Friendly
+Developer	Developer
+Open Monitoring with the current filters.	Open Monitoring with the current filters.
+Breeding traits are not supplied in the nearby creature stream.	Breeding traits are not supplied in the nearby creature stream.
+ADD TO MONITOR	ADD TO MONITOR
+Refresh the friends received from the client.	Refresh the friends received from the client.
+Request your animals, land vehicles and ships from the server and show them here.	Request your animals, land vehicles and ships from the server and show them here.
+Position	Position
+Updated	Updated
+Click: ascending, descending, then original order.	Click: ascending, descending, then original order.
+Friend status received from the client.	Friend status received from the client.
+Managed object type received from the server.	Managed object type received from the server.
+Position state. Visible now follows received movement; last known position is saved history; approximate direction has no exact coordinates.	Position state. Visible now follows received movement; last known position is saved history; approximate direction has no exact coordinates.
+Age of the last received position or direction observation.	Age of the last received position or direction observation.
+No managed animals, vehicles or ships to display.	No managed animals, vehicles or ships to display.
+Remove this target from ALL WAYPOINTS; keep its catalogue entry and history.	Remove this target from ALL WAYPOINTS; keep its catalogue entry and history.
+Add this target to ALL WAYPOINTS and follow its received position.	Add this target to ALL WAYPOINTS and follow its received position.
+Navigate to this target's confirmed or last known position. Approximate directions cannot start a route.	Navigate to this target's confirmed or last known position. Approximate directions cannot start a route.
+Request the native animal Find direction; this is an approximate bearing, not exact coordinates.	Request the native animal Find direction; this is an approximate bearing, not exact coordinates.
+Forget this target's saved position while retaining its catalogue entry.	Forget this target's saved position while retaining its catalogue entry.
+No targets match these filters.	No targets match these filters.
+Bearing {0}° ± {1}°; range {2}–{3} m from the observation point. {4} readings.	Bearing {0}° ± {1}°; range {2}–{3} m from the observation point. {4} readings.
+Back to Waypointer	Back to Waypointer
+Return to the Waypointer window.	Return to the Waypointer window.
+ (last observed)	 (last observed)

@@ -1,0 +1,444 @@
+# Waypointer UI catalogue; UTF-8
+ALL WAYPOINTS	ВСЕ ТОЧКИ
+MOBS AROUND	СУЩЕСТВА РЯДОМ
+CONTAINERS AROUND	КОНТЕЙНЕРЫ РЯДОМ
+OBJECTS AND ITEMS AROUND	ОБЪЕКТЫ И ПРЕДМЕТЫ РЯДОМ
+MY VEHICLES AND ANIMALS	МОЙ ТРАНСПОРТ И ЖИВОТНЫЕ
+MY FRIENDS	МОИ ДРУЗЬЯ
+SETTINGS	НАСТРОЙКИ
+General	Общие
+Language	Язык
+Navigation	Навигация
+Maps	Карты
+Scanner	Сканер
+Tracking	Отслеживание
+Markers	Маркеры
+Advanced	Дополнительно
+Data storage	Хранение данных
+Loot Map assistance	Помощь с картами сокровищ
+Archaeology assistance	Помощь с археологией
+Navigation signal	Сигнал навигации
+Pulse distance (m)	Дальность пульса (м)
+Maximum cart slope (dirt)	Максимальный уклон для телеги
+Maximum cart water depth (m)	Глубина воды для телеги (м)
+Prefer published highways	Предпочитать опубликованные дороги
+Highway refresh interval (minutes)	Обновление дорог (минуты)
+Server map	Карта сервера
+Show deeds	Показывать поселения
+Show highways	Показывать дороги
+Map refresh interval (minutes)	Обновление карты (минуты)
+Deed providers	Источники поселений
+Custom deed feeds	Свои источники поселений
+Scanner profile	Профиль сканера
+Appearance notifications	Уведомления о появлении
+Highlight matching models	Подсветка найденных моделей
+Maximum highlighted objects	Максимум подсвеченных объектов
+Highlight distance (m)	Дальность подсветки (м)
+Excluded names	Исключённые названия
+Keep last known positions (days)	Хранить последние позиции (дни)
+Maximum compass markers	Максимум маркеров компаса
+Maximum world markers	Максимум маркеров в мире
+World marker distance (m)	Дальность маркеров в мире (м)
+Maximum world labels	Максимум подписей в мире
+World label distance (m)	Дальность подписей в мире (м)
+Map width (tiles)	Ширина карты (тайлы)
+Map height (tiles)	Высота карты (тайлы)
+Archaeology history limit	Размер истории археологии
+Write navigation diagnostics	Записывать диагностику навигации
+Diagnostic movement threshold (tiles)	Порог движения для диагностики (тайлы)
+Waypoint file	Файл точек
+Import/export file	Файл импорта и экспорта
+Tracked target file	Файл отслеживаемых целей
+Landmark preferences file	Файл настроек ориентиров
+Loot Map log folder	Папка журналов сокровищ
+Archaeology sessions file	Файл сессий археологии
+Known archaeology locations file	Файл известных мест археологии
+Navigation log folder	Папка журналов навигации
+Highway cache folder	Папка кеша дорог
+Map cache folder	Папка кеша карт
+Deed cache folder	Папка кеша поселений
+Search	Поиск
+Search name / tag	Поиск по имени и тегу
+Search fields	Поля поиска
+Search all fields	Поиск по всем полям
+Refresh	Обновить
+Clear	Очистить
+Apply	Применить
+Apply filters	Применить фильтры
+Save	Сохранить
+Cancel	Отмена
+Close	Закрыть
+Save settings	Сохранить настройки
+Reset draft	Сбросить изменения
+Check setting: {0}	Проверьте настройку: {0}
+Saving settings…	Сохранение настроек…
+Settings saved.	Настройки сохранены.
+Settings saved. File paths take effect after restart.	Сохранено. Пути к файлам применятся после перезапуска.
+Settings could not be saved.	Не удалось сохранить настройки.
+Track	Следить
+Untrack	Не следить
+Track filtered	Следить за выбранными
+Clear filtered	Снять выбранные
+Clear all marks	Снять все метки
+Direction	Направление
+Clear last seen	Стереть позицию
+Visible now	Видна сейчас
+Last known position	Последняя позиция
+Position unknown	Позиция неизвестна
+Approximate direction	Примерное направление
+Approximate area	Примерная область
+{0} readings	Замеров: {0}
+Last seen {0} ago	Видна {0} назад
+Last seen {0}	Видна {0} назад
+No friends received from the client.	Клиент ещё не передал список друзей.
+No Manage catalogue yet. Press Refresh.	Списка Manage пока нет. Нажмите «Обновить».
+Press Refresh to request your Manage lists.	Нажмите «Обновить» для запроса списков Manage.
+Manage request timed out. Native forms remain available.	Истекло время запроса Manage. Обычные окна доступны.
+Manage request failed.	Не удалось отправить запрос Manage.
+Requesting Manage list…	Запрос списка Manage…
+Native Manage opened.	Открыто обычное окно Manage.
+Manage list received.	Список Manage получен.
+Waiting for animal direction…	Ожидание направления к животному…
+Animal direction is unavailable for this list.	Для этого списка направление недоступно.
+Animal position is unavailable.	Позиция животного недоступна.
+Animal direction received.	Направление к животному получено.
+On	Вкл
+Off	Выкл
+All	Все
+Current	Текущий
+Current (	Текущий (
+Unassigned	Без сервера
+Server	Сервер
+User	Персонаж
+Type	Тип
+Status	Статус
+All types	Все типы
+All statuses	Все состояния
+Name	Имя
+Edit	Править
+Share	Поделиться
+Copy	Копия
+Delete	Удалить
+Fixed	Фиксировано
+Nav	Маршрут
+Stop	Стоп
+Distance	Расстояние
+Style	Стиль
+Temporary	Временная
+Stale	Устарело
+Live	Актуальная
+Pending	Ожидание
+Last seen	Последняя позиция
+Live exact	Точная позиция
+Static exact	Фиксированная позиция
+Server bearing	Направление сервера
+Search step	Шаг поиска
+Exact saved	Сохранённая позиция
+Static	Статическая
+Vanilla system	Системная
+Loot map	Карта сокровищ
+Archaeology report	Археологический отчёт
+Managed animal	Животное
+Managed item	Предмет
+Player	Игрок
+Deed	Поселение
+Add...	Добавить…
+Enable filtered	Включить выбранные
+Disable filtered	Выключить выбранные
+Export	Экспорт
+Import	Импорт
+Paste shared	Вставить точку
+All waypoints	Все точки
+Surroundings	Окружение
+Waypoints	Точки
+Add Waypoint	Добавить точку
+Add Here	Добавить здесь
+Add Coordinates	Добавить координаты
+Edit Waypoint	Изменить точку
+Here	Здесь
+Coordinates	Координаты
+From coordinates	По координатам
+At my position	На моей позиции
+Description	Описание
+Group	Группа
+Tags	Теги
+World style	Вид маркера
+Marker size	Размер маркера
+Beam width	Ширина луча
+Label	Подпись
+Show label	Показывать подпись
+Show distance	Показывать расстояние
+Lifetime	Срок жизни
+Permanent	Постоянная
+Arrival radius	Радиус прибытия
+Clipboard	Буфер обмена
+Paste	Вставить
+Animals	Животные
+Containers	Контейнеры
+Items	Предметы
+Mark	Метка
+Category	Категория
+Trait	Свойство
+Unique	Уникальный
+Material	Материал
+Rarity	Редкость
+Layer	Слой
+Position / ID	Позиция / ID
+Short name	Короткое имя
+Include	Включить
+Exclude	Исключить
+Exclude names	Исключить названия
+Example: catseyes, post	Пример: catseyes, post
+Matches the client's undecorated short name	По короткому имени без дополнений клиента
+client short-name fragment	фрагмент короткого имени
+Monitoring	Наблюдение
+Monitoring (	Наблюдение (
+Detection	Обнаружено
+Type / distance	Тип / расстояние
+Surface	Поверхность
+Cave	Пещера
+Normal	Обычный
+Rare	Редкий
+Supreme	Превосходный
+Fantastic	Фантастический
+Yes	Да
+No	Нет
+Any	Любой
+None	Нет
+Marked	Отмечен
+Unmarked	Без метки
+Online	В сети
+Offline	Не в сети
+Other server	Другой сервер
+Unknown	Неизвестно
+PULSE	ПУЛЬС
+SOLID	СПЛОШНОЙ
+MOVING_DASHES	БЕГУЩИЙ ПУНКТИР
+off	выкл
+uniques	уникальные
+treasure	сокровища
+animals	животные
+Colored beam	Цветной луч
+Compass only	Только компас
+Target	Цель
+Hidden	Скрытый
+Exclamation	Восклицательный знак
+Distance asc	Расстояние ↑
+Name asc	Имя ↑
+{0} of {1} waypoints	Точек: {0} из {1}
+{0} of {1} objects	Объектов: {0} из {1}
+0 waypoints	0 точек
+0 objects	0 объектов
+0 detected	0 обнаружено
+Delete {0} permanently?	Удалить {0} навсегда?
+This cannot be undone.	Это действие нельзя отменить.
+now	сейчас
++ filter	+ filter
+- filter	- filter
+Example: horse, wolf	Пример: horse, wolf
+{0} of {1}; {2} tracked	{0} из {1}; отслеживается: {2}
+Tracked target cache could not be read. Existing file preserved.	Не удалось прочитать кэш целей. Существующий файл сохранён.
+Tracked targets could not be saved.	Не удалось сохранить отслеживаемые цели.
+Coordinates / map link	Координаты / ссылка на карту
+Use Clipboard	Из буфера обмена
+Choose a waypoint source.	Выберите источник точки.
+Parsed coordinates: paste a /gps line, x/y pair, or map link.	Координаты: вставьте строку /gps, пару x/y или ссылку на карту.
+Parsed coordinates	Распознанные координаты
+Location	Положение
+Edit Static Waypoint	Изменить статическую точку
+Hidden (Manager only)	Скрытый (только в списке)
+Arrival radius (disabled)	Радиус прибытия (выключен)
+Color	Цвет
+Beam alpha	Непрозрачность луча
+Beam field size	Размер луча
+Beam thickness	Толщина луча
+Circle alpha	Непрозрачность круга
+Circle radius	Радиус круга
+Center beam thickness	Толщина центрального луча
+Symbol alpha	Непрозрачность символа
+Symbol size	Размер символа
+Stroke thickness	Толщина линии
+No world-effect sliders. Compass marker size follows the compass window.	У этого стиля нет настроек эффекта в мире. Размер маркера зависит от окна компаса.
+No world-effect sliders while this waypoint is hidden.	Для скрытой точки настройки эффекта недоступны.
+Keep current ({0})	Оставить текущий ({0})
+{0} minute	{0} мин.
+{0} minutes	{0} мин.
+{0} hour	{0} ч.
+{0} hours	{0} ч.
+{0} day	{0} дн.
+expired	истёк
+{0}m left	осталось {0} мин.
+{0}h left	осталось {0} ч.
+{0}h {1}m left	осталось {0} ч. {1} мин.
+{0} s	{0} с
+{0} min	{0} мин
+{0} h	{0} ч
+{0} d	{0} дн
+Live {0}	Сейчас: {0}
+Stale {0}	Устарело: {0}
+All (clear selection)	Все (сбросить выбор)
+Done	Готово
+Chests	Сундуки
+Crates	Ящики
+Barrels	Бочки
+Bulk storage	Хранилища сыпучих грузов
+Vehicles	Транспорт
+Ships	Корабли
+{0} found; {1} tracked; {2} filters	Найдено: {0}; отслеживается: {1}; фильтров: {2}
+Custom map mark	Своя отметка на карте
+Text shown next to the mark	Текст рядом с отметкой
+Save custom mark	Сохранить отметку
+Find deed on map	Найти поселение на карте
+Find deed on {0}	Найти поселение на {0}
+0 deeds	0 поселений
+Queued	В очереди
+No provider	Нет источника данных
+Loading provider...	Загрузка источника...
+Provider error	Ошибка источника
+unknown age	возраст данных неизвестен
+{0}, mayor - {1}, X={2} Y={3}	{0}, мэр — {1}, X={2} Y={3}
+Track deed waypoint	Отслеживать поселение
+Nav to deed	Маршрут к поселению
+Tracked	Отслеживается
+Navigating	Маршрут активен
+Settlement	Поселение
+Mayor	Мэр
+Alliance	Альянс
+Guards	Стражники
+Citizens	Жители
+Founder	Основатель
+Founded	Основано
+Active	Активность
+Waypoint	Точка
+Full plan points	Точек в полном плане
+Full route length	Длина полного маршрута
+Full estimated time	Расчётное время
+Full plan end	Конец полного плана
+Plan	План
+Route Statistics	Статистика маршрута
+planning...	расчёт...
+COMPLETE TO TARGET	ПОЛНЫЙ ДО ЦЕЛИ
+PARTIAL (target {0}, {1})	ЧАСТИЧНЫЙ (цель {0}, {1})
+tile {0}, {1}	тайл {0}, {1}
+Speed model: off-road 8 / road 16 / Highway 24 km/h	Скорость: местность 8 / дорога 16 / магистраль 24 км/ч
+Mini Map	Миникарта
+Mini Map of: {0}	Миникарта: {0}
+FULL MAP	ВСЯ КАРТА
+GROUND	ПОВЕРХ
+CAVE	ПОДЗЕМ
+Cave data loading...	Загрузка данных пещеры...
+Map loading...	Загрузка карты...
+Open the full map	Открыть полную карту
+Save a permanent labelled mark on this tile.	Сохранить постоянную отметку с подписью на этом тайле.
+Create a standard tracked waypoint at this position.	Создать отслеживаемую точку в этом месте.
+Delete this Surroundings waypoint.	Снять эту метку окружения.
+Create a standard tracked waypoint for every filtered row.	Отслеживать каждую запись, прошедшую фильтры.
+Delete Surroundings waypoints for every filtered row.	Снять метки со всех записей, прошедших фильтры.
+Delete every Surroundings tracked target.	Снять все метки окружения.
+Create a waypoint at your current character position and layer.	Создать точку в текущем месте и на текущем уровне персонажа.
+Return to the waypoint list without creating anything.	Вернуться к списку без создания точки.
+Save this live draft as a new waypoint.	Сохранить текущий черновик как новую точку.
+Save the current live draft as a new waypoint.	Сохранить текущий черновик как новую точку.
+Commit the live draft to this waypoint.	Применить черновик к этой точке.
+Cancel creation and remove the temporary marker.	Отменить создание и убрать временный маркер.
+Discard the draft and restore the stored waypoint unchanged.	Отменить изменения и восстановить сохранённую точку.
+Apply the server, user, type and status filters.	Применить фильтры сервера, персонажа, типа и состояния.
+Filter by the character that owns the waypoint.	Отфильтровать по персонажу — владельцу точки.
+Filter by waypoint source type.	Отфильтровать по типу источника точки.
+Filter by coordinate resolution status.	Отфильтровать по состоянию координат.
+Waypoint name shown in the Manager, compass hover, and world label.	Имя точки в списке, подсказке компаса и подписи в мире.
+Create a waypoint at your position or from coordinates/map link.	Создать точку в своём месте, по координатам или ссылке на карту.
+Enable every waypoint currently matched by the filters.	Включить все точки, прошедшие фильтры.
+Disable every waypoint currently matched by the filters.	Выключить все точки, прошедшие фильтры.
+Export all waypoint records to the transfer file.	Экспортировать все точки в файл обмена.
+Import waypoint records from the transfer file.	Импортировать точки из файла обмена.
+Enable or disable this waypoint's compass marker, label, and world effect.	Включить или выключить маркер компаса, подпись и эффект в мире.
+Stop the active on-ground navigation route.	Остановить активный маршрут по земле.
+Navigate to this enabled current-server waypoint. Starting it stops the previous route.	Построить маршрут к включённой точке текущего сервера. Предыдущий маршрут остановится.
+Sort the table by {0}. Click again to reverse the order.	Сортировать по полю «{0}». Повторное нажатие меняет порядок.
+Request a provider refresh in the background.	Запросить обновление источника в фоне.
+Create or update this provider-managed DEED waypoint.	Создать или обновить точку поселения из источника данных.
+Track this deed waypoint and start the navigator.	Отслеживать поселение и построить маршрут.
+Switch back to the full Surroundings filters.	Вернуться к полным фильтрам окружения.
+Coordinates follow this tracked target automatically.	Координаты автоматически следуют за отслеживаемой целью.
+Remove this target from ALL WAYPOINTS. Track it again in its catalogue to add it back.	Убрать цель из списка всех точек. Чтобы добавить её снова, включите отслеживание в её каталоге.
+Remove {0} from ALL WAYPOINTS?	Убрать {0} из списка всех точек?
+You can add it again with Track in its catalogue.	Цель можно добавить снова, включив отслеживание в её каталоге.
+Condition	Состояние
+Conditions	Состояния
+Traits	Черты
+Hostility	Враждебность
+Neutral	Нейтральный
+Ally	Союзник
+Hostile	Враждебный
+Friendly	Дружелюбный
+Developer	Разработчик
+Open Monitoring with the current filters.	Открыть монитор с текущими фильтрами.
+Breeding traits are not supplied in the nearby creature stream.	Племенные черты не передаются в потоке соседних существ.
+ADD TO MONITOR	ADD TO MONITOR
+Unmark	Снять метку
+Show rows matching any comma-separated fragment. Empty means all rows.	Показать строки, совпавшие с любым фрагментом через запятую. Пустое поле показывает всё.
+Hide rows matching any comma-separated fragment. Empty excludes nothing.	Скрыть строки, совпавшие с любым фрагментом через запятую. Пустое поле ничего не исключает.
+Clear this text filter.	Очистить этот текстовый фильтр.
+Matching rows / loaded objects in this section; marked objects in this section.	Подходящие строки / загруженные объекты этого раздела; число отмеченных объектов этого раздела.
+Waypoints matching the applied filters / all saved waypoints.	Точки, подходящие под применённые фильтры / все сохранённые точки.
+Refresh the waypoint list using the applied filters.	Обновить список точек с применёнными фильтрами.
+Refresh the loaded objects using the current filters and sorting.	Обновить загруженные объекты с текущими фильтрами и сортировкой.
+Mark every filtered object by its ID. The waypoint follows its received position.	Отметить каждый объект из отфильтрованного списка по его ID. Точка следует за получаемыми координатами объекта.
+Mark this object by ID. The waypoint follows its received position.	Отметить объект по его ID. Точка следует за получаемыми координатами объекта.
+Mark follows the object by ID. Unmark removes its waypoint.	Метка следует за объектом по его ID. Снятие метки удаляет его точку.
+Full object name received from the client.	Полное имя объекта, полученное клиентом.
+Creature condition/modifier from its name, such as young or fierce.	Модификатор состояния существа, например fierce или diseased.
+Attitude received from the client: friendly, neutral, hostile or unknown.	Отношение, полученное клиентом: дружелюбное, нейтральное, враждебное или неизвестное.
+Whether the creature belongs to a known unique creature type.	Принадлежит ли существо к известному уникальному типу.
+Object category inferred from its client model.	Категория объекта, определённая по его модели в клиенте.
+Undecorated short name received from the client.	Короткое имя без дополнительных определений, полученное клиентом.
+Material received from the client; a dash means unavailable.	Материал, полученный клиентом. Прочерк означает отсутствие данных.
+Client rarity: ordinary, rare, supreme or fantastic.	Редкость в клиенте: обычная, rare, supreme или fantastic.
+Inside or outside known deed bounds; unknown when deed data is unavailable.	Внутри или вне известных границ поселения. Неизвестно, если нет данных о поселениях.
+Straight-line distance from your current position, in metres.	Расстояние по прямой от вашего текущего положения, в метрах.
+Surface means above ground; Cave means underground.	Поверхность — над землёй; пещера — под землёй.
+Click: ascending, descending, then original order. ^ ascending; v descending.	Нажатия: по возрастанию, по убыванию, затем исходный порядок. ^ — возрастание; v — убывание.
+Clear all selections in this filter; allow every value.	Очистить выбор в этом фильтре и разрешить все значения.
+Toggle this value. Multiple selected values are combined with OR.	Включить или исключить значение. Несколько выбранных значений объединяются условием ИЛИ.
+Close this list. Selection changes already apply immediately.	Закрыть список. Изменения выбора уже применяются сразу.
+{0}: all values. Click to select one or more values.	{0}: все значения. Нажмите, чтобы выбрать одно или несколько.
+Waypoint name and unique ID: {0}	Имя точки и её уникальный ID: {0}
+The provider or catalogue that created this waypoint.	Источник или каталог, создавший эту точку.
+Destination server: {0}. {1}	Сервер назначения: {0}. {1}
+Character that owns this waypoint.	Персонаж, которому принадлежит эта точка.
+Straight-line distance in metres; a dash means coordinates are unavailable here.	Расстояние по прямой в метрах. Прочерк означает, что здесь координаты недоступны.
+World marker appearance used when the waypoint is On.	Вид метки в мире, когда точка включена.
+Delete this stale deed waypoint immediately.	Сразу удалить устаревшую точку поселения.
+Stop tracking this deed immediately.	Сразу прекратить отслеживание поселения.
+Delete this waypoint immediately.	Сразу удалить эту точку.
+Automatically deleted at {0}	Будет автоматически удалена: {0}
+The target is loaded by the client. Its waypoint follows received movement. Time since the last coordinate update is not time since it disappeared.	Цель загружена клиентом. Точка следует за получаемыми перемещениями. Возраст последнего обновления координат не означает, что цель пропала из видимости.
+The target is no longer loaded. The waypoint retains its last received position; the time shown is the age of that position.	Цель больше не загружена. Точка сохраняет последнее полученное положение; время показывает возраст этих координат.
+The provider no longer confirms this waypoint. Its last known position is retained.	Источник больше не подтверждает точку. Её последнее известное положение сохранено.
+Approximate direction reported by the server; exact coordinates are unavailable.	Примерное направление, полученное от сервера. Точные координаты недоступны.
+Saved fixed coordinates. This waypoint does not follow a moving object.	Сохранённые фиксированные координаты. Эта точка не следует за движущимся объектом.
+Exact saved destination of a completed search.	Точное сохранённое назначение завершённого поиска.
+Intermediate position in a search; the destination is not confirmed yet.	Промежуточная позиция поиска. Назначение ещё не подтверждено.
+The target has no confirmed position yet. Waiting for client or provider data.	Положение цели ещё не подтверждено. Ожидание данных клиента или источника.
+Last coordinate update: {0}	Последнее обновление координат: {0}
+Refresh the friends received from the client.	Обновить список друзей, полученный клиентом.
+Request your animals, land vehicles and ships from the server and show them here.	Запросить у сервера ваших животных, наземный транспорт и корабли и показать их здесь.
+Position	Позиция
+Updated	Обновлено
+Click: ascending, descending, then original order.	Нажатия: по возрастанию, по убыванию, затем исходный порядок.
+Friend status received from the client.	Статус друга, полученный клиентом.
+Managed object type received from the server.	Тип управляемого объекта, полученный от сервера.
+Position state. Visible now follows received movement; last known position is saved history; approximate direction has no exact coordinates.	Состояние позиции. Видимая цель следует за перемещениями; последняя позиция сохранена ранее; примерное направление не даёт точных координат.
+Age of the last received position or direction observation.	Возраст последнего полученного положения или измерения направления.
+No managed animals, vehicles or ships to display.	Нет ваших животных, транспорта или кораблей для отображения.
+Remove this target from ALL WAYPOINTS; keep its catalogue entry and history.	Убрать цель из ALL WAYPOINTS, сохранив запись каталога и историю.
+Add this target to ALL WAYPOINTS and follow its received position.	Добавить цель в ALL WAYPOINTS и следовать за получаемой позицией.
+Navigate to this target's confirmed or last known position. Approximate directions cannot start a route.	Маршрут к подтверждённой или последней известной позиции. Примерного направления для маршрута недостаточно.
+Request the native animal Find direction; this is an approximate bearing, not exact coordinates.	Запросить штатное направление Find для животного. Это примерный пеленг, а не точные координаты.
+Forget this target's saved position while retaining its catalogue entry.	Забыть сохранённую позицию цели, оставив её в каталоге.
+No targets match these filters.	Нет целей, соответствующих этим фильтрам.
+Bearing {0}° ± {1}°; range {2}–{3} m from the observation point. {4} readings.	Пеленг {0}° ± {1}°; расстояние {2}–{3} м от точки наблюдения. Измерений: {4}.
+Back to Waypointer	Назад в Waypointer
+Return to the Waypointer window.	Вернуться в окно Waypointer.
+ (last observed)	 (последнее наблюдение)

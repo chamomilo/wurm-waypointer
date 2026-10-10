@@ -15,13 +15,18 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.chamomilo.wurm.ui.v1.UiDensity;
+import org.chamomilo.wurm.ui.v1.UiColor;
+import com.wurmonline.client.renderer.backend.Queue;
+import com.wurmonline.client.renderer.gui.text.ChamomiloUiV1Fonts;
 
-/** Compact mutually-exclusive view of detections from watched filters. */
-final class SurroundingsMonitoringWindow extends WWindow
+/** Compact companion showing detections from the current browser filter. */
+final class SurroundingsMonitoringWindow extends WaypointerUiWindow
         implements ButtonListener {
     static final int WINDOW_WIDTH = 440;
     private static final int TABLE_WIDTH = 410;
-    private static final int ROW_HEIGHT = 25;
+    private static final int ROW_HEIGHT = 32;
+    private static final int FOOTER_GAP = 8;
     private static final int MARK_WIDTH = 62;
     private static final int NAME_WIDTH = 230;
     private static final int DETAIL_WIDTH = 118;
@@ -36,12 +41,17 @@ final class SurroundingsMonitoringWindow extends WWindow
             new SurroundingsScrollState(SCROLL_SETTLE_MILLIS);
 
     private WurmArrayPanel<FlexComponent> table;
+    private WurmArrayPanel<FlexComponent> tableHeader;
+    private WurmBorderPanel tablePanel;
     private SurroundingsScrollPanel scrollPanel;
     private WButton surroundingsButton;
     private WButton refreshButton;
-    private WurmLabel countLabel;
+    private WaypointerLabel countLabel;
     private long displayedRevision = Long.MIN_VALUE;
     private long nextAutoRefreshAt;
+    private int minimumTableWidth = TABLE_WIDTH;
+    private final WaypointerButtonGroup rowMarks;
+    private final int markWidth;
 
     SurroundingsMonitoringWindow(SurroundingsController controller,
                                  List<SurroundingsQuery> queries) {
@@ -49,7 +59,13 @@ final class SurroundingsMonitoringWindow extends WWindow
         this.controller = controller;
         this.queries = Collections.unmodifiableList(
                 new ArrayList<SurroundingsQuery>(queries));
-        setTitle("Wurm Waypointer - Monitoring");
+        String[] captions=org.waypoints.next.i18n.Messages.texts(new String[]{"Mark","Clear"});
+        markWidth=Math.max(MARK_WIDTH,Math.max(WaypointerButtonGroup.width(captions[0],20,org.chamomilo.wurm.ui.v1.UiDensity.HIGH,false),
+                WaypointerButtonGroup.width(captions[1],20,org.chamomilo.wurm.ui.v1.UiDensity.HIGH,false)));
+        rowMarks=new WaypointerButtonGroup("monitoring.row-marks",org.chamomilo.wurm.ui.v1.UiDensity.HIGH,
+                WaypointerTableActionCell.BUTTON_HEIGHT,20,false,captions,new int[]{markWidth,markWidth});
+        setTitle(org.waypoints.next.i18n.Messages.text("Wurm Waypointer - Monitoring"));
+        setTitleFont(ChamomiloUiV1Fonts.caption(18,true,UiDensity.HIGH));
         build();
     }
 
@@ -73,7 +89,10 @@ final class SurroundingsMonitoringWindow extends WWindow
                         scrollState.observe(offset, nowMillis);
                     }
                 });
-        root.setComponent(scrollPanel, WurmBorderPanel.CENTER);
+        scrollPanel.useWholeRowOffsets();
+        tablePanel = new WholeRowsPanel();
+        tablePanel.setComponent(scrollPanel, WurmBorderPanel.CENTER);
+        root.setComponent(tablePanel, WurmBorderPanel.CENTER);
         root.setComponent(actionRow(), WurmBorderPanel.SOUTH);
         setComponent(root);
         refreshRows(0);
@@ -82,11 +101,19 @@ final class SurroundingsMonitoringWindow extends WWindow
     private FlexComponent actionRow() {
         WurmArrayPanel<FlexComponent> row = horizontal(
                 "waypointer.surroundings-monitoring.actions");
-        surroundingsButton = button("Surroundings", 122);
-        surroundingsButton.setHoverString(
-                "Switch back to the full Surroundings filters.");
-        refreshButton = button("Refresh", 82);
-        countLabel = new WurmLabel("0 detected");
+        String[] captions=org.waypoints.next.i18n.Messages.texts(new String[]{"Back to Waypointer","Refresh","{0} found; {1} tracked; {2} filters"});
+        captions[2]=org.waypoints.next.i18n.Messages.format("{0} found; {1} tracked; {2} filters",0,0,0);
+        int[] widths=new int[captions.length];
+        for(int i=0;i<widths.length;i++)widths[i]=WaypointerButtonGroup.width(captions[i],20,UiDensity.HIGH,false);
+        WaypointerButtonGroup group=new WaypointerButtonGroup("monitoring.footer",UiDensity.HIGH,ROW_HEIGHT,20,false,captions,widths);
+        surroundingsButton = button("Back to Waypointer", widths[0]);
+        surroundingsButton.setHoverString(org.waypoints.next.i18n.Messages.text(
+                "Return to the Waypointer window."));
+        refreshButton = button("Refresh", widths[1]);
+        group.apply((ChamomiloUiV1Button)surroundingsButton,widths[0]);
+        group.apply((ChamomiloUiV1Button)refreshButton,widths[1]);
+        countLabel = new CounterLabel(group);
+        row.componentWidthOffset=8;
         row.addComponent(surroundingsButton);
         row.addComponent(refreshButton);
         row.addComponent(cell(countLabel, 206));
@@ -105,8 +132,9 @@ final class SurroundingsMonitoringWindow extends WWindow
             List<SurroundingsRow> detections =
                     SurroundingsMonitoringView.merge(snapshots);
             List<FlexComponent> components =
-                    new ArrayList<FlexComponent>(detections.size() + 1);
-            components.add(header());
+                    new ArrayList<FlexComponent>(detections.size());
+            tableHeader = header();
+            tablePanel.setComponent(tableHeader, WurmBorderPanel.NORTH);
             rowActions.clear();
             int marked = 0;
             for (SurroundingsRow detection : detections) {
@@ -116,21 +144,24 @@ final class SurroundingsMonitoringWindow extends WWindow
             table.removeAllComponents();
             table.addComponents(components.toArray(
                     new FlexComponent[components.size()]));
+            countLabel.setLabel(org.waypoints.next.i18n.Messages.format("{0} found; {1} tracked; {2} filters",detections.size(),marked,queries.size()));
+            countLabel.setSize(Math.max(206, countLabel.textWidth()+8), ROW_HEIGHT);
+            fitColumns();
+            setSize(width, height);
             restoreScroll(scrollOffset);
             displayedRevision = controller.revision();
-            countLabel.setLabel(detections.size() + " found | "
-                    + marked + " marked | " + queries.size() + " filters");
         } catch (Throwable failure) {
             controller.reportFailure("refresh monitoring", failure);
         }
     }
 
-    private FlexComponent header() {
-        WurmArrayPanel<FlexComponent> row = horizontal(
-                "waypointer.surroundings-monitoring.header");
-        row.addComponent(cell(new WurmLabel("Mark"), MARK_WIDTH));
-        row.addComponent(cell(new WurmLabel("Detection"), NAME_WIDTH));
-        row.addComponent(cell(new WurmLabel("Type / distance"), DETAIL_WIDTH));
+    private WurmArrayPanel<FlexComponent> header() {
+        WurmArrayPanel<FlexComponent> row = new WaypointerTableHeader.Row("monitoring.headers");
+        String[] titles={"Mark","Detection","Type / distance"};
+        int[] widths={MARK_WIDTH,NAME_WIDTH,DETAIL_WIDTH};
+        String[] hints={"Mark follows the object by ID. Unmark removes its waypoint.","Full object name received from the client.","Straight-line distance from your current position, in metres."};
+        int baseline=WaypointerTableHeader.baseline(titles);
+        for(int i=0;i<titles.length;i++)row.addComponent(new WaypointerTableHeader("monitoring.headers",titles[i],Math.max(widths[i],WaypointerTableHeader.minimumWidth(titles[i])),0,baseline,false,null,hints[i]));
         return row;
     }
 
@@ -139,19 +170,21 @@ final class SurroundingsMonitoringWindow extends WWindow
         WurmArrayPanel<FlexComponent> row = horizontal(
                 "waypointer.surroundings-monitoring.row." + entry.getKey());
         WButton mark = button(data.isWaypointEnabled() ? "Clear" : "Mark",
-                MARK_WIDTH);
-        mark.setHoverString(data.isWaypointEnabled()
+                markWidth);
+        rowMarks.apply((ChamomiloUiV1Button)mark,markWidth);
+        WaypointerButtonGroup.active(mark,data.isWaypointEnabled());
+        mark.setHoverString(org.waypoints.next.i18n.Messages.text(data.isWaypointEnabled()
                 ? "Delete this Surroundings waypoint."
-                : "Create a standard 15-minute waypoint at this position.");
+                : "Create a standard tracked waypoint at this position."));
         rowActions.put(mark, new RowAction(
                 entry.getKey(), data.isWaypointEnabled()));
-        row.addComponent(mark);
-        WurmLabel name = new WurmLabel(entry.getName(),
-                entry.getCategory() + "; #" + entry.getWurmId());
+        row.addComponent(new WaypointerTableActionCell(mark));
+        WurmLabel name = new WaypointerTableLabel(entry.getName(),
+                entry.getCategory() + "; #" + entry.getWurmId(),false);
         row.addComponent(cell(name, NAME_WIDTH));
         String detail = kindLabel(entry.getKind()) + " / "
                 + data.getDistanceMetres() + "m";
-        row.addComponent(cell(new WurmLabel(detail), DETAIL_WIDTH));
+        row.addComponent(cell(new WaypointerTableLabel(detail), DETAIL_WIDTH));
         return row;
     }
 
@@ -185,6 +218,42 @@ final class SurroundingsMonitoringWindow extends WWindow
 
     @Override void closePressed() { SurroundingsWindowBridge.closed(this); }
 
+    @Override void setSize(int requestedWidth, int requestedHeight) {
+        int minimum = Math.max(WINDOW_WIDTH, minimumTableWidth + 48);
+        if (surroundingsButton != null && countLabel != null) minimum = Math.max(minimum,
+                surroundingsButton.width + refreshButton.width + countLabel.width + 64);
+        super.setSize(Math.max(minimum, requestedWidth), minimized?requestedHeight:Math.max(220, requestedHeight));
+    }
+
+    private void fitColumns() {
+        WurmArrayPanel<?> header = tableHeader;
+        List<FlexComponent> layoutRows = new ArrayList<FlexComponent>(table.components);
+        layoutRows.add(0, tableHeader);
+        int[] widths = {MARK_WIDTH, NAME_WIDTH, DETAIL_WIDTH};
+        for (int i=0; i<widths.length; i++) {
+            widths[i] = Math.max(widths[i], WaypointerTableHeader.minimumWidth(((WButton)header.components.get(i)).getLabel()));
+            for (FlexComponent child : layoutRows) {
+                FlexComponent cell = ((WurmArrayPanel<?>) child).components.get(i);
+                if (cell instanceof WaypointerTableActionCell) widths[i] = Math.max(widths[i], cell.width);
+                else if (cell instanceof WButton) widths[i] = Math.max(widths[i], WaypointerUi.captionWidth((WButton) cell));
+            }
+        }
+        minimumTableWidth = 0;for (int value : widths) minimumTableWidth += value;
+        for (FlexComponent child : layoutRows) {
+            WurmArrayPanel<?> row = (WurmArrayPanel<?>) child;
+            for(int i=0;i<widths.length;i++){
+                FlexComponent value=row.components.get(i);
+                if(value instanceof WaypointerTableActionCell)((WaypointerTableActionCell)value).resizeColumn(widths[i]);
+                else if(value instanceof WaypointerTableHeader)((WaypointerTableHeader)value).resize(widths[i],ROW_HEIGHT);
+                else if(value instanceof ChamomiloUiV1Button)((ChamomiloUiV1Button)value).resize(widths[i],ROW_HEIGHT);
+                else value.setSize(widths[i],value.height);
+            }
+            row.componentResized();
+        }
+        table.componentResized();
+        tablePanel.componentResized();
+    }
+
     private int captureScrollOffset() {
         return scrollPanel == null ? 0 : Math.max(0, scrollPanel.yo);
     }
@@ -197,8 +266,8 @@ final class SurroundingsMonitoringWindow extends WWindow
     }
 
     private WButton button(String label, int width) {
-        WButton result = new WButton(label, this);
-        result.setInitialSize(width, ROW_HEIGHT, false);
+        WButton result = WaypointerUi.button(org.waypoints.next.i18n.Messages.text(label), this, 90);
+        result.setInitialSize(Math.max(width, WaypointerUi.captionWidth(result)), ROW_HEIGHT, false);
         return result;
     }
 
@@ -234,6 +303,35 @@ final class SurroundingsMonitoringWindow extends WWindow
         private RowAction(SurroundingKey key, boolean enabled) {
             this.key = key;
             this.enabled = enabled;
+        }
+    }
+
+    /** Reserve the incomplete final row as space above the footer. */
+    private final class WholeRowsPanel extends WurmBorderPanel {
+        private final WurmPanel footerGap = new WurmPanel(1, FOOTER_GAP, false);
+        WholeRowsPanel() {
+            super("waypointer.surroundings-monitoring.table-panel");
+            setComponent(footerGap, SOUTH);
+        }
+        @Override void performLayout() {
+            int available = Math.max(0, height - ROW_HEIGHT - FOOTER_GAP);
+            footerGap.height = FOOTER_GAP + available % ROW_HEIGHT;
+            super.performLayout();
+        }
+    }
+
+    private static final class CounterLabel extends WaypointerLabel {
+        private final int baseline;
+        private String caption="";
+        CounterLabel(WaypointerButtonGroup group) {
+            super("","",false,false);
+            text=ChamomiloUiV1Fonts.caption(group.fontPixels,false,UiDensity.HIGH);
+            baseline=group.baseline;
+        }
+        @Override void setLabel(String value) { super.setLabel(value); caption=value; }
+        @Override protected void renderComponent(Queue queue,float ignoredAlpha) {
+            text.moveTo(x+8,y+baseline);
+            text.paint(queue,caption,UiColor.TEXT.red,UiColor.TEXT.green,UiColor.TEXT.blue,1f);
         }
     }
 }

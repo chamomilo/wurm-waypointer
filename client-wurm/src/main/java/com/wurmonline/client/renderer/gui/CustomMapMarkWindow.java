@@ -4,7 +4,7 @@ import org.waypoints.next.integration.WurmWaypointerRuntime;
 import org.waypoints.next.model.WaypointLayer;
 
 /** Small native editor opened by right-clicking a map tile. */
-final class CustomMapMarkWindow extends WWindow
+final class CustomMapMarkWindow extends WaypointerUiWindow
         implements InputFieldListener, ButtonListener {
     private static final int ROW_WIDTH = 350;
     private static final int ROW_HEIGHT = 23;
@@ -14,6 +14,7 @@ final class CustomMapMarkWindow extends WWindow
     private WurmInputField textInput;
     private WButton saveButton;
     private WButton cancelButton;
+    private int minimumHeight;
 
     CustomMapMarkWindow(int tileX, int tileY) {
         this(tileX, tileY, WaypointLayer.SURFACE);
@@ -24,29 +25,32 @@ final class CustomMapMarkWindow extends WWindow
         this.tileX = tileX;
         this.tileY = tileY;
         this.layer = layer;
-        setTitle("Custom map mark");
+        setTitle(org.waypoints.next.i18n.Messages.text("Custom map mark"));
         WurmArrayPanel<FlexComponent> content =
                 new WurmArrayPanel<FlexComponent>(
                         "waypointer.custom-map-mark.content", 0, true);
-        WurmLabel coordinates = new WurmLabel(
+        WurmLabel coordinates = new WaypointerLabel(
                 "Coordinates: X=" + tileX + ", Y=" + tileY + " | " + layer.name());
         coordinates.setInitialSize(ROW_WIDTH, ROW_HEIGHT, false);
         content.addComponent(coordinates);
-        textInput = new WurmInputField(
+        textInput = WaypointerUi.input(
                 "waypointer.custom-map-mark.text", this, 1, 120);
-        textInput.prompt = "Text shown next to the mark";
+        textInput.prompt = org.waypoints.next.i18n.Messages.text("Text shown next to the mark");
         textInput.simpleInput = true;
         textInput.setInitialSize(ROW_WIDTH, ROW_HEIGHT, false);
-        content.addComponent(textInput);
-        saveButton = new WButton("Save custom mark", this);
+        content.addComponent(WaypointerUi.view(textInput));
+        saveButton = WaypointerUi.button(org.waypoints.next.i18n.Messages.text("Save custom mark"), this, 90);
         saveButton.setInitialSize(ROW_WIDTH, ROW_HEIGHT, false);
-        saveButton.setHoverString("Save a permanent labelled mark on this tile.");
+        saveButton.setHoverString(org.waypoints.next.i18n.Messages.text("Save a permanent labelled mark on this tile."));
         content.addComponent(saveButton);
-        cancelButton = new WButton("Cancel", this);
+        cancelButton = WaypointerUi.button(org.waypoints.next.i18n.Messages.text("Cancel"), this, 90);
         cancelButton.setInitialSize(ROW_WIDTH, ROW_HEIGHT, false);
         content.addComponent(cancelButton);
         setComponent(content);
+        minimumHeight = content.calcHeight() + 80;
     }
+
+    @Override void setSize(int width, int height) { super.setSize(Math.max(390,width),minimized?height:Math.max(minimumHeight,height)); }
 
     void focusInput() {
         if (hud == null) return;

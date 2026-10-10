@@ -31,12 +31,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /** Dense native Wurm-style Phase 1 manager and static source editor. */
-final class WaypointManagerWindow extends WWindow
-        implements ButtonListener, InputFieldListener, ConfirmListener {
-    private static final int ROW_HEIGHT = 25;
+final class WaypointManagerWindow extends WaypointerContentPanel
+        implements ButtonListener, InputFieldListener {
+    private static final int ROW_HEIGHT = 32;
+    private static final int CONTROL_GAP = 6;
+    private static final int BUTTON_FONT_PIXELS = 20;
     private static final int TABLE_WIDTH = 1096;
     private static final int FORM_MINIMUM_WIDTH = 620;
     private static final int SOURCE_MINIMUM_WIDTH = 520;
@@ -58,6 +61,8 @@ final class WaypointManagerWindow extends WWindow
     private static final double DISTANCE_POSITION_EPSILON_TILES = 0.01d;
 
     private final WaypointManagerController controller;
+    private final WaypointerButtonGroup commandGroup;
+    private final WaypointerButtonGroup tableActionGroup;
     private final Map<WButton, RowAction> rowActions =
             new HashMap<WButton, RowAction>();
     private final Map<WButton, WaypointManagerQuery.SortColumn> sortActions =
@@ -70,11 +75,14 @@ final class WaypointManagerWindow extends WWindow
             new ArrayList<TableLayoutRow>();
     private final List<ResponsiveRow> responsiveRows =
             new ArrayList<ResponsiveRow>();
+    private final Map<UUID, LiveRow> liveRows = new HashMap<UUID, LiveRow>();
 
     private WurmArrayPanel<FlexComponent> table;
+    private WurmArrayPanel<FlexComponent> tableHeader;
+    private WurmBorderPanel listTable;
     private WurmBorderPanel listRoot;
     private WurmArrayPanel<FlexComponent> activeContent;
-    private WurmInputField searchInput;
+    private WurmScrollPanel listScroll;
     private WurmDropDown serverFilter;
     private WurmDropDown userFilter;
     private WurmDropDown typeFilter;
@@ -82,7 +90,7 @@ final class WaypointManagerWindow extends WWindow
     private String[] serverValues = new String[0];
     private String[] userValues = new String[0];
     private WurmLabel countLabel;
-    private WButton clearSearchButton;
+    private String countCaption = "";
     private WButton applyFilters;
     private WButton refreshButton;
     private WButton addButton;
@@ -96,6 +104,8 @@ final class WaypointManagerWindow extends WWindow
     private WaypointManagerQuery.SortColumn sortColumn =
             WaypointManagerQuery.SortColumn.NAME;
     private boolean sortAscending = true;
+    private String appliedServer = "current", appliedUser = "current";
+    private int appliedType, appliedStatus;
 
     private WurmInputField nameInput;
     private WurmInputField coordinateInput;
@@ -126,11 +136,10 @@ final class WaypointManagerWindow extends WWindow
     private UUID editingId;
     private String previewedInput = "";
     private WaypointCoordinate previewedCoordinate;
-    private ConfirmWindow confirmWindow;
-    private RowAction pendingDelete;
     private int listWidth;
     private int listHeight;
     private long nextDistanceRefreshAt;
+    private long nextCatalogueRefresh, catalogueRevision=-1;
     private long nextHerePreviewAt;
     private long nextDistanceErrorReportAt;
     private double lastDistanceOriginX = Double.NaN;
@@ -141,7 +150,9 @@ final class WaypointManagerWindow extends WWindow
     WaypointManagerWindow(WaypointManagerController controller) {
         super("wurm-waypointer.manager", true);
         this.controller = controller;
-        setTitle("Wurm Waypointer");
+        commandGroup = commandTypography();
+        tableActionGroup = tableActionTypography();
+        setTitle(org.waypoints.next.i18n.Messages.text("Wurm Waypointer"));
         showList();
     }
 
@@ -153,15 +164,15 @@ final class WaypointManagerWindow extends WWindow
 
     private void showList() {
         rememberListSize();
-        closeConfirmation();
         clearEditorState();
         viewMode = ViewMode.LIST;
         responsiveRows.clear();
         tableLayoutRows.clear();
+        liveRows.clear();
         hoverTexts.clear();
         activeContent = null;
         lastResponsiveWidth = -1;
-        setTitle("Wurm Waypointer - Waypoints");
+        setTitle(org.waypoints.next.i18n.Messages.text("Wurm Waypointer - Waypoints"));
         WaypointManagerContext context = controller.context();
         WaypointManagerSnapshot options = controller.snapshot(
                 WaypointManagerQuery.builder().allServers()
@@ -171,38 +182,39 @@ final class WaypointManagerWindow extends WWindow
         listRoot = root;
         WurmArrayPanel<FlexComponent> top = new WurmArrayPanel<FlexComponent>(
                 "waypointer.manager.filters", 0, true);
-        top.addComponent(filterRowOne());
+        top.addComponent(summaryRow());
+        top.addComponent(gap(1, CONTROL_GAP));
         top.addComponent(filterRowTwo(options, context));
+        top.addComponent(gap(1, CONTROL_GAP));
         root.setComponent(top, WurmBorderPanel.NORTH);
 
-        table = new WurmArrayPanel<FlexComponent>("waypointer.manager.table", 0, true);
-        WurmScrollPanel scroll = new WurmScrollPanel(
+        table = new WurmArrayPanel<FlexComponent>("waypointer.manager.table", 0);
+        WurmScrollPanel scroll = new ChamomiloUiV1ScrollPanel(
                 "waypointer.manager.scroll", table, false, true);
-        root.setComponent(scroll, WurmBorderPanel.CENTER);
-        root.setComponent(actionRow(), WurmBorderPanel.SOUTH);
+        listScroll=scroll;
+        listTable = new WurmBorderPanel("waypointer.manager.table-panel");
+        listTable.setComponent(scroll, WurmBorderPanel.CENTER);
+        root.setComponent(listTable, WurmBorderPanel.CENTER);
+        WurmBorderPanel footer = new WurmBorderPanel("waypointer.actions.spacing");
+        footer.setComponent(gap(1, CONTROL_GAP), NORTH);
+        footer.setComponent(actionRow(), CENTER);
+        root.setComponent(footer, WurmBorderPanel.SOUTH);
         setComponent(root);
         restoreListSize();
         refreshRows();
         applyResponsiveLayout();
     }
 
-    private FlexComponent filterRowOne() {
-        WurmArrayPanel<FlexComponent> row = horizontal("waypointer.filters.one");
-        WurmLabel searchLabel = new WurmLabel("Search name / tag");
-        registerHover(searchLabel, "Filter waypoint names and tags as you type.");
-        row.addComponent(cell(searchLabel, 110));
-        searchInput = inputField("waypointer.filter.text", 120);
-        registerHover(searchInput, "Type part of a waypoint name or tag.");
-        row.addComponent(cell(searchInput, 280));
-        clearSearchButton = button("Clear", 60);
-        clearSearchButton.setHoverString("Clear the text filter and show matching waypoints.");
-        row.addComponent(clearSearchButton);
-        countLabel = new WurmLabel("0 waypoints");
-        row.addComponent(cell(countLabel, 260));
-        refreshButton = button("Refresh", 82);
-        refreshButton.setHoverString("Reload the manager view from local waypoint storage.");
-        row.addComponent(refreshButton);
-        registerResponsive(row, new int[]{90, 150, 60, 150, 82}, 1, 3);
+    private FlexComponent summaryRow() {
+        WurmArrayPanel<FlexComponent> row=horizontal("waypointer.filters.count");
+        addButton=button("Add...",82);row.addComponent(addButton);row.addComponent(gap(CONTROL_GAP,ROW_HEIGHT));
+        addButton.setHoverString(org.waypoints.next.i18n.Messages.text("Create a waypoint at your position or from coordinates/map link."));
+        refreshButton=button("Refresh",100);row.addComponent(refreshButton);row.addComponent(gap(CONTROL_GAP,ROW_HEIGHT));
+        refreshButton.setHoverString(org.waypoints.next.i18n.Messages.text("Refresh the waypoint list using the applied filters."));
+        WaypointerButtonGroup.peers("all-waypoints.top-actions",org.chamomilo.wurm.ui.v1.UiDensity.HIGH,ROW_HEIGHT,addButton,refreshButton);
+        countLabel=new WaypointerLabel("0 waypoints");row.addComponent(cell(countLabel,350));
+        registerHover(countLabel,"Waypoints matching the applied filters / all saved waypoints.");
+        countCaption = "";
         return row;
     }
 
@@ -210,7 +222,7 @@ final class WaypointManagerWindow extends WWindow
                                        WaypointManagerContext context) {
         WurmArrayPanel<FlexComponent> row = horizontal("waypointer.filters.two");
 
-        row.addComponent(cell(new WurmLabel("Server"), 50));
+        row.addComponent(cell(new WaypointerLabel("Server"), 50));
         List<String> serverLabels = new ArrayList<String>();
         List<String> values = new ArrayList<String>();
         serverLabels.add("Current"); values.add("current");
@@ -221,12 +233,12 @@ final class WaypointManagerWindow extends WWindow
             values.add("specific:" + option.getValue());
         }
         serverValues = values.toArray(new String[values.size()]);
-        serverFilter = new WurmDropDown("waypointer.filter.server", 0,
+        serverFilter = WaypointerUi.dropDown("waypointer.filter.server", Math.max(0, values.indexOf(appliedServer)),
                 serverLabels.toArray(new String[serverLabels.size()]));
         registerHover(serverFilter, "Show the current server, every server, unassigned records, or one server.");
         row.addComponent(cell(serverFilter, 205));
 
-        row.addComponent(cell(new WurmLabel("User"), 38));
+        row.addComponent(cell(new WaypointerLabel("User"), 38));
         List<String> userLabels = new ArrayList<String>();
         values = new ArrayList<String>();
         userLabels.add("Current (" + context.getUser() + ")"); values.add("current");
@@ -236,32 +248,32 @@ final class WaypointManagerWindow extends WWindow
             userLabels.add(option.getLabel()); values.add(option.getValue());
         }
         userValues = values.toArray(new String[values.size()]);
-        userFilter = new WurmDropDown("waypointer.filter.user", 0,
+        userFilter = WaypointerUi.dropDown("waypointer.filter.user", Math.max(0, values.indexOf(appliedUser)),
                 userLabels.toArray(new String[userLabels.size()]));
         registerHover(userFilter, "Filter by the character that owns the waypoint.");
         row.addComponent(cell(userFilter, 180));
 
-        row.addComponent(cell(new WurmLabel("Type"), 36));
+        row.addComponent(cell(new WaypointerLabel("Type"), 36));
         String[] types = new String[WaypointSourceType.values().length + 1];
         types[0] = "All types";
         for (int i = 0; i < WaypointSourceType.values().length; i++) {
             types[i + 1] = title(WaypointSourceType.values()[i].name());
         }
-        typeFilter = new WurmDropDown("waypointer.filter.type", 0, types);
+        typeFilter = WaypointerUi.dropDown("waypointer.filter.type", appliedType, types);
         registerHover(typeFilter, "Filter by waypoint source type.");
         row.addComponent(cell(typeFilter, 140));
 
-        row.addComponent(cell(new WurmLabel("Status"), 45));
+        row.addComponent(cell(new WaypointerLabel("Status"), 45));
         String[] statuses = new String[WaypointResolution.values().length + 1];
         statuses[0] = "All statuses";
         for (int i = 0; i < WaypointResolution.values().length; i++) {
             statuses[i + 1] = title(WaypointResolution.values()[i].name());
         }
-        statusFilter = new WurmDropDown("waypointer.filter.status", 0, statuses);
+        statusFilter = WaypointerUi.dropDown("waypointer.filter.status", appliedStatus, statuses);
         registerHover(statusFilter, "Filter by coordinate resolution status.");
         row.addComponent(cell(statusFilter, 160));
         applyFilters = button("Apply filters", 110);
-        applyFilters.setHoverString("Apply the server, user, type and status filters.");
+        applyFilters.setHoverString(org.waypoints.next.i18n.Messages.text("Apply the server, user, type and status filters."));
         row.addComponent(applyFilters);
         registerResponsive(row,
                 new int[]{50, 130, 38, 120, 36, 100, 45, 110, 110},
@@ -271,34 +283,39 @@ final class WaypointManagerWindow extends WWindow
 
     private FlexComponent actionRow() {
         WurmArrayPanel<FlexComponent> row = horizontal("waypointer.actions");
-        addButton = button("Add...", 82);
         enableFiltered = button("Enable filtered", 122);
         disableFiltered = button("Disable filtered", 126);
         exportButton = button("Export", 82);
         importButton = button("Import", 82);
         pasteSharedButton = button("Paste shared", 112);
         surroundingsButton = button("Surroundings", 112);
-        addButton.setHoverString("Create a waypoint at your position or from coordinates/map link.");
-        enableFiltered.setHoverString("Enable every waypoint currently matched by the filters.");
-        disableFiltered.setHoverString("Disable every waypoint currently matched by the filters.");
-        exportButton.setHoverString("Export all waypoint records to the transfer file.");
-        importButton.setHoverString("Import waypoint records from the transfer file.");
-        pasteSharedButton.setHoverString(
-                "Import one WWP1 waypoint copied from chat. It stays inactive until you visit its destination server.");
-        surroundingsButton.setHoverString(
-                "Open the live catalog of animals, containers and items loaded around you.");
-        row.addComponent(addButton);
+        addButton.setHoverString(org.waypoints.next.i18n.Messages.text("Create a waypoint at your position or from coordinates/map link."));
+        enableFiltered.setHoverString(org.waypoints.next.i18n.Messages.text("Enable every waypoint currently matched by the filters."));
+        disableFiltered.setHoverString(org.waypoints.next.i18n.Messages.text("Disable every waypoint currently matched by the filters."));
+        exportButton.setHoverString(org.waypoints.next.i18n.Messages.text("Export all waypoint records to the transfer file."));
+        importButton.setHoverString(org.waypoints.next.i18n.Messages.text("Import waypoint records from the transfer file."));
+        pasteSharedButton.setHoverString(org.waypoints.next.i18n.Messages.text(
+                "Import one WWP1 waypoint copied from chat. It stays inactive until you visit its destination server."));
+        surroundingsButton.setHoverString(org.waypoints.next.i18n.Messages.text(
+                "Open the live catalog of animals, containers and items loaded around you."));
         row.addComponent(enableFiltered);
         row.addComponent(disableFiltered);
         row.addComponent(exportButton);
         row.addComponent(importButton);
         row.addComponent(pasteSharedButton);
-        row.addComponent(surroundingsButton);
-        registerResponsive(row, new int[]{82, 122, 126, 82, 82, 112, 112});
+
+        WaypointerButtonGroup.peers("all-waypoints.footer",org.chamomilo.wurm.ui.v1.UiDensity.HIGH,ROW_HEIGHT,
+                enableFiltered,disableFiltered,exportButton,importButton,pasteSharedButton);
+
+        registerResponsive(row, new int[]{122, 126, 82, 82, 112});
         return row;
     }
 
     private void refreshRows() {
+        refreshRows(true);
+    }
+
+    private void refreshRows(boolean explicitOrder) {
         // Stale native input callbacks can arrive while an editor view owns the
         // window and deliberately has no table. Ignore them instead of letting
         // one delayed search/Enter event break the Manager refresh path.
@@ -307,57 +324,109 @@ final class WaypointManagerWindow extends WWindow
             WaypointManagerContext context = controller.context();
             WaypointManagerQuery query = query(context);
             WaypointManagerSnapshot snapshot = controller.snapshot(query);
+            if (!explicitOrder && canUpdateLiveRows(snapshot)) {
+                for (WaypointManagerRow data : snapshot.getRows()) liveRows.get(data.getId()).update(data);
+                updateCount(snapshot);
+                catalogueRevision = controller.revision();
+                return;
+            }
+            int previousOffset = listScroll.yo;
+            List<UUID> previousIds = new ArrayList<UUID>(filteredIds);
+            List<WaypointManagerRow> displayRows = new ArrayList<WaypointManagerRow>(snapshot.getRows());
+            if (!explicitOrder && !previousIds.isEmpty()) {
+                Map<UUID, Integer> order = new HashMap<UUID, Integer>();
+                for (UUID id : previousIds) order.put(id, order.size());
+                for (WaypointManagerRow data : displayRows) if (!order.containsKey(data.getId())) order.put(data.getId(), order.size());
+                displayRows.sort((left, right) -> Integer.compare(order.get(left.getId()), order.get(right.getId())));
+            }
             table.removeAllComponents();
             rowActions.clear();
             sortActions.clear();
             liveDistanceCells.clear();
+            liveRows.clear();
             lastDistanceOriginX = Double.NaN;
             lastDistanceOriginY = Double.NaN;
             filteredIds = new ArrayList<UUID>();
             tableLayoutRows.clear();
-            table.addComponent(header());
-            for (WaypointManagerRow row : snapshot.getRows()) {
+            tableHeader = header();
+            WurmBorderPanel heading = new WurmBorderPanel("waypointer.manager.heading");
+            heading.setComponent(tableHeader, NORTH);
+            heading.setComponent(gap(1, CONTROL_GAP), SOUTH);
+            listTable.setComponent(heading, NORTH);
+            for (WaypointManagerRow row : displayRows) {
                 filteredIds.add(row.getId());
                 table.addComponent(dataRow(row));
+                table.addComponent(gap(1, CONTROL_GAP));
             }
-            countLabel.setLabel(snapshot.getFilteredCount() + " of "
-                    + snapshot.getTotalCount() + " waypoint(s)");
+            updateCount(snapshot);
             lastResponsiveWidth = -1;
             applyResponsiveLayout();
+            restoreScroll(previousOffset, previousIds);
+            catalogueRevision = controller.revision();
         } catch (Throwable failure) {
             controller.reportFailure("refresh manager", failure);
         }
     }
 
+    private void updateCount(WaypointManagerSnapshot snapshot) {
+        String next = org.waypoints.next.i18n.Messages.format("{0} of {1} waypoints",
+                snapshot.getFilteredCount(), snapshot.getTotalCount());
+        if (!next.equals(countCaption)) { countCaption = next; countLabel.setLabel(next); }
+    }
+
+    private boolean canUpdateLiveRows(WaypointManagerSnapshot snapshot) {
+        if (liveRows.size() != snapshot.getRows().size()) return false;
+        for (WaypointManagerRow data : snapshot.getRows()) {
+            LiveRow previous = liveRows.get(data.getId());
+            if (previous == null || !previous.sameControls(data)) return false;
+        }
+        return true;
+    }
+
+    /** Retain the top visible UUID and the intra-row pixel offset, including after deletion. */
+    private void restoreScroll(int offset, List<UUID> previousIds) {
+        int stride = ROW_HEIGHT + CONTROL_GAP;
+        int restored = offset;
+        if (offset > 0 && !previousIds.isEmpty()) {
+            int index = Math.min(previousIds.size() - 1, Math.max(0, offset / stride));
+            int withinRow = offset - index * stride;
+            for (int i = index; i < previousIds.size(); i++) {
+                int nextIndex = filteredIds.indexOf(previousIds.get(i));
+                if (nextIndex >= 0) { restored = nextIndex * stride + withinRow; break; }
+            }
+        }
+        ((ChamomiloUiV1ScrollPanel) listScroll).scrollTo(0, restored);
+    }
+
     private WaypointManagerQuery query(WaypointManagerContext context) {
         WaypointManagerQuery.Builder builder = WaypointManagerQuery.builder()
-                .text(searchInput.getText()).currentContext(context.getServer())
+                .currentContext(context.getServer())
                 .originTiles(context.getTileX(), context.getTileY())
                 .sort(sortColumn, sortAscending);
-        String server = selected(serverValues, serverFilter, "current");
+        String server = appliedServer;
         if ("all".equals(server)) builder.allServers();
         else if ("unassigned".equals(server)) builder.unassignedServer();
         else if (server.startsWith("specific:")) {
             builder.specificServer(server.substring("specific:".length()));
         } else builder.currentServer(context.getServer());
 
-        String user = selected(userValues, userFilter, "current");
+        String user = appliedUser;
         if ("current".equals(user)) builder.user(context.getUser());
         else if (!"all".equals(user)) builder.user(user);
-        if (typeFilter.getValue() > 0) {
-            builder.sourceType(WaypointSourceType.values()[typeFilter.getValue() - 1]);
+        if (appliedType > 0) {
+            builder.sourceType(WaypointSourceType.values()[appliedType - 1]);
         }
-        if (statusFilter.getValue() > 0) {
-            builder.resolution(WaypointResolution.values()[statusFilter.getValue() - 1]);
+        if (appliedStatus > 0) {
+            builder.resolution(WaypointResolution.values()[appliedStatus - 1]);
         }
         return builder.build();
     }
 
-    private FlexComponent header() {
-        WurmArrayPanel<FlexComponent> row = horizontal("waypointer.table.header");
+    private WurmArrayPanel<FlexComponent> header() {
+        WurmArrayPanel<FlexComponent> row = new WaypointerTableHeader.Row("all-waypoints.headers");
         row.addComponent(sortButton("On", ON_WIDTH,
                 WaypointManagerQuery.SortColumn.ENABLED));
-        row.addComponent(cell(new WurmLabel("Nav"), NAV_WIDTH));
+        row.addComponent(plainHeader("Nav", NAV_WIDTH));
         row.addComponent(sortButton("Name", NAME_WIDTH,
                 WaypointManagerQuery.SortColumn.NAME));
         row.addComponent(sortButton("Type", TYPE_WIDTH,
@@ -372,10 +441,10 @@ final class WaypointManagerWindow extends WWindow
                 WaypointManagerQuery.SortColumn.DISTANCE));
         row.addComponent(sortButton("Style", STYLE_WIDTH,
                 WaypointManagerQuery.SortColumn.STYLE));
-        row.addComponent(cell(new WurmLabel("Edit"), EDIT_WIDTH));
-        row.addComponent(cell(new WurmLabel("Share"), SHARE_WIDTH));
-        row.addComponent(cell(new WurmLabel("Copy"), COPY_WIDTH));
-        row.addComponent(cell(new WurmLabel("Delete"), DELETE_WIDTH));
+        row.addComponent(plainHeader("Edit", EDIT_WIDTH));
+        row.addComponent(plainHeader("Share", SHARE_WIDTH));
+        row.addComponent(plainHeader("Copy", COPY_WIDTH));
+        row.addComponent(plainHeader("Delete", DELETE_WIDTH));
         registerTableRow(row);
         return row;
     }
@@ -384,85 +453,96 @@ final class WaypointManagerWindow extends WWindow
         WurmArrayPanel<FlexComponent> row = horizontal(
                 "waypointer.row." + data.getId());
         WButton on = button(data.isEnabled() ? "On" : "Off", ON_WIDTH);
-        on.setHoverString(data.isSystemManaged()
+        tableActionGroup.apply((ChamomiloUiV1Button)on,on.width);
+        WaypointerButtonGroup.active(on,data.isEnabled());
+        on.setHoverString(org.waypoints.next.i18n.Messages.text(data.isSystemManaged()
                 ? "Enable or disable this server's managed vanilla landmark. This On/Off choice is remembered per server."
                 : data.getSourceType() == WaypointSourceType.LOOT_MAP
                 ? "Show or hide the active Loot Map waypoint without deleting hunt progress. New readings keep this choice."
                 : data.getSourceType() == WaypointSourceType.DEED
                 ? "Show or hide this provider-managed deed waypoint. Feed refreshes keep this choice."
-                : "Enable or disable this waypoint's compass marker, label, and world effect.");
+                : "Enable or disable this waypoint's compass marker, label, and world effect."));
         rowActions.put(on, new RowAction(ActionKind.TOGGLE, data.getId(),
                 data.isEnabled(), data.getName() + " [" + data.getShortId() + "]"));
         row.addComponent(on);
         boolean navigating = controller.isNavigatorActive(data.getId());
         WButton navigator = button(navigating ? "Stop" : "Nav", NAV_WIDTH);
-        navigator.setHoverString(navigating
+        tableActionGroup.apply((ChamomiloUiV1Button)navigator,navigator.width);
+        WaypointerButtonGroup.active(navigator,navigating);
+        navigator.setHoverString(org.waypoints.next.i18n.Messages.text(navigating
                 ? "Stop the active on-ground navigation route."
-                : "Navigate to this enabled current-server waypoint. Starting it stops the previous route.");
+                : "Navigate to this enabled current-server waypoint. Starting it stops the previous route."));
         rowActions.put(navigator, new RowAction(ActionKind.NAVIGATE, data.getId(),
                 navigating, data.getName() + " [" + data.getShortId() + "]"));
         row.addComponent(navigator);
-        row.addComponent(cell(new WurmLabel(data.isSystemManaged()
+        row.addComponent(cell(new WaypointerTableLabel(data.isSystemManaged()
                 ? data.getName() : data.getName() + " [" + data.getShortId() + "]",
-                data.getId().toString()), NAME_WIDTH));
-        row.addComponent(cell(new WurmLabel(title(data.getSourceType().name())), TYPE_WIDTH));
-        row.addComponent(cell(new WurmLabel(data.getServerLabel(),
-                data.getServerFingerprint()), SERVER_WIDTH));
-        row.addComponent(cell(new WurmLabel(data.getUser()), USER_WIDTH));
-        String age = data.getDataAgeLabel(java.time.Instant.now());
-        String statusText = data.isTemporary() ? "Temporary"
-                : title(data.getResolution().name());
-        if (!age.isEmpty()) statusText = (data.getResolution()
-                == org.waypoints.next.model.WaypointResolution.STALE
-                ? "Stale " : "Live ") + age;
-        WurmLabel status = new WurmLabel(statusText);
-        if (data.isTemporary()) registerHover(status,
-                "Automatically deleted at " + data.getExpiresAt()
-                        + ". Press Refresh if it expires while this Manager window is open.");
-        else if (!age.isEmpty()) registerHover(status,
-                "Provider data age: " + age + ". Last confirmed at "
-                        + data.getLastResolvedAt()
-                        + (data.getResolution()
-                        == org.waypoints.next.model.WaypointResolution.STALE
-                        ? ". The deed disappeared from a valid newer catalog; delete it or leave it disabled until it reappears."
-                        : ". Coordinates follow valid provider updates automatically."));
+                org.waypoints.next.i18n.Messages.format("Waypoint name and unique ID: {0}",data.getId()),false), NAME_WIDTH));
+        row.addComponent(cell(new WaypointerTableLabel(title(data.getSourceType().name()),
+                org.waypoints.next.i18n.Messages.text("The provider or catalogue that created this waypoint.")), TYPE_WIDTH));
+        row.addComponent(cell(new WaypointerTableLabel(data.getServerLabel(),
+                org.waypoints.next.i18n.Messages.format("Destination server: {0}. {1}",data.getServerLabel(),data.getServerFingerprint()),false), SERVER_WIDTH));
+        row.addComponent(cell(new WaypointerTableLabel(data.getUser(),
+                org.waypoints.next.i18n.Messages.text("Character that owns this waypoint."),false), USER_WIDTH));
+        String statusText = statusText(data);
+        WurmLabel status = new WaypointerTableLabel(statusText,statusHelp(data));
         row.addComponent(cell(status, STATUS_WIDTH));
-        WurmLabel distance = new WurmLabel(data.getDistanceMetres() == null
-                ? "-" : data.getDistanceMetres() + "m");
+        WurmLabel distance = new WaypointerTableLabel(data.getDistanceMetres() == null
+                ? "-" : data.getDistanceMetres() + "m",org.waypoints.next.i18n.Messages.text("Straight-line distance in metres; a dash means coordinates are unavailable here."),true,true);
         row.addComponent(cell(distance, DISTANCE_WIDTH));
+        LiveDistanceCell distanceCell = null;
         if (data.getDistanceMetres() != null) {
-            liveDistanceCells.add(new LiveDistanceCell(distance,
+            distanceCell = new LiveDistanceCell(distance,
                     data.getTileX(), data.getTileY(),
-                    data.getDistanceMetres().intValue()));
+                    data.getDistanceMetres().intValue());
+            liveDistanceCells.add(distanceCell);
         }
-        row.addComponent(cell(new WurmLabel(title(data.getWorldStyle().name())), STYLE_WIDTH));
+        liveRows.put(data.getId(), new LiveRow(data, navigating, status, statusText, distanceCell));
+        row.addComponent(cell(new WaypointerTableLabel(title(data.getWorldStyle().name()),
+                org.waypoints.next.i18n.Messages.text("World marker appearance used when the waypoint is On.")), STYLE_WIDTH));
 
         if (data.isToggleOnlyManaged()) {
             String explanation = data.isSystemManaged()
                     ? "Managed vanilla landmark. Its server coordinates and exact vanilla renderer are fixed; only On/Off is available."
                     : "Active Loot Map hunt waypoint. On/Off hides or restores its compass, map, label, and world marker without deleting hunt progress.";
-            WurmLabel fixed = new WurmLabel("Fixed");
+            WurmLabel fixed = new WaypointerTableLabel("Fixed");
             registerHover(fixed, explanation);
             row.addComponent(cell(fixed, EDIT_WIDTH));
-            row.addComponent(cell(new WurmLabel("-"), SHARE_WIDTH));
-            row.addComponent(cell(new WurmLabel("-"), COPY_WIDTH));
-            row.addComponent(cell(new WurmLabel("-"), DELETE_WIDTH));
+            row.addComponent(cell(new WaypointerTableLabel("-"), SHARE_WIDTH));
+            row.addComponent(cell(new WaypointerTableLabel("-"), COPY_WIDTH));
+            row.addComponent(cell(new WaypointerTableLabel("-"), DELETE_WIDTH));
+            registerTableRow(row);
+            return row;
+        }
+
+        if (data.isTrackedTarget()) {
+            WurmLabel fixed = new WaypointerTableLabel("Fixed");
+            registerHover(fixed, "Coordinates follow this tracked target automatically.");
+            row.addComponent(cell(fixed, EDIT_WIDTH));
+            row.addComponent(cell(new WaypointerTableLabel("-"), SHARE_WIDTH));
+            row.addComponent(cell(new WaypointerTableLabel("-"), COPY_WIDTH));
+            WButton delete = button("Delete", DELETE_WIDTH);
+            delete.setHoverString(org.waypoints.next.i18n.Messages.text(
+                    "Remove this target from ALL WAYPOINTS. Track it again in its catalogue to add it back."));
+            rowActions.put(delete, new RowAction(ActionKind.REMOVE_TRACKED, data.getId(), false,
+                    data.getName() + " [" + data.getShortId() + "]"));
+            row.addComponent(delete);
             registerTableRow(row);
             return row;
         }
 
         if (data.isProviderManaged()) {
-            WurmLabel fixed = new WurmLabel("Fixed");
+            WurmLabel fixed = new WaypointerTableLabel("Fixed");
             registerHover(fixed,
                     "Provider-managed deed coordinates cannot be edited manually; feed updates move this UUID automatically.");
             row.addComponent(cell(fixed, EDIT_WIDTH));
-            row.addComponent(cell(new WurmLabel("-"), SHARE_WIDTH));
-            row.addComponent(cell(new WurmLabel("-"), COPY_WIDTH));
+            row.addComponent(cell(new WaypointerTableLabel("-"), SHARE_WIDTH));
+            row.addComponent(cell(new WaypointerTableLabel("-"), COPY_WIDTH));
             WButton delete = button("Delete", DELETE_WIDTH);
-            delete.setHoverString(data.getResolution()
+            delete.setHoverString(org.waypoints.next.i18n.Messages.text(data.getResolution()
                     == org.waypoints.next.model.WaypointResolution.STALE
-                    ? "Resolve this stale deed by deleting its last-known waypoint after confirmation."
-                    : "Stop tracking this deed after an explicit Yes/No confirmation.");
+                    ? "Delete this stale deed waypoint immediately."
+                    : "Stop tracking this deed immediately."));
             rowActions.put(delete, new RowAction(ActionKind.DELETE, data.getId(), false,
                     data.getName() + " [" + data.getShortId() + "]"));
             row.addComponent(delete);
@@ -471,23 +551,23 @@ final class WaypointManagerWindow extends WWindow
         }
 
         WButton edit = button("Edit", EDIT_WIDTH);
-        edit.setHoverString("Edit coordinates and style using a temporary live marker; Cancel restores the stored waypoint.");
+        edit.setHoverString(org.waypoints.next.i18n.Messages.text("Edit coordinates and style using a temporary live marker; Cancel restores the stored waypoint."));
         rowActions.put(edit, new RowAction(ActionKind.EDIT, data.getId(), false,
                 data.getName() + " [" + data.getShortId() + "]"));
         row.addComponent(edit);
         WButton share = button("Share", SHARE_WIDTH);
-        share.setHoverString(
-                "Copy this exact waypoint as a WWP1 service line and print it in Event for sharing.");
+        share.setHoverString(org.waypoints.next.i18n.Messages.text(
+                "Copy this exact waypoint as a WWP1 service line and print it in Event for sharing."));
         rowActions.put(share, new RowAction(ActionKind.SHARE, data.getId(), false,
                 data.getName() + " [" + data.getShortId() + "]"));
         row.addComponent(share);
         WButton copy = button("Copy", COPY_WIDTH);
-        copy.setHoverString("Create a disabled duplicate with a new UUID.");
+        copy.setHoverString(org.waypoints.next.i18n.Messages.text("Create a disabled duplicate with a new UUID."));
         rowActions.put(copy, new RowAction(ActionKind.DUPLICATE, data.getId(), false,
                 data.getName() + " [" + data.getShortId() + "]"));
         row.addComponent(copy);
         WButton delete = button("Delete", DELETE_WIDTH);
-        delete.setHoverString("Delete this UUID after an explicit Yes/No confirmation.");
+        delete.setHoverString(org.waypoints.next.i18n.Messages.text("Delete this waypoint immediately."));
         rowActions.put(delete, new RowAction(ActionKind.DELETE, data.getId(), false,
                 data.getName() + " [" + data.getShortId() + "]"));
         row.addComponent(delete);
@@ -497,12 +577,16 @@ final class WaypointManagerWindow extends WWindow
 
     private FlexComponent sortButton(String label, int width,
                                      WaypointManagerQuery.SortColumn column) {
-        String arrow = column == sortColumn ? (sortAscending ? " ^" : " v") : "";
-        WButton button = button(label + arrow, width);
-        button.setHoverString("Sort the table by " + label + ". Click again to reverse the order.");
+        WButton button = new WaypointerTableHeader("all-waypoints.headers",label,Math.max(width,WaypointerTableHeader.minimumWidth(label)),column==sortColumn?(sortAscending?1:-1):0,headerBaseline(),column==WaypointManagerQuery.SortColumn.DISTANCE,this,
+                org.waypoints.next.i18n.Messages.format("Sort the table by {0}. Click again to reverse the order.",org.waypoints.next.i18n.Messages.text(label)));
         sortActions.put(button, column);
         return button;
     }
+
+    private FlexComponent plainHeader(String caption,int width){
+        return new WaypointerTableHeader("all-waypoints.headers",caption,Math.max(width,WaypointerTableHeader.minimumWidth(caption)),0,headerBaseline(),false,null,caption);
+    }
+    private static int headerBaseline(){return WaypointerTableHeader.baseline(new String[]{"On","Nav","Name","Type","Server","User","Status","Distance","Style","Edit","Share","Copy","Delete"});}
 
     private void showSourceChooser() {
         rememberListSize();
@@ -514,18 +598,18 @@ final class WaypointManagerWindow extends WWindow
         activeContent = null;
         lastResponsiveWidth = -1;
         table = null;
-        setTitle("Wurm Waypointer - Add Waypoint");
+        setTitle(org.waypoints.next.i18n.Messages.text("Wurm Waypointer - Add Waypoint"));
         WurmArrayPanel<FlexComponent> content = vertical("waypointer.source.chooser");
-        content.addComponent(cell(new WurmLabel(
-                "Choose a static waypoint source. Dynamic sources arrive in later phases."),
+        content.addComponent(cell(new WaypointerLabel(
+                "Choose a waypoint source."),
                 680, 34));
         sourceHere = button("Here", 220);
         sourceCoordinates = button("Coordinates / map link", 220);
         cancelButton = button("Cancel", 120);
-        sourceHere.setHoverString("Create a waypoint at your current character position and layer.");
-        sourceCoordinates.setHoverString(
-                WaypointManagerHelpText.COORDINATE_SOURCE);
-        cancelButton.setHoverString("Return to the waypoint list without creating anything.");
+        sourceHere.setHoverString(org.waypoints.next.i18n.Messages.text("Create a waypoint at your current character position and layer."));
+        sourceCoordinates.setHoverString(org.waypoints.next.i18n.Messages.text(
+                WaypointManagerHelpText.COORDINATE_SOURCE));
+        cancelButton.setHoverString(org.waypoints.next.i18n.Messages.text("Return to the waypoint list without creating anything."));
         content.addComponent(centered(sourceHere, 680));
         content.addComponent(centered(sourceCoordinates, 680));
         content.addComponent(centered(cancelButton, 680));
@@ -541,7 +625,7 @@ final class WaypointManagerWindow extends WWindow
         hoverTexts.clear();
         lastResponsiveWidth = -1;
         table = null;
-        setTitle("Wurm Waypointer - Add Here");
+        setTitle(org.waypoints.next.i18n.Messages.text("Wurm Waypointer - Add Here"));
         WaypointManagerContext context = controller.context();
         WurmArrayPanel<FlexComponent> content = vertical("waypointer.here.form");
         activeContent = content;
@@ -552,7 +636,7 @@ final class WaypointManagerWindow extends WWindow
         addStyleControls(content);
         addArrivalControl(content, WaypointArrival.DEFAULT_RADIUS_METRES);
         addLifetimeControl(content, null);
-        WurmLabel location = new WurmLabel("Location: server="
+        WurmLabel location = new WaypointerLabel("Location: server="
                 + context.getServer().getShortName() + " ["
                 + context.getServer().getEndpointFingerprint() + "]"
                 + ", user=" + context.getUser() + ", X=" + context.getTileX()
@@ -562,8 +646,8 @@ final class WaypointManagerWindow extends WWindow
         WurmArrayPanel<FlexComponent> actions = horizontal("waypointer.here.actions");
         saveButton = button("OK", 100);
         cancelButton = button("Cancel", 100);
-        saveButton.setHoverString("Save this live draft as a new waypoint.");
-        cancelButton.setHoverString("Cancel creation and remove the temporary marker.");
+        saveButton.setHoverString(org.waypoints.next.i18n.Messages.text("Save this live draft as a new waypoint."));
+        cancelButton.setHoverString(org.waypoints.next.i18n.Messages.text("Cancel creation and remove the temporary marker."));
         actions.addComponent(saveButton);
         actions.addComponent(cancelButton);
         registerResponsive(actions, new int[]{100, 100});
@@ -586,8 +670,8 @@ final class WaypointManagerWindow extends WWindow
         table = null;
         editingId = id;
         WaypointEditData edit = id == null ? null : controller.editData(id);
-        setTitle(id == null ? "Wurm Waypointer - Add Coordinates"
-                : "Wurm Waypointer - Edit Static Waypoint");
+        setTitle(org.waypoints.next.i18n.Messages.text(id == null ? "Wurm Waypointer - Add Coordinates"
+                : "Wurm Waypointer - Edit Static Waypoint"));
         WurmArrayPanel<FlexComponent> content = vertical("waypointer.coordinate.form");
         activeContent = content;
         MarkerStyle editableStyle = UserMarkerStyles.editable(edit == null
@@ -600,7 +684,7 @@ final class WaypointManagerWindow extends WWindow
                 WaypointManagerHelpText.COORDINATE_INPUT);
         if (edit != null) coordinateInput.setTextMoveToEnd(format(edit));
         content.addComponent(formRow("Coordinates / map link", coordinateInput));
-        coordinateStatusLabel = new WurmLabel(
+        coordinateStatusLabel = new WaypointerLabel(
                 "Parsed coordinates: paste a /gps line, x/y pair, or map link.");
         registerHover(coordinateStatusLabel,
                 "This read-only line confirms the parsed server hint, X, Y, layer, and input type before OK.");
@@ -618,14 +702,14 @@ final class WaypointManagerWindow extends WWindow
         clipboardButton = button("Use Clipboard", 120);
         saveButton = button("OK", 100);
         cancelButton = button("Cancel", 100);
-        clipboardButton.setHoverString(
-                "Paste and parse one /gps line, x/y pair, map fragment, or full wu-map link. A WWP1 service line is imported immediately with its original server, style, arrival radius, and expiry.");
-        saveButton.setHoverString(id == null
+        clipboardButton.setHoverString(org.waypoints.next.i18n.Messages.text(
+                "Paste and parse one /gps line, x/y pair, map fragment, or full wu-map link. A WWP1 service line is imported immediately with its original server, style, arrival radius, and expiry."));
+        saveButton.setHoverString(org.waypoints.next.i18n.Messages.text(id == null
                 ? "Save the current live draft as a new waypoint."
-                : "Commit the live draft to this waypoint.");
-        cancelButton.setHoverString(id == null
+                : "Commit the live draft to this waypoint."));
+        cancelButton.setHoverString(org.waypoints.next.i18n.Messages.text(id == null
                 ? "Cancel creation and remove the temporary marker."
-                : "Discard the draft and restore the stored waypoint unchanged.");
+                : "Discard the draft and restore the stored waypoint unchanged."));
         actions.addComponent(clipboardButton);
         actions.addComponent(saveButton);
         actions.addComponent(cancelButton);
@@ -669,7 +753,7 @@ final class WaypointManagerWindow extends WWindow
             labels[i] = values[i] == MarkerStyle.WorldStyle.HIDDEN
                     ? "Hidden (Manager only)" : title(values[i].name());
         }
-        worldStyleInput = new WurmDropDown("waypointer.world.style",
+        worldStyleInput = WaypointerUi.dropDown("waypointer.world.style",
                 UserMarkerStyles.indexOf(selected), labels);
         registerHover(worldStyleInput,
                 "Choose a custom presentation. Vanilla White Light, Black Light, and Rift are available only as fixed server landmarks. Hidden keeps the record enabled but Manager-only; Off disables it entirely.");
@@ -700,7 +784,7 @@ final class WaypointManagerWindow extends WWindow
                         updateArrivalRadiusLabel();
                     }
                 });
-        arrivalRadiusLabel = new WurmLabel("");
+        arrivalRadiusLabel = new WaypointerLabel("");
         updateArrivalRadiusLabel();
         WurmArrayPanel<FlexComponent> row = horizontal(
                 "waypointer.form.arrival.radius", ROW_HEIGHT);
@@ -738,7 +822,7 @@ final class WaypointManagerWindow extends WWindow
             lifetimeValues[index] = minutes;
             labels[index++] = lifetimeLabel(minutes);
         }
-        lifetimeInput = new WurmDropDown("waypointer.lifetime", 0, labels);
+        lifetimeInput = WaypointerUi.dropDown("waypointer.lifetime", 0, labels);
         registerHover(lifetimeInput,
                 "Permanent waypoints remain until deleted. A temporary waypoint is automatically removed from the Manager, compass, world, storage, export, and navigation when this lifetime expires.");
         content.addComponent(formRow("Lifetime", lifetimeInput));
@@ -868,7 +952,7 @@ final class WaypointManagerWindow extends WWindow
     }
 
     private void addStyleNote(String text) {
-        WurmLabel note = new WurmLabel(text);
+        WurmLabel note = new WaypointerLabel(text);
         registerHover(note, text);
         styleSliderHoverComponents.add(note);
         FlexComponent row = fullWidthRow("waypointer.style.none", note, 28);
@@ -903,9 +987,9 @@ final class WaypointManagerWindow extends WWindow
 
     private WurmInputField inputField(String componentName, int maxInput) {
         // Pinned Wurm constructor arguments are maxLines and maxInput, not pixels.
-        WurmInputField field = new WurmInputField(
+        WurmInputField field = WaypointerUi.input(
                 componentName, this, 1, maxInput);
-        field.prompt = "";
+        field.prompt = org.waypoints.next.i18n.Messages.text("");
         field.simpleInput = true;
         return field;
     }
@@ -948,9 +1032,14 @@ final class WaypointManagerWindow extends WWindow
     private void focusInput(WurmInputField field) {
         preferredInput = field;
         if (field == null || hud == null) return;
+        WurmComponent window = this;
+        while (window.parent != null) window = window.parent;
+        // setActiveWindow registers its argument as a top-level HUD component.
+        // This panel belongs to the hub and must never be registered separately.
+        if (window == this || !hud.getComponents().contains(window)) return;
         try {
             hud.stopTyping();
-            hud.setActiveWindow(this);
+            hud.setActiveWindow(window);
             hud.startTyping();
         } catch (Throwable failure) {
             controller.reportFailure("focus manager input", failure);
@@ -964,6 +1053,7 @@ final class WaypointManagerWindow extends WWindow
     @Override WurmInputField getInputField() {
         return preferredInput;
     }
+    @Override boolean mouseWheeledAt(int x,int y,int delta){if(table==null||listScroll==null||!listScroll.contains(x,y))return false;listScroll.mouseWheeled(x,y,delta);return true;}
 
     @Override public void pick(PickData pickData, int mouseX, int mouseY) {
         super.pick(pickData, mouseX, mouseY);
@@ -978,7 +1068,7 @@ final class WaypointManagerWindow extends WWindow
 
     private void registerHover(FlexComponent component, String text) {
         if (component != null && text != null && !text.trim().isEmpty()) {
-            hoverTexts.put(component, text.trim());
+            hoverTexts.put(component, org.waypoints.next.i18n.Messages.text(text.trim()));
         }
     }
 
@@ -989,7 +1079,7 @@ final class WaypointManagerWindow extends WWindow
     private FlexComponent formRow(String label, FlexComponent input, int height) {
         WurmArrayPanel<FlexComponent> row = horizontal(
                 "waypointer.form." + label, height);
-        row.addComponent(cell(new WurmLabel(label), 150, height));
+        row.addComponent(cell(new WaypointerLabel(label), 150, height));
         row.addComponent(cell(input, 620, height));
         registerResponsive(row, new int[]{150, 400}, 1);
         return row;
@@ -1085,24 +1175,25 @@ final class WaypointManagerWindow extends WWindow
 
     @Override public void buttonClicked(WButton button) {
         try {
-            if (button == applyFilters) refreshRows();
-            else if (button == clearSearchButton) {
-                searchInput.setTextMoveToEnd("");
+            if (button == applyFilters) {
+                appliedServer = selected(serverValues, serverFilter, "current");
+                appliedUser = selected(userValues, userFilter, "current");
+                appliedType = typeFilter.getValue(); appliedStatus = statusFilter.getValue();
                 refreshRows();
             }
-            else if (button == refreshButton) showList();
+            else if (button == refreshButton) refreshRows();
             else if (button == addButton) showSourceChooser();
             else if (button == enableFiltered) {
                 controller.setEnabled(new ArrayList<UUID>(filteredIds), true);
-                refreshRows();
+                refreshRows(false);
             } else if (button == disableFiltered) {
                 controller.setEnabled(new ArrayList<UUID>(filteredIds), false);
-                refreshRows();
+                refreshRows(false);
             } else if (button == exportButton) controller.exportAll();
             else if (button == importButton) controller.importAll();
             else if (button == pasteSharedButton) {
                 controller.importSharedClipboard();
-                refreshRows();
+                refreshRows(false);
             }
             else if (button == surroundingsButton) controller.openSurroundings();
             else if (button == sourceHere) showHereForm();
@@ -1117,8 +1208,7 @@ final class WaypointManagerWindow extends WWindow
                 refreshRows();
             } else if (rowActions.containsKey(button)) {
                 RowAction action = rowActions.get(button);
-                if (action.kind == ActionKind.DELETE) requestDelete(action);
-                else perform(action);
+                perform(action);
             }
         } catch (Throwable failure) {
             controller.reportFailure("manager button", failure);
@@ -1145,13 +1235,18 @@ final class WaypointManagerWindow extends WWindow
 
     private void perform(RowAction action) {
         switch (action.kind) {
+            case DELETE:
+            case REMOVE_TRACKED:
+                controller.delete(action.id);
+                refreshRows(false);
+                break;
             case TOGGLE:
                 controller.setEnabled(action.id, !action.enabled);
-                refreshRows();
+                refreshRows(false);
                 break;
             case NAVIGATE:
                 controller.toggleNavigator(action.id);
-                refreshRows();
+                refreshRows(false);
                 break;
             case EDIT: showCoordinateForm(action.id); break;
             case SHARE:
@@ -1159,42 +1254,12 @@ final class WaypointManagerWindow extends WWindow
                 break;
             case DUPLICATE:
                 controller.duplicate(action.id);
-                refreshRows();
+                refreshRows(false);
                 break;
             default: throw new IllegalStateException("unsupported row action");
         }
     }
 
-    private void requestDelete(RowAction action) {
-        closeConfirmation();
-        pendingDelete = action;
-        confirmWindow = new ConfirmWindow(this,
-                "Delete " + action.displayName + " permanently?",
-                "This cannot be undone.");
-    }
-
-    @Override public void confirmed() {
-        RowAction action = pendingDelete;
-        closeConfirmation();
-        if (action == null) return;
-        try {
-            controller.delete(action.id);
-            refreshRows();
-        } catch (Throwable failure) {
-            controller.reportFailure("confirm delete", failure);
-        }
-    }
-
-    @Override public void cancelled() {
-        closeConfirmation();
-    }
-
-    private void closeConfirmation() {
-        ConfirmWindow current = confirmWindow;
-        confirmWindow = null;
-        pendingDelete = null;
-        if (current != null) current.close();
-    }
 
     @Override public void handleInput(String input) {
         try {
@@ -1206,9 +1271,7 @@ final class WaypointManagerWindow extends WWindow
     }
 
     @Override public void handleInputChanged(WurmInputField field, String input) {
-        if (field == searchInput && table != null) {
-            refreshRows();
-        } else if (field == coordinateInput) {
+        if (field == coordinateInput) {
             updateCoordinateDraft(false);
         } else if (field == nameInput && styleEditor != null) {
             publishLivePreview();
@@ -1229,6 +1292,10 @@ final class WaypointManagerWindow extends WWindow
                 && tickNow >= nextHerePreviewAt) {
             nextHerePreviewAt = tickNow + DISTANCE_REFRESH_INTERVAL_MILLIS;
             publishHerePreview();
+        }
+        if (table != null && tickNow >= nextCatalogueRefresh) {
+            nextCatalogueRefresh = tickNow + 1000;
+            refreshRows(false);
         }
         if (table == null || liveDistanceCells.isEmpty()) return;
         long now = tickNow;
@@ -1261,11 +1328,12 @@ final class WaypointManagerWindow extends WWindow
     }
 
     @Override void closePressed() {
-        WaypointManagerWindowBridge.closed(this);
+        WaypointManagerWindowBridge.detach(null, "panel close");
     }
 
+    @Override void leaving() { if (table == null) showList(); prepareDetach(); }
+
     void prepareDetach() {
-        closeConfirmation();
         controller.clearLivePreview();
         restoreListSize();
     }
@@ -1295,35 +1363,25 @@ final class WaypointManagerWindow extends WWindow
     }
 
     @Override void setSize(int requestedWidth, int requestedHeight) {
-        ViewMode mode = viewMode;
-        if (mode == null) {
-            super.setSize(requestedWidth, requestedHeight);
-            return;
-        }
-        int minimumWidth = mode == ViewMode.LIST
-                ? WaypointManagerTableLayout.minimumWindowWidth()
-                : mode == ViewMode.SOURCE ? SOURCE_MINIMUM_WIDTH
-                : FORM_MINIMUM_WIDTH;
-        int minimumHeight = mode == ViewMode.LIST ? 300
-                : mode == ViewMode.SOURCE ? 190
-                : mode == ViewMode.HERE ? 420 : 460;
-        super.setSize(Math.max(minimumWidth, requestedWidth),
-                WaypointManagerWindowSizing.height(mode == ViewMode.LIST,
-                        requestedHeight, minimumHeight));
-        lastResponsiveWidth = -1;
+        super.setSize(requestedWidth,requestedHeight);lastResponsiveWidth=-1;
     }
 
     private void applyResponsiveLayout() {
         if (width == lastResponsiveWidth) return;
         lastResponsiveWidth = width;
         int contentWidth = viewMode == ViewMode.LIST
-                ? WaypointManagerTableLayout.contentWidth(width)
-                : Math.max(1, width - WaypointManagerTableLayout.WINDOW_CHROME);
+                ? WaypointManagerTableLayout.contentWidth(width + WaypointManagerTableLayout.WINDOW_CHROME)
+                : Math.max(1, width);
         for (ResponsiveRow row : responsiveRows) row.apply(contentWidth);
         if (viewMode == ViewMode.LIST) {
-            int[] columnWidths = WaypointManagerTableLayout.columns(width);
+            int[] columnWidths = minimumTableColumns();
+            int minimum = 0;for(int value:columnWidths)minimum+=value;
+            int extra = Math.max(0, ((FlexComponent)(Object)listScroll.offs).width - minimum
+                    - CONTROL_GAP * (WaypointManagerTableLayout.COLUMN_COUNT - 1));
+            columnWidths[2] += extra; // Names use the remaining viewport space.
+            int tableWidth=CONTROL_GAP * (WaypointManagerTableLayout.COLUMN_COUNT - 1);for(int columnWidth:columnWidths)tableWidth+=columnWidth;
             for (TableLayoutRow row : tableLayoutRows) {
-                row.apply(contentWidth, columnWidths);
+                row.apply(tableWidth, columnWidths);
             }
             if (table != null) table.componentResized();
             if (listRoot != null) listRoot.componentResized();
@@ -1333,9 +1391,51 @@ final class WaypointManagerWindow extends WWindow
         }
     }
 
+    private int[] minimumTableColumns() {
+        int[] widths = WaypointManagerTableLayout.columns(WaypointManagerTableLayout.minimumWindowWidth());
+        if (!tableLayoutRows.isEmpty()) {
+            List<FlexComponent> headers = tableLayoutRows.get(0).columns;
+            for (int i = 0; i < headers.size(); i++) {
+                FlexComponent header = headers.get(i);
+                if (header instanceof WaypointerTableHeader) widths[i] = Math.max(widths[i], WaypointerTableHeader.minimumWidth(((WButton)header).getLabel()));
+                else if (header instanceof WButton) widths[i] = Math.max(widths[i], uniformCaptionWidth(((WButton) header).getLabel()));
+                else if (header instanceof WaypointerLabel) widths[i] = Math.max(widths[i], ((WaypointerLabel) header).textWidth());
+                for (TableLayoutRow row : tableLayoutRows) if (row!=tableLayoutRows.get(0)) {
+                    FlexComponent cell = row.columns.get(i);
+                    WButton button = cell instanceof WaypointerTableActionCell
+                            ? ((WaypointerTableActionCell)cell).button : cell instanceof WButton ? (WButton)cell : null;
+                    if (button != null) widths[i] = Math.max(widths[i], uniformCaptionWidth(button.getLabel()));
+                }
+            }
+        }
+        return widths;
+    }
+
+    @Override int minimumContentWidth() {
+        int required = 0;for (int value : minimumTableColumns()) required += value;
+        required += 40 + CONTROL_GAP * (WaypointManagerTableLayout.COLUMN_COUNT - 1);
+        for (ResponsiveRow row : responsiveRows) {
+            int total = CONTROL_GAP * (row.minimums.length - 1);for (int value : row.minimums) total += value;
+            required = Math.max(required, total);
+        }
+        return Math.max(900, required);
+    }
+
     private void registerTableRow(WurmArrayPanel<FlexComponent> row) {
+        for (int i=0;i<row.components.size();i++) {
+            FlexComponent component=row.components.get(i);
+            if(component instanceof ChamomiloUiV1Button) {
+                ChamomiloUiV1Button button=(ChamomiloUiV1Button)component;
+                if (!WaypointerButtonGroup.id(button.text).equals("all-waypoints.row-actions"))
+                    tableActionGroup.apply(button,button.width);
+                WaypointerTableActionCell cell=new WaypointerTableActionCell(button);
+                cell.parent=row;
+                row.components.set(i,cell);
+            }
+        }
         tableLayoutRows.add(new TableLayoutRow(row,
                 new ArrayList<FlexComponent>(row.components)));
+        separateControls(row);
     }
 
     private void registerResponsive(WurmArrayPanel<FlexComponent> row,
@@ -1343,6 +1443,22 @@ final class WaypointManagerWindow extends WWindow
         responsiveRows.add(new ResponsiveRow(row,
                 new ArrayList<FlexComponent>(row.components),
                 minimums, flexibleColumns));
+        separateControls(row);
+    }
+
+    private static FlexComponent gap(int width, int height) {
+        return new FlexComponent("waypointer.gap", 0, 0, width, height) {
+            { sizeFlags = FIXED_WIDTH | FIXED_HEIGHT; }
+        };
+    }
+
+    private static void separateControls(WurmArrayPanel<FlexComponent> row) {
+        List<FlexComponent> cells = new ArrayList<FlexComponent>(row.components);
+        row.components.clear();
+        for (FlexComponent cell : cells) {
+            if (!row.components.isEmpty()) { FlexComponent space = gap(CONTROL_GAP, ROW_HEIGHT); space.parent = row; row.components.add(space); }
+            row.components.add(cell);
+        }
     }
 
     private FlexComponent fullWidthRow(String name, FlexComponent value, int height) {
@@ -1353,9 +1469,38 @@ final class WaypointManagerWindow extends WWindow
     }
 
     private WButton button(String label, int width) {
-        WButton result = new WButton(label, this);
-        result.setInitialSize(width, ROW_HEIGHT, false);
+        ChamomiloUiV1Button result = (ChamomiloUiV1Button) WaypointerUi.button(org.waypoints.next.i18n.Messages.text(label), this, width);
+        commandGroup.apply(result,Math.max(width,uniformCaptionWidth(label)));
         return result;
+    }
+
+    private static WaypointerButtonGroup commandTypography(){
+        List<String> captions=new ArrayList<String>();List<Integer> widths=new ArrayList<Integer>();
+        String[] labels={"Refresh","Apply filters","Add...","Enable filtered","Disable filtered","Export","Import","Paste shared","Surroundings",
+                "On","Off","Nav","Stop","Delete","Edit","Share","Copy","Here","Coordinates / map link","Cancel","OK","Use Clipboard"};
+        int[] preferred={100,110,82,122,126,82,82,112,112,ON_WIDTH,ON_WIDTH,NAV_WIDTH,NAV_WIDTH,DELETE_WIDTH,EDIT_WIDTH,SHARE_WIDTH,COPY_WIDTH,220,220,100,100,120};
+        for(int i=0;i<labels.length;i++){captions.add(org.waypoints.next.i18n.Messages.text(labels[i]));widths.add(Math.max(preferred[i],uniformCaptionWidth(labels[i])));}
+        int[] geometry=new int[widths.size()];for(int i=0;i<geometry.length;i++)geometry[i]=widths.get(i);
+        return new WaypointerButtonGroup("all-waypoints.commands",org.chamomilo.wurm.ui.v1.UiDensity.HIGH,ROW_HEIGHT,captions.toArray(new String[0]),geometry);
+    }
+
+    private static int uniformCaptionWidth(String caption) {
+        String label = org.waypoints.next.i18n.Messages.text(caption);
+        int span=0;
+        for(boolean bold:new boolean[]{false,true}){
+            java.awt.Rectangle ink=org.chamomilo.wurm.ui.v1.UiTypography.ink(label,BUTTON_FONT_PIXELS,bold);
+            span=Math.max(span,Math.max(org.chamomilo.wurm.ui.v1.UiTypography.width(label,BUTTON_FONT_PIXELS,bold),ink.x+ink.width)-Math.min(0,ink.x));
+        }
+        return span+24;
+    }
+
+    private static WaypointerButtonGroup tableActionTypography() {
+        String[] labels={"On","Off","Nav","Stop","Delete","Edit","Share","Copy"};
+        int[] preferred={ON_WIDTH,ON_WIDTH,NAV_WIDTH,NAV_WIDTH,DELETE_WIDTH,EDIT_WIDTH,SHARE_WIDTH,COPY_WIDTH};
+        String[] captions=org.waypoints.next.i18n.Messages.texts(labels);
+        for(int i=0;i<preferred.length;i++)preferred[i]=Math.max(preferred[i],uniformCaptionWidth(labels[i]));
+        return new WaypointerButtonGroup("all-waypoints.row-actions",org.chamomilo.wurm.ui.v1.UiDensity.HIGH,
+                WaypointerTableActionCell.BUTTON_HEIGHT,20,false,captions,preferred);
     }
 
     private FlexComponent cell(FlexComponent value, int width) {
@@ -1363,6 +1508,7 @@ final class WaypointManagerWindow extends WWindow
     }
 
     private FlexComponent cell(FlexComponent value, int width, int height) {
+        value = WaypointerUi.view(value);
         value.setInitialSize(width, height, false);
         return value;
     }
@@ -1449,6 +1595,35 @@ final class WaypointManagerWindow extends WWindow
         return Character.toUpperCase(clean.charAt(0)) + clean.substring(1);
     }
 
+    private static String statusText(WaypointManagerRow data) {
+        String age = org.waypoints.next.i18n.Messages.text(data.getDataAgeLabel(java.time.Instant.now()));
+        if (data.isTemporary()) return "Temporary";
+        if(data.getResolution()==WaypointResolution.LIVE_EXACT)return "Visible now";
+        if (age.isEmpty()) return title(data.getResolution().name());
+        switch (data.getResolution()) {
+            case LAST_SEEN: return "Last seen " + age;
+            case STALE: return "Stale " + age;
+            case SERVER_BEARING: return title(data.getResolution().name()) + " " + age;
+            default: return title(data.getResolution().name());
+        }
+    }
+
+    private static String statusHelp(WaypointManagerRow data){
+        if(data.isTemporary())return org.waypoints.next.i18n.Messages.format("Automatically deleted at {0}",data.getExpiresAt());
+        String help;
+        switch(data.getResolution()){
+            case LIVE_EXACT:help="The target is loaded by the client. Its waypoint follows received movement. Time since the last coordinate update is not time since it disappeared.";break;
+            case LAST_SEEN:help="The target is no longer loaded. The waypoint retains its last received position; the time shown is the age of that position.";break;
+            case STALE:help="The provider no longer confirms this waypoint. Its last known position is retained.";break;
+            case SERVER_BEARING:help="Approximate direction reported by the server; exact coordinates are unavailable.";break;
+            case STATIC_EXACT:help="Saved fixed coordinates. This waypoint does not follow a moving object.";break;
+            case EXACT_SAVED:help="Exact saved destination of a completed search.";break;
+            case SEARCH_STEP:help="Intermediate position in a search; the destination is not confirmed yet.";break;
+            default:help="The target has no confirmed position yet. Waiting for client or provider data.";break;
+        }
+        return org.waypoints.next.i18n.Messages.text(help)+(data.getLastResolvedAt()==null?"":" "+org.waypoints.next.i18n.Messages.format("Last coordinate update: {0}",data.getLastResolvedAt()));
+    }
+
     private void updateCoordinateStatus(ParsedCoordinate parsed) {
         if (coordinateStatusLabel == null || parsed == null) return;
         WaypointCoordinate coordinate = parsed.getCoordinate();
@@ -1468,7 +1643,7 @@ final class WaypointManagerWindow extends WWindow
 
     private enum ViewMode { LIST, SOURCE, HERE, COORDINATE }
 
-    private enum ActionKind { TOGGLE, NAVIGATE, EDIT, SHARE, DUPLICATE, DELETE }
+    private enum ActionKind { TOGGLE, NAVIGATE, EDIT, SHARE, DUPLICATE, DELETE, REMOVE_TRACKED }
 
     private static final class TableLayoutRow {
         private final WurmArrayPanel<FlexComponent> panel;
@@ -1484,9 +1659,12 @@ final class WaypointManagerWindow extends WWindow
             if (columns.size() != widths.length) return;
             for (int i = 0; i < widths.length; i++) {
                 FlexComponent column = columns.get(i);
-                column.setSize(widths[i], column.height);
+                if (column instanceof WaypointerTableActionCell) ((WaypointerTableActionCell)column).resizeColumn(widths[i]);
+                else if (column instanceof ChamomiloUiV1Button) { ((ChamomiloUiV1Button) column).resize(widths[i], ROW_HEIGHT); ((ChamomiloUiV1Button) column).setFixedWidth(true); }
+                else if(column instanceof WaypointerTableHeader)((WaypointerTableHeader)column).resize(widths[i],ROW_HEIGHT);
+                else column.setSize(widths[i], ROW_HEIGHT);
             }
-            panel.setSize(contentWidth, panel.height);
+            panel.setSize(contentWidth, ROW_HEIGHT);
             panel.componentResized();
         }
     }
@@ -1508,18 +1686,24 @@ final class WaypointManagerWindow extends WWindow
             this.panel = panel;
             this.components = components;
             this.minimums = minimums.clone();
+            for(int i=0;i<components.size();i++) {
+                FlexComponent c=components.get(i);
+                if(c instanceof WButton)this.minimums[i]=Math.max(this.minimums[i],uniformCaptionWidth(((WButton)c).getLabel()));
+                else if(c instanceof WaypointerLabel&&minimums[i]<100)this.minimums[i]=Math.max(this.minimums[i],((WaypointerLabel)c).textWidth());
+            }
             this.preferred = new int[components.size()];
             for (int i = 0; i < components.size(); i++) {
-                preferred[i] = Math.max(minimums[i], components.get(i).width);
+                preferred[i] = Math.max(this.minimums[i], components.get(i).width);
             }
             this.flexible = flexible == null ? new int[0] : flexible.clone();
         }
 
         private void apply(int availableWidth) {
-            int[] widths = allocate(minimums, preferred, availableWidth, flexible);
+            int[] widths = allocate(minimums, preferred, availableWidth - CONTROL_GAP * (components.size() - 1), flexible);
             for (int i = 0; i < widths.length; i++) {
                 FlexComponent component = components.get(i);
-                component.setSize(widths[i], component.height);
+                if (component instanceof ChamomiloUiV1Button) { ((ChamomiloUiV1Button) component).resize(widths[i], ROW_HEIGHT); ((ChamomiloUiV1Button) component).setFixedWidth(true); }
+                else component.setSize(widths[i], component.height);
             }
             panel.setSize(availableWidth, panel.height);
             panel.componentResized();
@@ -1579,10 +1763,51 @@ final class WaypointManagerWindow extends WWindow
         }
     }
 
+    private final class LiveRow {
+        private WaypointManagerRow data;
+        private final boolean navigating;
+        private final WurmLabel status;
+        private String statusCaption;
+        private final LiveDistanceCell distance;
+
+        LiveRow(WaypointManagerRow data, boolean navigating, WurmLabel status,
+                String statusCaption, LiveDistanceCell distance) {
+            this.data = data; this.navigating = navigating; this.status = status;
+            this.statusCaption = statusCaption; this.distance = distance;
+        }
+
+        boolean sameControls(WaypointManagerRow next) {
+            return data.isEnabled() == next.isEnabled()
+                    && navigating == controller.isNavigatorActive(next.getId())
+                    && data.getName().equals(next.getName())
+                    && data.getSourceType() == next.getSourceType()
+                    && data.getServerLabel().equals(next.getServerLabel())
+                    && data.getServerFingerprint().equals(next.getServerFingerprint())
+                    && data.getUser().equals(next.getUser())
+                    && data.getResolution() == next.getResolution()
+                    && data.getWorldStyle() == next.getWorldStyle()
+                    && Objects.equals(data.getExpiresAt(), next.getExpiresAt())
+                    && (data.getDistanceMetres() == null) == (next.getDistanceMetres() == null);
+        }
+
+        void update(WaypointManagerRow next) {
+            data = next;
+            String caption = statusText(next);
+            if (!caption.equals(statusCaption)) { statusCaption = caption; status.setLabel(caption); }
+            ((WaypointerTableLabel)status).setHint(statusHelp(next));
+            if (distance != null) {
+                distance.targetTileX = next.getTileX(); distance.targetTileY = next.getTileY();
+                if (distance.metres != next.getDistanceMetres()) {
+                    distance.metres = next.getDistanceMetres(); distance.label.setLabel(distance.metres + "m");
+                }
+            }
+        }
+    }
+
     private static final class LiveDistanceCell {
         private final WurmLabel label;
-        private final double targetTileX;
-        private final double targetTileY;
+        private double targetTileX;
+        private double targetTileY;
         private int metres;
 
         private LiveDistanceCell(WurmLabel label, double targetTileX,

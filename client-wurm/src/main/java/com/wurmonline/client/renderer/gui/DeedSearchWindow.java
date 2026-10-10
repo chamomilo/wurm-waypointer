@@ -14,15 +14,16 @@ import java.util.Comparator;
 import java.util.List;
 
 /** Native Wurm-style searchable deed catalog opened from the M-map. */
-final class DeedSearchWindow extends WWindow
+final class DeedSearchWindow extends WaypointerUiWindow
         implements InputFieldListener, ButtonListener {
-    private static final int ROW_HEIGHT = 23;
+    private static final int ROW_HEIGHT = 32;
     private static final int TABLE_WIDTH = 558;
 
     private final List<Deed> deeds = new ArrayList<Deed>();
-    private WurmInputField searchInput;
+    private WurmInputField searchInput,minusInput;
     private WurmLabel countLabel;
     private WButton refreshButton;
+    private WButton clearPlus,clearMinus;
     private WurmArrayPanel<FlexComponent> table;
     private int filteredCount;
     private Deed onlyFiltered;
@@ -32,10 +33,11 @@ final class DeedSearchWindow extends WWindow
     private Instant dataTimestamp;
     private String serverLabel = "current server";
     private ServerMapSnapshot lastSnapshot;
+    private int minimumWidth = 800;
 
     DeedSearchWindow(List<Deed> source) {
         super("wurm-waypointer.deed-search", true);
-        setTitle("Find deed on map");
+        setTitle(org.waypoints.next.i18n.Messages.text("Find deed on map"));
         updateDeeds(source);
         build();
     }
@@ -62,8 +64,8 @@ final class DeedSearchWindow extends WWindow
             serverLabel = !shortName.isEmpty() ? shortName
                     : !fullName.isEmpty() ? fullName : serverLabel;
         }
-        setTitle("Find deed on " + serverLabel);
-        if (refreshButton != null) refreshButton.setLabel("Refresh", false);
+        setTitle(org.waypoints.next.i18n.Messages.text("Find deed on " + serverLabel));
+        if (refreshButton != null) refreshButton.setLabel(org.waypoints.next.i18n.Messages.text("Refresh"), false);
         updateDeeds(snapshot.getDeeds());
     }
 
@@ -98,31 +100,37 @@ final class DeedSearchWindow extends WWindow
                 "waypointer.deed-search.root");
         WurmArrayPanel<FlexComponent> filters =
                 new WurmArrayPanel<FlexComponent>(
-                        "waypointer.deed-search.filters", 1);
-        filters.setInitialSize(TABLE_WIDTH, ROW_HEIGHT, false);
-        searchInput = new WurmInputField(
+                        "waypointer.deed-search.filters", 0,true);
+        searchInput = WaypointerUi.input(
                 "waypointer.deed-search.input", this, 1, 160);
-        searchInput.prompt = "";
+        searchInput.prompt = org.waypoints.next.i18n.Messages.text("");
         searchInput.simpleInput = true;
         searchInput.setInitialSize(265, ROW_HEIGHT, false);
-        filters.addComponent(searchInput);
-        countLabel = new WurmLabel("0 deeds");
-        countLabel.setInitialSize(190, ROW_HEIGHT, false);
+        minusInput=WaypointerUi.input("waypointer.deed-search.minus",this,1,160);
+        clearPlus=WaypointerUi.button(org.waypoints.next.i18n.Messages.text("Clear"),this,70);
+        clearMinus=WaypointerUi.button(org.waypoints.next.i18n.Messages.text("Clear"),this,70);
+        filters.addComponent(new WaypointerFilterRow("+ filter",searchInput,clearPlus,"Example: horse, wolf"));
+        filters.addComponent(new WaypointerFilterRow("- filter",minusInput,clearMinus,"Example: catseyes, post"));
+        countLabel = new WaypointerLabel("0 deeds");
+        countLabel.setInitialSize(140, ROW_HEIGHT, false);
         filters.addComponent(countLabel);
-        refreshButton = new WButton("Refresh", this);
+        refreshButton = WaypointerUi.button(org.waypoints.next.i18n.Messages.text("Refresh"), this, 90);
         refreshButton.setInitialSize(88, ROW_HEIGHT, false);
-        refreshButton.setHoverString("Request a provider refresh in the background.");
+        refreshButton.setHoverString(org.waypoints.next.i18n.Messages.text("Request a provider refresh in the background."));
         filters.addComponent(refreshButton);
         root.setComponent(filters, WurmBorderPanel.NORTH);
+        minimumWidth = Math.max(800,filters.calcWidth()+48);
 
         table = new WurmArrayPanel<FlexComponent>(
                 "waypointer.deed-search.table", 0, true);
-        root.setComponent(new WurmScrollPanel(
+        root.setComponent(new ChamomiloUiV1ScrollPanel(
                 "waypointer.deed-search.scroll", table, false, true),
                 WurmBorderPanel.CENTER);
         setComponent(root);
         refreshRows();
     }
+
+    @Override void setSize(int width,int height) { super.setSize(Math.max(minimumWidth,width),minimized?height:Math.max(340,height)); }
 
     private void refreshRows() {
         if (table == null) return;
@@ -131,8 +139,9 @@ final class DeedSearchWindow extends WWindow
                 : safe(searchInput.getText()).trim();
         int shown = 0;
         onlyFiltered = null;
-        for (Deed deed : DeedSearchRanker.rank(deeds, filter)) {
+        for (Deed deed : DeedSearchRanker.rank(deeds, "")) {
             String line = format(deed);
+            if(!new org.waypoints.next.service.TextFilter(filter,minusInput.getText()).matches(line))continue;
             DeedRow row = new DeedRow(line, deed, this);
             row.setInitialSize(TABLE_WIDTH, ROW_HEIGHT, false);
             table.addComponent(row);
@@ -156,7 +165,7 @@ final class DeedSearchWindow extends WWindow
     }
 
     @Override public void handleInputChanged(WurmInputField field, String input) {
-        if (field == searchInput) refreshRows();
+        if (field == searchInput || field == minusInput) refreshRows();
     }
 
     @Override public void handleEscape(WurmInputField field) {
@@ -166,9 +175,11 @@ final class DeedSearchWindow extends WWindow
     @Override public void buttonPressed(WButton button) { }
 
     @Override public void buttonClicked(WButton button) {
+        if(button==clearPlus){searchInput.setTextMoveToEnd("");refreshRows();return;}
+        if(button==clearMinus){minusInput.setTextMoveToEnd("");refreshRows();return;}
         if (button == refreshButton) {
             WurmWaypointerRuntime.serverMapDeedProviderRefreshRequested();
-            refreshButton.setLabel("Queued", false);
+            refreshButton.setLabel(org.waypoints.next.i18n.Messages.text("Queued"), false);
         }
     }
 
@@ -185,8 +196,7 @@ final class DeedSearchWindow extends WWindow
     private static String format(Deed deed) {
         String mayor = safe(deed.getMayor()).trim();
         if (mayor.isEmpty()) mayor = "unknown";
-        return deed.getName() + ", mayor - " + mayor + ", X="
-                + deed.getX() + " Y=" + deed.getY();
+        return org.waypoints.next.i18n.Messages.format("{0}, mayor - {1}, X={2} Y={3}",deed.getName(),mayor,deed.getX(),deed.getY());
     }
 
     private String providerLabel(int shown) {
@@ -197,9 +207,9 @@ final class DeedSearchWindow extends WWindow
         if (providerStatus == DeedDataStatus.ERROR && deeds.isEmpty()) {
             return "Provider error";
         }
-        return shown + "/" + deeds.size() + " · "
+        return shown + "/" + deeds.size() + " В· "
                 + (providerKey.isEmpty() ? "provider" : providerKey)
-                + " · " + age(dataTimestamp)
+                + " В· " + age(dataTimestamp)
                 + (providerStatus == DeedDataStatus.CACHED ? " cached" : "");
     }
 

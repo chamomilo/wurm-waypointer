@@ -8,6 +8,7 @@ import javassist.CtNewMethod;
 import javassist.NotFoundException;
 import org.chamomilo.wurm.update.SharedUpdateCoordinator;
 import org.chamomilo.wurm.update.SharedUpdateHooks;
+import org.chamomilo.wurm.update.SharedLanguageCoordinator;
 import org.gotti.wurmunlimited.modloader.classhooks.HookManager;
 import org.gotti.wurmunlimited.modloader.interfaces.Configurable;
 import org.gotti.wurmunlimited.modloader.interfaces.Initable;
@@ -27,8 +28,16 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public final class WurmWaypointerMod implements WurmClientMod, Configurable, PreInitable, Initable,
-        ModListener {
-    public static final String VERSION = "1.5.3";
+        ModListener, SharedLanguageCoordinator.Participant {
+    public static final String VERSION = "1.6.17";
+
+    @Override public String[] supportedLanguageCodes() {
+        return org.waypoints.next.i18n.Messages.CODES.clone();
+    }
+
+    @Override public void setUserLanguage(String code) {
+        WurmWaypointerRuntime.setUserLanguage(code);
+    }
 
     @Override public void modInitialized(ModEntry<?> entry) {
         SharedUpdateCoordinator.modInitialized(entry);
@@ -46,6 +55,9 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
 
     @Override
     public void configure(Properties properties) {
+        org.waypoints.next.integration.WaypointerDiagnosticLog.start(
+                java.nio.file.Paths.get("wurm-waypointer-data"),VERSION);
+        WurmWaypointerRuntime.configureHub(properties);
         try {
             configuration = BeamProbeConfiguration.from(properties);
         } catch (RuntimeException invalid) {
@@ -67,8 +79,15 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
 
     @Override
     public void preInit() {
+        SharedUpdateHooks.install();
         final ClassPool pool = HookManager.getInstance().getClassPool();
         FailOpenHookInstaller hooks = new FailOpenHookInstaller(LOGGER);
+        hooks.install("map texture GL lifecycle", new FailOpenHookInstaller.HookOperation() {
+            @Override public void install() throws Exception { hookMapTextures(pool); }
+        });
+        hooks.install("native render diagnostics", new FailOpenHookInstaller.HookOperation() {
+            @Override public void install() throws Exception { hookNativeRenderDiagnostics(pool); }
+        });
         hooks.install("selected Steam server capture", new FailOpenHookInstaller.HookOperation() {
             @Override public void install() throws Exception { hookSelectedServer(pool); }
         });
@@ -128,6 +147,18 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
                 new FailOpenHookInstaller.HookOperation() {
                     @Override public void install() { hookLootMapActions(); }
                 });
+        hooks.install("correlated vanilla Manage catalogues", new FailOpenHookInstaller.HookOperation() {
+            @Override public void install() {
+                HookManager.getInstance().registerHook(
+                    "com.wurmonline.client.renderer.gui.HeadsUpDisplay", "showBml",
+                    "(SLjava/lang/String;IIFFZZFFFLjava/lang/String;)V",
+                    () -> (proxy, method, args) -> {
+                        if (WurmWaypointerRuntime.interceptManagedBml((HeadsUpDisplay) proxy,
+                                (String) args[1], (String) args[11])) return null;
+                        return method.invoke(proxy,args);
+                    });
+            }
+        });
         hooks.install("Loot Map opened-chest completion",
                 new FailOpenHookInstaller.HookOperation() {
                     @Override public void install() throws Exception {
@@ -195,13 +226,39 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
                         + "com.wurmonline.client.launcherfx.WurmMain.serverPort);");
     }
 
+    private static void hookMapTextures(ClassPool pool) throws Exception {
+        String bridge = "com.wurmonline.client.resources.textures.WaypointerCaveTexture.";
+        CtClass queue = pool.get("com.wurmonline.client.renderer.backend.Queue");
+        String before="if ($0.order == com.wurmonline.client.renderer.backend.Queue.QUEUE_HUD) { "
+                +bridge+"flushUploads(); org.waypoints.next.render.WaypointRenderProfiler.recordHudQueue($0.getQueueCount()); }";
+        queue.getDeclaredMethod("render").insertBefore(before);
+        queue.getDeclaredMethod("renderModern").insertBefore(before);
+        pool.get("com.wurmonline.client.renderer.backend.Backend")
+                .getDeclaredMethod("endFrame").insertAfter(bridge + "finishFrame();");
+    }
+
+    /** Optional timings cannot prevent installation of texture retirement/upload hooks. */
+    private static void hookNativeRenderDiagnostics(ClassPool pool) throws Exception {
+        CtClass queue = pool.get("com.wurmonline.client.renderer.backend.Queue");
+        String profiler = "org.waypoints.next.render.WaypointRenderProfiler.";
+        for (String name : new String[]{"render", "renderModern"}) {
+            CtMethod method = queue.getDeclaredMethod(name);
+            method.addLocalVariable("__waypointerQueueStart", CtClass.longType);
+            method.insertBefore("__waypointerQueueStart = System.nanoTime();");
+            method.insertAfter(profiler+"recordNativeQueue(System.nanoTime()-__waypointerQueueStart);");
+        }
+        CtMethod output = pool.get("com.wurmonline.client.LwjglClient").getDeclaredMethod("update");
+        output.addLocalVariable("__waypointerOutputStart", CtClass.longType);
+        output.insertBefore("__waypointerOutputStart = System.nanoTime();");
+        output.insertAfter(profiler+"recordFrameOutput(System.nanoTime()-__waypointerOutputStart);");
+    }
+
     private static void hookHud() {
         HookManager.getInstance().registerHook(
                 "com.wurmonline.client.renderer.gui.HeadsUpDisplay", "init", "(II)V",
                 () -> (proxy, method, args) -> {
                     Object result = method.invoke(proxy, args);
                     WurmWaypointerRuntime.hudReady((HeadsUpDisplay) proxy);
-                    com.wurmonline.client.renderer.gui.ChamomiloUpdateBridge.hudReady((HeadsUpDisplay) proxy);
                     return result;
                 });
         HookManager.getInstance().registerHook(
@@ -209,7 +266,6 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
                 () -> (proxy, method, args) -> {
                     Object result = method.invoke(proxy, args);
                     WurmWaypointerRuntime.hudTick((HeadsUpDisplay) proxy);
-                    com.wurmonline.client.renderer.gui.ChamomiloUpdateBridge.tick((HeadsUpDisplay) proxy);
                     return result;
                 });
         HookManager.getInstance().registerHook(
@@ -483,6 +539,9 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
         creatures.getMethod("setPosImmediately", "(FFFZZ)V").insertAfter(
                 "org.waypoints.next.integration.WurmWaypointerRuntime."
                         + "surroundingsCreatureMoved($0, $1, $2, $3);");
+        creatures.getMethod("setAttitude", "(I)V").insertAfter(
+                "org.waypoints.next.integration.WurmWaypointerRuntime."
+                        + "surroundingsRenderableUpserted($0);");
 
         CtClass listener = pool.getCtClass(
                 "com.wurmonline.client.comm.ServerConnectionListenerClass");

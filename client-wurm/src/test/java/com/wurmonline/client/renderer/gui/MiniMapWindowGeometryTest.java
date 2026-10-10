@@ -9,33 +9,42 @@ import static org.junit.Assert.assertTrue;
 public final class MiniMapWindowGeometryTest {
     @Test public void compactControlsFitBesideEachOtherInsideTheFrame() {
         int left = 100, size = MiniMapWindow.MAP_SIZE;
-        int open = MiniMapControlsLayout.openButtonLeft(left, size);
-        int mode = MiniMapControlsLayout.modeButtonLeft(left, size);
-        int topographic = MiniMapControlsLayout.topographicBlockLeft(left, size);
+        MiniMapControlsLayout layout = new MiniMapControlsLayout(80, 68);
+        int open = layout.openButtonLeft(left, size);
+        int mode = layout.modeButtonLeft(left, size);
+        int topographic = layout.topographicBlockLeft(left, size);
         assertEquals(MiniMapControlsLayout.BLOCK_GAP,
-                open - mode - MiniMapControlsLayout.MODE_BUTTON_WIDTH);
+                open - mode - layout.modeButtonWidth);
         assertEquals(MiniMapControlsLayout.BLOCK_GAP,
                 mode - topographic - MiniMapControlsLayout.TOPOGRAPHIC_BLOCK_WIDTH);
-        assertEquals(50, topographic - left);
-        assertEquals(50, left + size - open - MiniMapControlsLayout.OPEN_BUTTON_WIDTH);
-        assertEquals(20, MiniMapControlsLayout.BUTTON_HEIGHT);
+        assertTrue(topographic - left >= 22);
+        assertEquals(topographic - left, left + size - open - layout.openButtonWidth);
+        assertEquals(26, MiniMapControlsLayout.BUTTON_HEIGHT);
         assertEquals(272, MiniMapControlsLayout.buttonTop(0, size));
-        assertEquals(topographic, MiniMapControlsLayout.topographicZoneLeft(left, size, 0));
-        assertEquals(MiniMapControlsLayout.topographicZoneLeft(left, size, 0)
+        assertTrue(MiniMapControlsLayout.buttonTop(0,size)>=size-MiniMapControlsLayout.FOOTER_HEIGHT);
+        assertTrue(MiniMapControlsLayout.buttonTop(0,size)+MiniMapControlsLayout.BUTTON_HEIGHT<=size);
+        assertEquals(topographic, layout.topographicZoneLeft(left, size, 0));
+        assertEquals(layout.topographicZoneLeft(left, size, 0)
                 + MiniMapControlsLayout.TOPOGRAPHIC_BUTTON_WIDTH,
-                MiniMapControlsLayout.topographicZoneLeft(left, size, 1));
-        assertEquals(MiniMapControlsLayout.topographicZoneLeft(left, size, 1)
+                layout.topographicZoneLeft(left, size, 1));
+        assertEquals(layout.topographicZoneLeft(left, size, 1)
                 + MiniMapControlsLayout.TOPOGRAPHIC_FIELD_WIDTH,
-                MiniMapControlsLayout.topographicZoneLeft(left, size, 2));
-        assertEquals(MiniMapControlsLayout.topographicZoneLeft(left, size, 2)
+                layout.topographicZoneLeft(left, size, 2));
+        assertEquals(layout.topographicZoneLeft(left, size, 2)
                 + MiniMapControlsLayout.TOPOGRAPHIC_BUTTON_WIDTH,
                 topographic + MiniMapControlsLayout.TOPOGRAPHIC_BLOCK_WIDTH);
+    }
+
+    @Test public void longCaptionsExpandTheSquareWithoutOverlappingFrameCorners() {
+        MiniMapControlsLayout layout = new MiniMapControlsLayout(130, 110);
+        int size = Math.max(MiniMapWindow.MAP_SIZE, layout.minimumSize());
+        assertTrue(size > MiniMapWindow.MAP_SIZE);
+        assertEquals(22, layout.topographicBlockLeft(0, size));
+        assertEquals(size - 22, layout.openButtonLeft(0, size) + layout.openButtonWidth);
     }
 
     @Test
     public void miniMapHasNoInvisibleWWindowMargins() {
         assertFalse(WWindow.class.isAssignableFrom(MiniMapWindow.class));
-        assertEquals(MiniMapWindow.MAP_SIZE, MiniMapWindow.WINDOW_WIDTH);
-        assertEquals(MiniMapWindow.MAP_SIZE, MiniMapWindow.WINDOW_HEIGHT);
     }
 }

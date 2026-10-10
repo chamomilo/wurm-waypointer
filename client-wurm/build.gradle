@@ -46,15 +46,19 @@ jar {
     archiveFileName = "wurm-waypointer-client-wurm-internal-${project.version}.jar"
 }
 
-// Exercise the production layout, menu lifecycle and preference with the pinned
-// native client, replacing GPU drawing and online checks in an isolated process.
-task verifyUpdaterUi(type: JavaExec, dependsOn: ['classes', 'testClasses']) {
+task verifyWaypointerUi(type: JavaExec, dependsOn: ['classes', 'testClasses']) {
+    systemProperty 'waypointer.probe.managerOnly', project.hasProperty('managerUiOnly')
+    systemProperty 'waypointer.probe.trackingOnly', project.hasProperty('trackingUiOnly')
     classpath = sourceSets.test.runtimeClasspath
-    if (rootProject.ext.wurmJavaFxJar != null) {
-        classpath += files(rootProject.ext.wurmJavaFxJar)
-    }
-    main = 'org.chamomilo.wurm.update.UpdaterUiProbe'
-    args file('src/main/resources/org/chamomilo/wurm/update/update-frame.png').absolutePath,
-            file("${buildDir}/updater-preview.png").absolutePath,
-            file('src/main/resources/org/chamomilo/wurm/update/update-button.png').absolutePath
+    if (rootProject.ext.wurmJavaFxJar != null) classpath += files(rootProject.ext.wurmJavaFxJar)
+    main = 'org.waypoints.next.ui.WaypointerUiProbe'
+    args 'standard-kit',
+            file("${buildDir}/waypointer-preview").absolutePath,
+            'standard-kit'
 }
+
+ext.chamomiloUpdate = [id: 'wurm-waypointer', name: 'Waypointer',
+        repo: 'chamomilo/wurm-waypointer', asset: 'wurm-waypointer-{version}.zip',
+        properties: '../mods/wurm-waypointer.properties',
+        main: 'src/main/java/org/waypoints/next/WurmWaypointerMod.java']
+apply from: 'gradle/chamomilo-updater.gradle'

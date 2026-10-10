@@ -22,6 +22,8 @@ public class HookBytecodeCompatibilityTest {
 
         invokeInstaller("hookSelectedServer", pool);
         invokeInstaller("hookDirectConnect", pool);
+        invokeInstaller("hookMapTextures", pool);
+        invokeInstaller("hookNativeRenderDiagnostics", pool);
         invokeInstaller("hookConnectionLifecycle", pool);
         invokeInstaller("hookCaveTileCoverage", pool);
         invokeInstaller("hookWorldMap", pool);
@@ -44,6 +46,9 @@ public class HookBytecodeCompatibilityTest {
                 .toBytecode().length > 0);
         assertTrue(pool.get("com.wurmonline.client.game.CaveDataBuffer")
                 .toBytecode().length > 0);
+        assertTrue(pool.get("com.wurmonline.client.renderer.backend.Queue").toBytecode().length > 0);
+        assertTrue(pool.get("com.wurmonline.client.renderer.backend.Backend").toBytecode().length > 0);
+        assertTrue(pool.get("com.wurmonline.client.LwjglClient").toBytecode().length > 0);
         assertTrue(pool.get("com.wurmonline.client.renderer.gui.CompassComponent")
                 .toBytecode().length > 0);
         assertTrue(pool.get("com.wurmonline.client.renderer.gui.WorldMap")
@@ -68,6 +73,14 @@ public class HookBytecodeCompatibilityTest {
                 .toBytecode().length > 0);
         assertTrue(pool.get("com.wurmonline.client.renderer.WorldRender")
                 .toBytecode().length > 0);
+    }
+
+    @Test public void textureLifecycleDoesNotDependOnOptionalWindowInstrumentation() throws Exception {
+        ClassPool pool=pinnedPool();
+        pool.get("com.wurmonline.client.LwjglClient").freeze();
+        invokeInstaller("hookMapTextures",pool);
+        assertTrue(pool.get("com.wurmonline.client.renderer.backend.Queue").toBytecode().length>0);
+        assertTrue(pool.get("com.wurmonline.client.renderer.backend.Backend").toBytecode().length>0);
     }
 
     @Test

@@ -6,6 +6,7 @@ import com.wurmonline.client.renderer.PickData;
 import com.wurmonline.client.renderer.backend.Primitive;
 import com.wurmonline.client.renderer.backend.Queue;
 import com.wurmonline.client.renderer.gui.text.TextFont;
+import com.wurmonline.client.renderer.gui.text.WaypointerFonts;
 import com.wurmonline.client.resources.FakeResourceUrl;
 import com.wurmonline.client.resources.ResourceUrl;
 import com.wurmonline.client.resources.textures.ResourceTexture;
@@ -40,7 +41,7 @@ public final class WaypointCompassMarkerBridge {
     private static final long HIT_FRESHNESS_NANOS = 500_000_000L;
     private static final int CLUSTER_THRESHOLD_PIXELS = 12;
     private static final int[] PROJECTED = new int[3];
-    private static final TextFont CLUSTER_FONT = TextFont.getFixedSizeText();
+    private static final TextFont CLUSTER_FONT = WaypointerFonts.compact(false);
     private static final String[] CLUSTER_COUNT_TEXT = clusterCountText();
     private static final String COMPASS_BASE_RESOURCE =
             "/org/waypoints/next/compass/compass-hud-base.png";

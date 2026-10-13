@@ -1,6 +1,6 @@
 Render diagnostics
 
-Waypointer 1.6.17 retains the render and map diagnostics introduced in 1.6.15–1.6.16. Logging runs on a background worker; render hooks record counters and timestamps without writing files.
+Logging runs on a background worker; render hooks record counters and timestamps without writing files.
 
 Files and measurements
 
@@ -23,7 +23,5 @@ Reporting a freeze or black screen
 Interpretation and current limits
 
 Small map-preparation counters do not exclude native GPU or frame-output stalls. Queue timings cover the client's shared rendering work, including the world and other mods; they cannot attribute a delay to Waypointer alone. CPU elapsed time can also include scheduling or GC pauses. A thread snapshot taken after a freeze does not identify the call that caused it.
-
-Investigation of 1.6.15 established a 1.29-second full GC pause and independent connection failures with automatic reconnects. Later reported freezes occurred without a new full GC. The changes retain the unchanged published map and terrain index across reconnects, consume completed native texture requests on the worker, skip obsolete queued jobs, reuse dynamic texture storage and upload at the HUD queue boundary. These address established unnecessary work; they do not establish that every black screen or connection failure is fixed.
 
 These diagnostics do not request a heap dump, force GC, change driver settings or modify the game installation.

@@ -7,8 +7,8 @@ import com.wurmonline.client.renderer.backend.Primitive;
 import com.wurmonline.client.renderer.backend.Queue;
 import com.wurmonline.client.renderer.gui.text.TextFont;
 import com.wurmonline.client.renderer.gui.text.WaypointerFonts;
-import com.wurmonline.client.resources.FakeResourceUrl;
 import com.wurmonline.client.resources.ResourceUrl;
+import com.wurmonline.client.resources.WaypointerCompassResourceUrl;
 import com.wurmonline.client.resources.textures.ResourceTexture;
 import com.wurmonline.client.resources.textures.ResourceTextureLoader;
 import org.waypoints.next.model.MarkerStyle;
@@ -25,7 +25,6 @@ import org.waypoints.next.render.WaypointDistanceLabel;
 import org.waypoints.next.render.WaypointRenderProfiler;
 import org.waypoints.next.render.WaypointRenderRuntimeBridge;
 
-import java.net.URL;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -171,37 +170,7 @@ public final class WaypointCompassMarkerBridge {
     }
 
     private static PreparedArtwork artwork(String path, String label) {
-        URL url = artworkUrl(path);
-        if (url == null) {
-            LOGGER.warning("HUD " + label + " resource is missing: " + path);
-            return null;
-        }
-        LOGGER.info("HUD " + label + " resolved from " + url);
-        return new PreparedArtwork(new FakeResourceUrl(url), label);
-    }
-
-    /**
-     * Patched com.wurmonline bridge classes are defined by the game loader, which
-     * does not expose resources from the mod JAR. Resolve artwork through the
-     * mod-owned runtime bridge so the install only needs the complete mod JAR.
-     */
-    private static URL artworkUrl(String path) {
-        String resourceName = path.startsWith("/") ? path.substring(1) : path;
-        URL embedded = resourceFrom(
-                WaypointRenderRuntimeBridge.class.getClassLoader(), resourceName);
-        if (embedded == null) {
-            embedded = resourceFrom(
-                    Thread.currentThread().getContextClassLoader(), resourceName);
-        }
-        if (embedded == null) {
-            embedded = resourceFrom(ClassLoader.getSystemClassLoader(), resourceName);
-        }
-        return embedded != null ? embedded
-                : WaypointCompassMarkerBridge.class.getResource('/' + resourceName);
-    }
-
-    private static URL resourceFrom(ClassLoader loader, String resourceName) {
-        return loader == null ? null : loader.getResource(resourceName);
+        return new PreparedArtwork(new WaypointerCompassResourceUrl(path), label);
     }
 
     private static void prepareArtwork(PreparedArtwork artwork) {

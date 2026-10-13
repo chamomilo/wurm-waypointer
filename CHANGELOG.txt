@@ -1,3 +1,16 @@
+1.10.6 - 2026-10-14
+
+- Rebuild with the latest complete canonical updater 1.5.0 and Chamomilo UI 0.4.11, including all Waypointer preferences in the shared Mods Registry settings window.
+- Publish the embedded compass loading fix from 1.10.5; neither compass layer depends on a loose or extracted image.
+- Replace the illustrated GitHub guide and plain-text installation guide. Keep the installation ZIP limited to the mod JAR, loader descriptor, default configuration and README.txt.
+- Remove obsolete internal design notes and local build/research artifacts from the project directory.
+
+1.10.5 - 2026-10-14
+
+- Fix embedded HUD compass loading under Wurm's shared Javassist loader. Read the dial and rotating needle directly from the JAR supplying the compass resource bridge, even when ordinary classloader resource lookup cannot see the mod.
+- Keep all compass artwork inside the mod JAR, without loose images or extracted texture files. Close resource streams without retaining a cached JAR handle.
+- Verify both PNG layers with a Javassist loader that cannot expose compass resources, and retain the four-file manual installation ZIP with verified canonical updater 1.5.0 and UI SDK 0.4.11.
+
 1.10.4 - 2026-10-13
 
 - Embed the freshly verified complete canonical updater 1.5.0 with UI SDK 0.4.11. All general settings remain in the updater Mods Registry, including creature rules, tile radius, terrain highlights and meteorite options.

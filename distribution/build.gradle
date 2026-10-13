@@ -147,6 +147,7 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries', ':client-w
                 'org/waypoints/api/ObjectMarkRequest.class',
                 'org/waypoints/api/WurmObjectSnapshot.class',
                 'org/waypoints/next/WurmWaypointerMod.class',
+                'com/wurmonline/client/resources/WaypointerCompassResourceUrl.class',
                 'org/waypoints/next/integration/WurmWaypointerRuntime.class',
                 'com/wurmonline/client/renderer/gui/PlayerArrowGeometry.class',
                 'com/wurmonline/client/renderer/gui/MiniMapControlsLayout.class',

@@ -99,8 +99,6 @@ Waiting for animal direction…	Aguardando direção do animal…
 Animal direction is unavailable for this list.	Direção indisponível para esta lista.
 Animal position is unavailable.	Posição do animal indisponível.
 Animal direction received.	Direção do animal recebida.
-On	Ligado
-Off	Desligado
 All	Todos
 Current	Atual
 Current (	Atual (
@@ -211,7 +209,6 @@ Unknown	Desconhecido
 PULSE	PULSO
 SOLID	CONTÍNUO
 MOVING_DASHES	TRAÇOS MÓVEIS
-off	desligado
 uniques	únicos
 treasure	tesouro
 animals	animais
@@ -412,7 +409,6 @@ Animal waypoint race started: {0}	Busca do animal iniciada: {0}
 Animal search stopped: direction is unavailable.	Busca interrompida: direção indisponível.
 Animal search stopped: no direction response after three checks.	Busca interrompida: sem resposta após três verificações.
 Animal found: {0}. Navigation now follows its received position.	Animal encontrado: {0}. A navegação segue a posição recebida.
-
 Mobs	Criaturas
 Objects / items	Objetos / itens
 ALL MAPS ON SERVER	TODOS OS MAPAS DO SERVIDOR
@@ -421,3 +417,52 @@ Choose a map to view	Escolha um mapa para ver
 Wheel: zoom | drag: pan | CENTER: return to your character	Roda: zoom | arrastar: mover | CENTER: voltar ao personagem
 Add this animal to ALL WAYPOINTS and automatically start a waypoint race if it is out of sight.	Adicione este animal a ALL WAYPOINTS e inicie automaticamente a busca por waypoints se ele estiver fora de vista.
 Loading full map...	Carregando o mapa completo...
+Creatures Highlight	Realce de criaturas
+Players	Jogadores
+Monsters	Monstros
+Champion	Campeão
+Diseased	Doente
+Fierce	Feroz
+Angry	Furioso
+Raging	Enfurecido
+Slow	Lento
+Alert	Alerta
+Greenish	Esverdeado
+Lurking	À espreita
+Sly	Astuto
+Hardened	Endurecido
+Scared	Assustado
+Small	Pequeno
+Mini	Mini
+Tiny	Minúsculo
+ON	ON
+OFF	OFF
+Auto-mark	Marcar auto
+Apply color	Aplicar cor
+Color: {0}	Cor: {0}
+Drag to choose	Arraste para escolher
+Loaded creatures. Priority: modifier > Unique > category.	Criaturas carregadas. Prioridade: modificador > Único > categoria.
+Auto-mark works independently of ON/OFF and keeps one target per creature.	A marcação automática independe de ON/OFF e mantém um alvo por criatura.
+Create a target when this creature appears in the loaded area.	Criar um alvo quando esta criatura aparecer na área carregada.
+CREATURES HIGHLIGHT	CRIATURAS EM DESTAQUE
+On	Ligado
+Off	Desligado
+Non-aggressive animals	Animais não agressivos
+Aggressive animals	Animais agressivos
+ALL ON	Ligar tudo
+ALL OFF	Desligar tudo
+Tiles Highlight	Destaque de tiles
+Tile highlight radius	Raio do destaque de tiles
+Radius in tiles along both axes, 1..16; default 7 gives a 15 x 15 square (225 tiles, 28 m in each direction). Diagonal corners are included. Uses only received surface terrain; changing the radius applies immediately and does not affect meteorite object detection.	Raio nos dois eixos: 1..16 tiles; padrão 7 forma um quadrado de 15 x 15 (225 tiles, 28 m em cada direção), incluindo os cantos diagonais. Usa apenas terreno de superfície recebido. Mudanças são imediatas e não afetam a detecção de objetos meteoritos.
+Non-rideable if the highest and lowest corners differ by more than 40 dirt (4 m), or water is more than 0.7 m above the lowest corner. Exactly 40 dirt and 0.7 m remain allowed. Cave openings and lava always match. Terrain indication only; fences, buildings and server permissions are not checked.	Não transitável se a diferença entre os cantos exceder 40 dirt (4 m), ou a água exceder 0,7 m acima do canto mais baixo. Exatamente 40 dirt e 0,7 m são permitidos. Entradas de cavernas e lava sempre são destacadas. Somente terreno; cercas, construções e permissões do servidor não são verificadas.
+Ripe crop stages 5 and 6 only. Normal trees and bushes require the received fruit flag and ages Mature through Very old (including sprouting). Young, Overaged and Shrivelled trees do not match. Updates after received harvest or growth changes; independent of the old-tree switch.	Lavouras maduras apenas nos estágios 5 e 6. Árvores e arbustos normais exigem o indicador de frutos recebido e idade de Mature a Very old, incluindo sprouting. Young, Overaged e Shrivelled não são incluídos. Atualiza com dados recebidos de colheita ou crescimento, independentemente das árvores envelhecidas.
+TILES HIGHLIGHT	DESTAQUE DE TILES
+Non-rideable tiles	Tiles não transitáveis
+Flower tiles	Tiles com flores
+Harvestable areas	Áreas prontas para colheita
+Overaged trees	Árvores envelhecidas
+Include Overaged and Shrivelled trees.	Inclui árvores Overaged e Shrivelled.
+Meteors	Meteoritos
+Chime	Som
+Create one target per detected meteorite.	Criar um alvo para cada meteorito detectado.
+Play a chime when a new meteorite is detected.	Tocar um som ao detectar um novo meteorito.

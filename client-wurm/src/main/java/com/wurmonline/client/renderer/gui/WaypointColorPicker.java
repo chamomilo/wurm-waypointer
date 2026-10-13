@@ -35,7 +35,9 @@ final class WaypointColorPicker extends FlexComponent {
         setSize(620, 118);
     }
 
-    void setColor(float red, float green, float blue) {
+    // WurmComponent.setColor is GUI tint propagation during native attachment.
+    // Keep selection updates separate so layout cannot reset the chosen RGB.
+    void setSelectedColor(float red, float green, float blue) {
         state.setColor(red, green, blue);
     }
 
@@ -105,7 +107,7 @@ final class WaypointColorPicker extends FlexComponent {
         font.paint(queue, state.getHex(), 0.95f, 0.88f, 0.70f, 1.0f);
         font.moveTo(swatchLeft, swatchTop + swatchHeight + font.getAscent()
                 + font.getHeight() + 6);
-        font.paint(queue, "Drag to choose", 0.78f, 0.76f, 0.70f, 1.0f);
+        font.paint(queue, org.waypoints.next.i18n.Messages.text("Drag to choose"), 0.78f, 0.76f, 0.70f, 1.0f);
     }
 
     @Override protected void leftPressed(int mouseX, int mouseY, int clickCount) {
@@ -151,7 +153,9 @@ final class WaypointColorPicker extends FlexComponent {
     }
 
     private int saturationWidth() {
-        return Math.max(80, width - SWATCH_WIDTH - MARGIN * 2 - 12);
+        int swatchWidth=Math.max(SWATCH_WIDTH,WaypointerFonts.body().getWidth(
+                org.waypoints.next.i18n.Messages.text("Drag to choose"))+12);
+        return Math.max(80, width - swatchWidth - MARGIN * 2 - 12);
     }
 
     private int saturationHeight() {

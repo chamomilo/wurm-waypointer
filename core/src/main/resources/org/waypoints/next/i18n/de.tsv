@@ -99,8 +99,6 @@ Waiting for animal direction…	Warten auf Tierrichtung…
 Animal direction is unavailable for this list.	Tierrichtung für diese Liste nicht verfügbar.
 Animal position is unavailable.	Tierposition nicht verfügbar.
 Animal direction received.	Tierrichtung empfangen.
-On	An
-Off	Aus
 All	Alle
 Current	Aktuell
 Current (	Aktuell (
@@ -211,7 +209,6 @@ Unknown	Unbekannt
 PULSE	PULS
 SOLID	DURCHGEHEND
 MOVING_DASHES	BEWEGTE STRICHE
-off	aus
 uniques	einzigartige
 treasure	Schatz
 animals	Tiere
@@ -412,7 +409,6 @@ Animal waypoint race started: {0}	Tier-Wegpunktsuche gestartet: {0}
 Animal search stopped: direction is unavailable.	Tiersuche gestoppt: Richtung nicht verfügbar.
 Animal search stopped: no direction response after three checks.	Tiersuche gestoppt: keine Antwort nach drei Abfragen.
 Animal found: {0}. Navigation now follows its received position.	Tier gefunden: {0}. Die Navigation folgt jetzt seiner empfangenen Position.
-
 Mobs	Kreaturen
 Objects / items	Objekte / Gegenstände
 ALL MAPS ON SERVER	ALLE SERVERKARTEN
@@ -421,3 +417,52 @@ Choose a map to view	Eine Karte zur Ansicht auswählen
 Wheel: zoom | drag: pan | CENTER: return to your character	Mausrad: Zoom | ziehen: verschieben | CENTER: zurück zur Spielfigur
 Add this animal to ALL WAYPOINTS and automatically start a waypoint race if it is out of sight.	Dieses Tier zu ALL WAYPOINTS hinzufügen und automatisch die Wegpunktsuche starten, wenn es außer Sicht ist.
 Loading full map...	Vollständige Karte wird geladen...
+Creatures Highlight	Kreaturen hervorheben
+Players	Spieler
+Monsters	Monster
+Champion	Champion
+Diseased	Krank
+Fierce	Wild
+Angry	Wütend
+Raging	Rasend
+Slow	Langsam
+Alert	Wachsam
+Greenish	Grünlich
+Lurking	Lauernd
+Sly	Listig
+Hardened	Abgehärtet
+Scared	Ängstlich
+Small	Klein
+Mini	Mini
+Tiny	Winzig
+ON	ON
+OFF	OFF
+Auto-mark	Auto-Markierung
+Apply color	Farbe anwenden
+Color: {0}	Farbe: {0}
+Drag to choose	Zum Wählen ziehen
+Loaded creatures. Priority: modifier > Unique > category.	Geladene Kreaturen. Priorität: Modifikator > Einzigartig > Kategorie.
+Auto-mark works independently of ON/OFF and keeps one target per creature.	Auto-Markierung arbeitet unabhängig von ON/OFF: ein Ziel pro Kreatur.
+Create a target when this creature appears in the loaded area.	Ein Ziel erstellen, sobald diese Kreatur im geladenen Gebiet erscheint.
+CREATURES HIGHLIGHT	KREATUREN HERVORHEBEN
+On	Ein
+Off	Aus
+Non-aggressive animals	Nicht aggressive Tiere
+Aggressive animals	Aggressive Tiere
+ALL ON	ALLE AN
+ALL OFF	ALLE AUS
+Tiles Highlight	Kacheln markieren
+Tile highlight radius	Radius der Kachelmarkierung
+Radius in tiles along both axes, 1..16; default 7 gives a 15 x 15 square (225 tiles, 28 m in each direction). Diagonal corners are included. Uses only received surface terrain; changing the radius applies immediately and does not affect meteorite object detection.	Radius entlang beider Achsen: 1..16 Kacheln. Standard 7 ergibt ein Quadrat von 15 x 15 (225 Kacheln, 28 m je Richtung), einschließlich der diagonalen Ecken. Nur empfangenes Oberflächengelände; Änderungen gelten sofort und beeinflussen die Erkennung von Meteoritenobjekten nicht.
+Non-rideable if the highest and lowest corners differ by more than 40 dirt (4 m), or water is more than 0.7 m above the lowest corner. Exactly 40 dirt and 0.7 m remain allowed. Cave openings and lava always match. Terrain indication only; fences, buildings and server permissions are not checked.	Nicht reitbar bei mehr als 40 dirt (4 m) Höhenunterschied zwischen den Ecken oder mehr als 0,7 m Wasser über der niedrigsten Ecke. Genau 40 dirt und 0,7 m sind erlaubt. Höhleneingänge und Lava werden immer markiert. Nur Gelände; Zäune, Gebäude und Serverrechte werden nicht geprüft.
+Ripe crop stages 5 and 6 only. Normal trees and bushes require the received fruit flag and ages Mature through Very old (including sprouting). Young, Overaged and Shrivelled trees do not match. Updates after received harvest or growth changes; independent of the old-tree switch.	Reife Feldfrüchte nur in Stufe 5 und 6. Normale Bäume und Büsche benötigen das empfangene Fruchtmerkmal und ein Alter von Mature bis Very old einschließlich sprouting. Young, Overaged und Shrivelled sind ausgeschlossen. Aktualisierung mit empfangenen Ernte- oder Wachstumsdaten, unabhängig von alten Bäumen.
+TILES HIGHLIGHT	KACHELN MARKIEREN
+Non-rideable tiles	Nicht reitbare Kacheln
+Flower tiles	Blumenkacheln
+Harvestable areas	Erntebereite Flächen
+Overaged trees	Überalterte Bäume
+Include Overaged and Shrivelled trees.	Enthält überalterte und verkümmerte Bäume.
+Meteors	Meteoriten
+Chime	Klang
+Create one target per detected meteorite.	Ein Ziel für jeden entdeckten Meteoriten erstellen.
+Play a chime when a new meteorite is detected.	Bei einem neuen Meteoriten einen Klang abspielen.

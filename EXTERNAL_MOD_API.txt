@@ -1,7 +1,6 @@
 Waypointer API for external client mods
 
-This is a concise integration reference that can be copied in full into a new
-Codex task.
+Public integration reference for other Wurm Unlimited client mods.
 
 Integration rules
 

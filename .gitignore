@@ -19,11 +19,6 @@ hs_err_pid*
 *.jar
 !gradle/wrapper/gradle-wrapper.jar
 
-# Retained local drafting and superseded artwork
-README.DRAFT.md
-docs/wurm-waypointer-forum-banner*.png
-
-# Local investigation captures and temporary probes
-research/
+# Temporary files
 .tmp-*
 *.class

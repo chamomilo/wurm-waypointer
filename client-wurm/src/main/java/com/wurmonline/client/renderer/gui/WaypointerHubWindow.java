@@ -17,6 +17,10 @@ final class WaypointerHubWindow extends WaypointerUiWindow implements ButtonList
     private int navigationWidth;
     WaypointerHubWindow(WaypointManagerController controller){super("wurm-waypointer.manager",true);this.controller=controller;setTitle(org.waypoints.next.i18n.Messages.text("Wurm Waypointer"));setHeaderHeight(29);setContentPadding(4);rebuild();}
     private void rebuild(){
+        CreatureHighlightPanel oldHighlights=(CreatureHighlightPanel)panels.get(WaypointerSection.CREATURES_HIGHLIGHT);
+        boolean reopenColor=oldHighlights!=null&&oldHighlights.colorWindowOpen();
+        TileHighlightPanel oldTiles=(TileHighlightPanel)panels.get(WaypointerSection.TILES_HIGHLIGHT);
+        boolean reopenTileColor=oldTiles!=null&&oldTiles.colorWindowOpen();
         WaypointerContentPanel old=panels.get(section);if(old!=null)old.leaving();panels.clear();selectors.clear();languageRevision=Messages.revision();
         root=new WurmBorderPanel("waypointer.hub");
         WurmArrayPanel<FlexComponent> tabs=new WurmArrayPanel<FlexComponent>("hub.selectors",WurmArrayPanel.DIR_HORIZONTAL);
@@ -39,6 +43,8 @@ final class WaypointerHubWindow extends WaypointerUiWindow implements ButtonList
         navigationBand.setComponent(tabs,NORTH);navigationBand.setComponent(spacer(1,6),SOUTH);
         root.setComponent(navigationBand,NORTH);
         for(WaypointerSection view:WaypointerSection.values())panels.put(view,create(view));
+        if(oldHighlights!=null)((CreatureHighlightPanel)panels.get(WaypointerSection.CREATURES_HIGHLIGHT)).restoreDraft(oldHighlights,reopenColor);
+        if(oldTiles!=null)((TileHighlightPanel)panels.get(WaypointerSection.TILES_HIGHLIGHT)).restoreDraft(oldTiles,reopenTileColor);
         WurmBorderPanel padded=new WurmBorderPanel("hub.padding");padded.setComponent(spacer(4,1),WEST);padded.setComponent(spacer(4,1),EAST);padded.setComponent(spacer(1,3),NORTH);padded.setComponent(spacer(1,4),SOUTH);padded.setComponent(root,CENTER);setComponent(padded);select(section);
     }
     void select(WaypointerSection next){
@@ -53,7 +59,8 @@ final class WaypointerHubWindow extends WaypointerUiWindow implements ButtonList
     }
     private WaypointerContentPanel create(WaypointerSection view){
         if(view==WaypointerSection.ALL_WAYPOINTS)return new WaypointManagerWindow(controller);
-        if(view==WaypointerSection.SETTINGS)return new WaypointerSettingsPanel(controller.settings());
+        if(view==WaypointerSection.CREATURES_HIGHLIGHT)return new CreatureHighlightPanel(controller.settings());
+        if(view==WaypointerSection.TILES_HIGHLIGHT)return new TileHighlightPanel(controller.settings());
         if(view==WaypointerSection.MY_VEHICLES||view==WaypointerSection.MY_ANIMALS)return new TrackedTargetsPanel(controller.tracking(),controller,view==WaypointerSection.MY_ANIMALS);
         SurroundingsWindow panel=new SurroundingsWindow(controller.surroundings());panel.selectKind(view==WaypointerSection.MOBS_AROUND?SurroundingKind.ANIMAL:view==WaypointerSection.CONTAINERS_AROUND?SurroundingKind.CONTAINER:SurroundingKind.ITEM);return panel;
     }
@@ -69,6 +76,10 @@ final class WaypointerHubWindow extends WaypointerUiWindow implements ButtonList
         }
     }
     boolean ownsHudComponent(WurmComponent component){
+        CreatureHighlightPanel highlights=(CreatureHighlightPanel)panels.get(WaypointerSection.CREATURES_HIGHLIGHT);
+        if(highlights!=null&&highlights.ownsColorComponent(component))return true;
+        TileHighlightPanel tiles=(TileHighlightPanel)panels.get(WaypointerSection.TILES_HIGHLIGHT);
+        if(tiles!=null&&tiles.ownsColorComponent(component))return true;
         if(component instanceof WurmDropdownPopup)
             return ownsHudComponent(((WurmDropdownPopup)component).dropDown);
         for(WurmComponent current=component;current!=null;current=current.parent)
@@ -80,9 +91,9 @@ final class WaypointerHubWindow extends WaypointerUiWindow implements ButtonList
     @Override WurmInputField getInputField(){WaypointerContentPanel panel=panels.get(section);return panel==null?null:panel.getInputField();}
     @Override public void gameTick(){if(languageRevision!=Messages.revision())rebuild();super.gameTick();}
     int minimumWindowWidth(){if(panels==null)return 940;int content=navigationWidth;for(WaypointerContentPanel panel:panels.values())content=Math.max(content,panel.minimumContentWidth());return Math.max(940,content+32);}
-    @Override void setSize(int w,int h){super.setSize(Math.max(minimumWindowWidth(),w),minimized?h:Math.max(380,h));}
+    @Override void setSize(int w,int h){WaypointerContentPanel panel=panels==null?null:panels.get(section);int minimum=panel==null?380:Math.max(380,panel.minimumContentHeight()+100);super.setSize(Math.max(minimumWindowWidth(),w),minimized?h:Math.max(minimum,h));}
     private static String compactLabel(WaypointerSection section){
-        switch(section){case ALL_WAYPOINTS:return "Waypoints";case MOBS_AROUND:return "Mobs";case CONTAINERS_AROUND:return "Containers";case OBJECTS_AROUND:return "Objects / items";case MY_VEHICLES:return "Vehicles";case MY_ANIMALS:return "My animals";default:return "Settings";}
+        switch(section){case ALL_WAYPOINTS:return "Waypoints";case MOBS_AROUND:return "Mobs";case CONTAINERS_AROUND:return "Containers";case OBJECTS_AROUND:return "Objects / items";case MY_VEHICLES:return "Vehicles";case MY_ANIMALS:return "My animals";case CREATURES_HIGHLIGHT:return "Creatures Highlight";case TILES_HIGHLIGHT:return "Tiles Highlight";default:return "Settings";}
     }
     @Override public void buttonPressed(WButton button){}
     @Override public void buttonClicked(WButton button){WaypointerSection next=selectors.get(button);if(next!=null&&button.isEnabled())select(next);}

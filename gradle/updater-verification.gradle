@@ -1,0 +1,51 @@
+// Shared by reference regression tests and consumer release verification.
+ext.chamomiloUpdaterOwned = { String name ->
+    name.startsWith('org/chamomilo/wurm/update/') ||
+            name.startsWith('org/chamomilo/wurm/ui/v1/') ||
+            name.startsWith('com/wurmonline/client/renderer/gui/ChamomiloUiV1') ||
+            name.startsWith('com/wurmonline/client/renderer/gui/text/ChamomiloUiV1') ||
+            name.startsWith('com/wurmonline/client/resources/ChamomiloUiV1ResourceUrl') ||
+            name.startsWith('com/wurmonline/client/renderer/gui/ChamomiloUpdate') ||
+            name.startsWith('com/wurmonline/client/renderer/gui/ChamomiloSkinnedButton') ||
+            name.startsWith('com/wurmonline/client/resources/ChamomiloResourceUrl') ||
+            name.startsWith('META-INF/chamomilo-updater')
+}
+ext.chamomiloUpdaterReadEntries = { File archive ->
+    def zip = new java.util.zip.ZipFile(archive)
+    def result = [:]
+    try {
+        java.util.Collections.list(zip.entries()).each { entry ->
+            if (!entry.directory) {
+                if (result.containsKey(entry.name))
+                    throw new GradleException('Duplicate archive entry: ' + entry.name)
+                zip.getInputStream(entry).withCloseable { result[entry.name] = it.bytes }
+            }
+        }
+    } finally { zip.close() }
+    result
+}
+ext.chamomiloUpdaterMetadata = { Map entries ->
+    def bytes = entries['META-INF/chamomilo-updater.properties']
+    if (!bytes) throw new GradleException('Missing updater module version marker')
+    def metadata = new Properties()
+    metadata.load(new ByteArrayInputStream(bytes))
+    metadata
+}
+ext.chamomiloUpdaterVerify = { Map actual, Map reference, String version ->
+    def expectedMetadata = chamomiloUpdaterMetadata(reference)
+    def actualMetadata = chamomiloUpdaterMetadata(actual)
+    [module:'chamomilo-updater', version:version, protocol:'1'].each { key, expected ->
+        if (expectedMetadata.getProperty(key) != expected || actualMetadata.getProperty(key) != expected)
+            throw new GradleException('Updater module ' + key + ' differs from reference: expected ' + expected)
+    }
+    def expected = reference.findAll { key, value -> chamomiloUpdaterOwned(key) }
+    def embedded = actual.findAll { key, value -> chamomiloUpdaterOwned(key) }
+    def missing = expected.keySet() - embedded.keySet()
+    def obsolete = embedded.keySet() - expected.keySet()
+    if (missing || obsolete)
+        throw new GradleException('Updater entry set differs; missing=' + missing + ', obsolete=' + obsolete)
+    expected.each { name, bytes ->
+        if (!java.util.Arrays.equals(bytes, embedded[name]))
+            throw new GradleException('Updater bytes differ from reference: ' + name)
+    }
+}

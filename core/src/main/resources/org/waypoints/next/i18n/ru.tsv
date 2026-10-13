@@ -99,8 +99,6 @@ Waiting for animal direction…	Ожидание направления к жи�
 Animal direction is unavailable for this list.	Для этого списка направление недоступно.
 Animal position is unavailable.	Позиция животного недоступна.
 Animal direction received.	Направление к животному получено.
-On	Вкл
-Off	Выкл
 All	Все
 Current	Текущий
 Current (	Текущий (
@@ -211,7 +209,6 @@ Unknown	Неизвестно
 PULSE	ПУЛЬС
 SOLID	СПЛОШНОЙ
 MOVING_DASHES	БЕГУЩИЙ ПУНКТИР
-off	выкл
 uniques	уникальные
 treasure	сокровища
 animals	животные
@@ -451,7 +448,6 @@ Animal waypoint race started: {0}	Гонка к животному начата:
 Animal search stopped: direction is unavailable.	Поиск животного остановлен: направление недоступно.
 Animal search stopped: no direction response after three checks.	Поиск животного остановлен: нет ответа после трёх проверок.
 Animal found: {0}. Navigation now follows its received position.	Животное найдено: {0}. Навигация следует его полученной позиции.
-
 Mobs	Существа
 Objects / items	Объекты / предметы
 ALL MAPS ON SERVER	ВСЕ КАРТЫ СЕРВЕРА
@@ -460,3 +456,52 @@ Choose a map to view	Выберите карту для просмотра
 Wheel: zoom | drag: pan | CENTER: return to your character	Колесо: масштаб | перетаскивание: движение | CENTER: вернуться к персонажу
 Add this animal to ALL WAYPOINTS and automatically start a waypoint race if it is out of sight.	Добавить животное в ALL WAYPOINTS и автоматически начать поиск по вейпоинтам, если его не видно.
 Loading full map...	Загрузка полной карты...
+Creatures Highlight	Подсветка существ
+Players	Игроки
+Monsters	Монстры
+Champion	Чемпион
+Diseased	Больной
+Fierce	Свирепый
+Angry	Злой
+Raging	Бешеный
+Slow	Медленный
+Alert	Бдительный
+Greenish	Зеленоватый
+Lurking	Крадущийся
+Sly	Хитрый
+Hardened	Закалённый
+Scared	Испуганный
+Small	Маленький
+Mini	Мини
+Tiny	Крошечный
+ON	ON
+OFF	OFF
+Auto-mark	Автоцель
+Apply color	Применить цвет
+Color: {0}	Цвет: {0}
+Drag to choose	Тяните для выбора
+Loaded creatures. Priority: modifier > Unique > category.	Загруженные существа. Приоритет: модификатор > Unique > категория.
+Auto-mark works independently of ON/OFF and keeps one target per creature.	Автоцель работает независимо от ON/OFF и создаёт одну цель на существо.
+Create a target when this creature appears in the loaded area.	Создать цель, когда это существо появится в загруженной области.
+CREATURES HIGHLIGHT	ПОДСВЕТКА СУЩЕСТВ
+On	Вкл
+Off	Выкл
+Non-aggressive animals	Неагрессивные животные
+Aggressive animals	Агрессивные животные
+ALL ON	ВСЕ ВКЛ
+ALL OFF	ВСЕ ВЫКЛ
+Tiles Highlight	Подсветка тайлов
+Tile highlight radius	Радиус подсветки тайлов
+Radius in tiles along both axes, 1..16; default 7 gives a 15 x 15 square (225 tiles, 28 m in each direction). Diagonal corners are included. Uses only received surface terrain; changing the radius applies immediately and does not affect meteorite object detection.	Радиус по обеим осям: 1..16 тайлов; по умолчанию 7 — квадрат 15 x 15 (225 тайлов, 28 м в каждую сторону). Углы по диагонали включены. Используются только загруженные тайлы поверхности. Изменение применяется сразу и не влияет на обнаружение метеоритов-объектов.
+Non-rideable if the highest and lowest corners differ by more than 40 dirt (4 m), or water is more than 0.7 m above the lowest corner. Exactly 40 dirt and 0.7 m remain allowed. Cave openings and lava always match. Terrain indication only; fences, buildings and server permissions are not checked.	Тайл непроезжаемый, если перепад между самым высоким и низким углами больше 40 dirt (4 м), либо вода выше нижнего угла более чем на 0,7 м. Ровно 40 dirt и 0,7 м допускаются. Входы в пещеры и лава отмечаются всегда. Учитывается только грунт; заборы, здания и серверные разрешения не проверяются.
+Ripe crop stages 5 and 6 only. Normal trees and bushes require the received fruit flag and ages Mature through Very old (including sprouting). Young, Overaged and Shrivelled trees do not match. Updates after received harvest or growth changes; independent of the old-tree switch.	Созревшие посевы: только стадии 5 и 6. Обычные деревья и кусты — с полученным признаком урожая, возраст от Mature до Very old, включая sprouting. Young, Overaged и Shrivelled не подходят. Обновляется после получения данных о сборе или росте, независимо от подсветки старых деревьев.
+TILES HIGHLIGHT	ПОДСВЕТКА ТАЙЛОВ
+Non-rideable tiles	Непроезжаемые тайлы
+Flower tiles	Тайлы с цветами
+Harvestable areas	Готовые к сбору участки
+Overaged trees	Перестаревшие деревья
+Include Overaged and Shrivelled trees.	Включает деревья Overaged и Shrivelled.
+Meteors	Метеориты
+Chime	Звук
+Create one target per detected meteorite.	Создавать одну цель для каждого обнаруженного метеорита.
+Play a chime when a new meteorite is detected.	Проигрывать звук при обнаружении нового метеорита.

@@ -8,11 +8,15 @@ final class WaypointerFilterCheck extends WButton implements ButtonListener {
     private final Runnable action;
     private final UiButtonMotion motion=new UiButtonMotion();
     private boolean checked;
+    private int side=28;
     WaypointerFilterCheck(boolean checked,Runnable action){
-        super("");this.checked=checked;this.action=action;
-        setButtonListener(this);sizeFlags=0;setSize(28,28);sizeFlags=FIXED_WIDTH|FIXED_HEIGHT;
+        this(checked,action,28);
     }
-    @Override void setSize(int width,int height){super.setSize(28,28);}
+    WaypointerFilterCheck(boolean checked,Runnable action,int side){
+        super("");this.checked=checked;this.action=action;
+        this.side=side;setButtonListener(this);sizeFlags=0;setSize(side,side);sizeFlags=FIXED_WIDTH|FIXED_HEIGHT;
+    }
+    @Override void setSize(int width,int height){int size=side==0?28:side;super.setSize(size,size);}
     void setChecked(boolean checked){this.checked=checked;}
     boolean checked(){return checked;}
     @Override public void buttonPressed(WButton button){motion.pointerPressed(System.nanoTime());}
@@ -22,7 +26,8 @@ final class WaypointerFilterCheck extends WButton implements ButtonListener {
         ChamomiloUiV1Canvas canvas=WaypointerUi.canvas(this,queue);
         UiPainter.button(canvas,motion.brightness(),motion.depth(),motion.hover(),UiScale.BASE,1f,x,y,width,height);
         int shift=Math.round(motion.depth());
-        UiIcon.MAXIMIZE.paint(canvas,UiColor.MUTED,1f,x+6+shift,y+6+shift,20);
-        if(checked)UiIcon.CHECK.paint(canvas,UiColor.TEXT,1f,x+6+shift,y+6+shift,20);
+        int size=Math.min(20,side-8),left=x+(width-size)/2+shift,top=y+(height-size)/2+shift;
+        UiIcon.MAXIMIZE.paint(canvas,UiColor.MUTED,1f,left,top,size);
+        if(checked)UiIcon.CHECK.paint(canvas,UiColor.TEXT,1f,left,top,size);
     }
 }

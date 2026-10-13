@@ -36,6 +36,7 @@ final class ArchaeologyChimePlayer {
     synchronized void enqueueLootMapDig() {
         phrases.add(READY);
     }
+    synchronized void enqueueMeteor(){phrases.add(new String[]{"sound.bell.handbell"});}
 
     synchronized void tick(World world) {
         if (active == null) {

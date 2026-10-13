@@ -60,12 +60,20 @@ jar {
         }
     } { exclude 'META-INF/MANIFEST.MF' }
     exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+    into('META-INF/waypointer') {
+        from rootProject.file('LICENSE')
+        from rootProject.file('THIRD_PARTY_NOTICES.txt')
+    }
 }
 
 task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries', ':client-wurm:verifyChamomiloUpdater']) {
     doLast {
         verifyEmbeddedUpdater(jar.archiveFile.get().asFile)
         def contents = zipTree(jar.archiveFile.get().asFile)
+        ['META-INF/waypointer/LICENSE', 'META-INF/waypointer/THIRD_PARTY_NOTICES.txt'].each { required ->
+            if (contents.matching { include required }.files.empty)
+                throw new GradleException('Missing embedded license notice: ' + required)
+        }
         ['SharedUpdateCoordinator', 'GitHubReleaseClient', 'ModUpdate', 'UpdateTarget', 'ModCatalog', 'SharedUpdateHooks', 'UpdatePreferences'].each { name ->
             if (contents.matching { include "org/chamomilo/wurm/update/${name}.class" }.files.empty)
                 throw new GradleException('Missing shared updater class: ' + name)
@@ -102,7 +110,22 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries', ':client-w
                 'com/wurmonline/client/renderer/gui/WaypointerHubWindow.class',
                 'com/wurmonline/client/renderer/gui/WaypointerContentPanel.class',
                 'com/wurmonline/client/renderer/gui/WaypointerFilterRow.class',
-                'com/wurmonline/client/renderer/gui/WaypointerSettingsPanel.class',
+                'com/wurmonline/client/renderer/gui/CreatureHighlightPanel.class',
+                'com/wurmonline/client/renderer/gui/CreatureHighlightColorWindow.class',
+                'org/waypoints/next/integration/CreatureHighlightRuntime.class',
+                'com/wurmonline/client/renderer/gui/TileHighlightPanel.class',
+                'com/wurmonline/client/renderer/gui/WaypointerCompactAction.class',
+                'org/waypoints/next/integration/TileHighlightRuntime.class',
+                'org/waypoints/next/integration/MeteoriteHighlightRuntime.class',
+                'org/waypoints/next/surroundings/MeteoritePolicy.class',
+                'org/waypoints/next/integration/WurmTileHighlightSampler.class',
+                'org/waypoints/next/tiles/TileHighlightSettings.class',
+                'org/waypoints/next/render/TileHighlightGeometry.class',
+                'com/wurmonline/client/renderer/effects/TileHighlightOverlay.class',
+                'org/waypoints/next/surroundings/CreatureHighlightRule.class',
+                'org/waypoints/next/surroundings/CreatureHighlightSettings.class',
+                'org/waypoints/next/surroundings/CreatureHighlightPolicy.class',
+                'org/waypoints/next/surroundings/CreatureAutoMarkSession.class',
                 'com/wurmonline/client/renderer/gui/TrackedTargetsPanel.class',
                 'com/wurmonline/client/renderer/gui/WaypointerTableHeader.class',
                 'com/wurmonline/client/renderer/gui/WaypointerTableActionCell.class',
@@ -314,51 +337,13 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries', ':client-w
     }
 }
 
-def textDocumentationDirectory = file("${buildDir}/text-documentation")
-def packagedDocuments = [
-        'README.md', 'THIRD_PARTY_NOTICES.txt', 'CHANGELOG.txt', 'EXTERNAL_MOD_API.txt',
-        'docs/WAYPOINTER_HUB.txt', 'docs/RENDER_DIAGNOSTICS.txt'
-]
-task prepareTextDocumentation {
-    inputs.files(packagedDocuments.collect { rootProject.file(it) })
-    outputs.dir(textDocumentationDirectory)
-    outputs.file(rootProject.file('README.txt'))
-    doLast {
-        packagedDocuments.each { relative ->
-            String plain = rootProject.file(relative).getText('UTF-8')
-                    .replaceAll(/!\[[^\]]*\]\([^\n)]*\)/, '')
-                    .replaceAll(/(?m)^#{1,6}\s+/, '')
-                    .replaceAll(/(?m)^\s*```[^\r\n]*\r?\n/, '')
-                    .replaceAll(/\[([^\]]+)\]\(([^)]+)\)/, '$1 ($2)')
-                    .replace('**', '').replace('`', '')
-            def target = new File(textDocumentationDirectory, relative.replaceAll(/\.md$/, '.txt'))
-            target.parentFile.mkdirs()
-            target.setText(plain, 'UTF-8')
-            if (relative == 'README.md') rootProject.file('README.txt').setText(plain, 'UTF-8')
-        }
-    }
-}
-
-task dist(type: Zip, dependsOn: [test, verifyArtifact, prepareTextDocumentation, ':client-wurm:verifyChamomiloUpdater', ':client-wurm:verifyWaypointerUi']) {
+task dist(type: Zip, dependsOn: [test, verifyArtifact, ':client-wurm:verifyChamomiloUpdater', ':client-wurm:verifyWaypointerUi']) {
     archiveFileName = "wurm-waypointer-${project.version}.zip"
     destinationDirectory = file("${buildDir}/distributions")
 
     into('mods/wurm-waypointer') {
         from jar
-        from textDocumentationDirectory
-        from rootProject.file('LICENSE')
-        into('assets/gallery') {
-            from(rootProject.file(
-                    'client-wurm/src/main/resources/org/waypoints/next/map/gallery')) {
-                include '*.png'
-            }
-        }
-        into('assets/compass') {
-            from(rootProject.file('render-wurm/src/main/resources/org/waypoints/next/compass')) {
-                include 'compass-hud-base.png', 'compass-hud-needle.png'
-            }
-        }
-
+        from rootProject.file('README.txt')
     }
     into('mods') {
         from rootProject.file('mods/wurm-waypointer.properties')
@@ -396,19 +381,6 @@ task dist(type: Zip, dependsOn: [test, verifyArtifact, prepareTextDocumentation,
                 'mods/wurm-waypointer.properties',
                 'mods/wurm-waypointer.config',
                 'mods/wurm-waypointer/README.txt',
-                'mods/wurm-waypointer/THIRD_PARTY_NOTICES.txt',
-                'mods/wurm-waypointer/LICENSE',
-                'mods/wurm-waypointer/CHANGELOG.txt',
-                'mods/wurm-waypointer/EXTERNAL_MOD_API.txt',
-                'mods/wurm-waypointer/docs/WAYPOINTER_HUB.txt',
-                'mods/wurm-waypointer/docs/RENDER_DIAGNOSTICS.txt',
-                'mods/wurm-waypointer/assets/gallery/liberty.png',
-                'mods/wurm-waypointer/assets/gallery/novus.png',
-                'mods/wurm-waypointer/assets/gallery/caza.png',
-                'mods/wurm-waypointer/assets/gallery/infinity-r5.png',
-                'mods/wurm-waypointer/assets/gallery/old-infinity.png',
-                'mods/wurm-waypointer/assets/compass/compass-hud-base.png',
-                'mods/wurm-waypointer/assets/compass/compass-hud-needle.png',
                 "mods/wurm-waypointer/wurm-waypointer-${project.version}.jar"
         ].sort()
         if (actual != expected) {
@@ -422,9 +394,24 @@ build.dependsOn verifyArtifact
 
 task verifyUiKit(type: Exec, dependsOn: jar) {
     def kitReference = rootProject.findProperty('chamomiloUiKitReference') ?: 'C:/projects/interface items'
-    commandLine 'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
-            '-File', new File(kitReference.toString(), 'tools/Verify-UiKitEmbedding.ps1').absolutePath,
-            '-ModJar', jar.archiveFile.get().asFile.absolutePath,
-            '-ReferenceJar', new File(updaterReference, 'dependencies/chamomilo-ui-0.4.10.jar').absolutePath
+    doFirst {
+        def metadata = new Properties()
+        def referenceArchive = new java.util.zip.ZipFile(new File(updaterReference, 'dist/chamomilo-updater.jar'))
+        try {
+            def entry = referenceArchive.getEntry('META-INF/chamomilo-updater.properties')
+            if (entry == null) throw new GradleException('Compiled updater is missing its UI kit metadata')
+            referenceArchive.getInputStream(entry).withCloseable { metadata.load(it) }
+        } finally { referenceArchive.close() }
+        def kitVersion = metadata.getProperty('uiKitVersion', '')
+        if (!(kitVersion ==~ /[0-9]+\.[0-9]+\.[0-9]+/)) throw new GradleException('Invalid pinned UI kit version')
+        def referenceKit = new File(updaterReference, "dependencies/chamomilo-ui-${kitVersion}.jar")
+        if (!referenceKit.isFile()) throw new GradleException('Pinned UI kit archive is missing')
+        def sha256 = java.security.MessageDigest.getInstance('SHA-256').digest(referenceKit.bytes).encodeHex().toString()
+        if (sha256 != metadata.getProperty('uiKitSha256')) throw new GradleException('Pinned UI kit SHA-256 differs from compiled updater metadata')
+        commandLine 'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+                '-File', new File(kitReference.toString(), 'tools/Verify-UiKitEmbedding.ps1').absolutePath,
+                '-ModJar', jar.archiveFile.get().asFile.absolutePath,
+                '-ReferenceJar', referenceKit.absolutePath
+    }
 }
 dist.dependsOn verifyUiKit

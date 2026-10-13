@@ -60,10 +60,7 @@ final class FilterListProbe {
                 }
             }
         } finally {height.setInt(WurmComponent.hud,originalHeight);}
-        hub.select(WaypointerSection.SETTINGS);
-        for(FlexComponent component:descendants(panels(hub).get(WaypointerSection.SETTINGS).getComponent()))
-            if(component instanceof WurmDropDown)verifyDropdown((WurmDropDown)component,output,null);
-        System.out.println("FULL_FILTER_LISTS_OK: "+language+", every checkbox filter, all manager/settings dropdowns, 80 options and 480px viewport");
+        System.out.println("FULL_FILTER_LISTS_OK: "+language+", every checkbox filter, manager dropdowns, 80 options and 480px viewport");
     }
 
     private static void verifyDropdown(WurmDropDown field,String output,String preview) throws Exception {

@@ -29,7 +29,7 @@ import java.util.logging.Logger;
 
 public final class WurmWaypointerMod implements WurmClientMod, Configurable, PreInitable, Initable,
         ModListener, SharedLanguageCoordinator.Participant {
-    public static final String VERSION = "1.7.6";
+    public static final String VERSION = "1.10.4";
 
     @Override public String[] supportedLanguageCodes() {
         return org.waypoints.next.i18n.Messages.CODES.clone();
@@ -233,8 +233,9 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
                 +bridge+"flushUploads(); org.waypoints.next.render.WaypointRenderProfiler.recordHudQueue($0.getQueueCount()); }";
         queue.getDeclaredMethod("render").insertBefore(before);
         queue.getDeclaredMethod("renderModern").insertBefore(before);
-        pool.get("com.wurmonline.client.renderer.backend.Backend")
-                .getDeclaredMethod("endFrame").insertAfter(bridge + "finishFrame();");
+        CtClass backend=pool.get("com.wurmonline.client.renderer.backend.Backend");
+        backend.getDeclaredMethod("beginFrame").insertBefore("com.wurmonline.client.renderer.effects.TileHighlightOverlay.flushUploads();");
+        backend.getDeclaredMethod("endFrame").insertAfter(bridge + "finishFrame(); com.wurmonline.client.renderer.effects.TileHighlightOverlay.finishFrame();");
     }
 
     /** Optional timings cannot prevent installation of texture retirement/upload hooks. */
@@ -546,6 +547,12 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
         creatures.getMethod("setAttitude", "(I)V").insertAfter(
                 "org.waypoints.next.integration.WurmWaypointerRuntime."
                         + "surroundingsRenderableUpserted($0);");
+        // Refresh condition/model matching even for stationary renamed creatures.
+        for(CtMethod method:creatures.getDeclaredMethods()) {
+            String name=method.getName();
+            if(name.equals("rename") || name.equals("changeModelName") || name.equals("setLayer"))
+                method.insertAfter("org.waypoints.next.integration.WurmWaypointerRuntime.surroundingsRenderableUpserted($0);");
+        }
 
         CtClass listener = pool.getCtClass(
                 "com.wurmonline.client.comm.ServerConnectionListenerClass");

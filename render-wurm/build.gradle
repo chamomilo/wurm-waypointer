@@ -66,6 +66,6 @@ check.dependsOn verifyRendererBoundary
 // This module is bundled into the one installable mod. Its standalone jar is
 // an internal build input and must never be installed by hand.
 jar {
-    manifest { attributes 'Chamomilo-UI-Version': '0.4.10' }
+    manifest { attributes 'Chamomilo-UI-Version': '0.4.11' }
     archiveFileName = "wurm-waypointer-render-wurm-internal-${project.version}.jar"
 }

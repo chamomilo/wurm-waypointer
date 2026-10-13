@@ -141,21 +141,6 @@
       "baseline": "common across the entire row and both weights"
     },
     {
-      "id": "settings.footer",
-      "block": "settings bottom action row",
-      "members": [
-        "Save settings",
-        "Reset draft"
-      ],
-      "density": "HIGH",
-      "family": "Alegreya Sans SC",
-      "height": 28,
-      "captionRows": 1,
-      "typographicLevel": "footer-action",
-      "sharedFontSize": "16 px shared across every localized caption and both weights",
-      "baseline": "common across both actions and weights"
-    },
-    {
       "id": "surroundings.monitor",
       "block": "summary toolbar above the surroundings table",
       "members": [
@@ -341,15 +326,135 @@
     {
       "id": "main-map.controls",
       "block": "general full-map toolbar",
-      "members": ["ALL MAPS ON SERVER", "Zoom speed: 1X / 2X / 4X", "CENTER", "NAV LINE", "MINI MAP", "DEEDS", "ROADS", "MARKS"],
+      "members": [
+        "ALL MAPS ON SERVER",
+        "Zoom speed: 1X / 2X / 4X",
+        "CENTER",
+        "NAV LINE",
+        "MINI MAP",
+        "DEEDS",
+        "ROADS",
+        "MARKS"
+      ],
       "density": "HIGH",
       "family": "Alegreya Sans SC",
       "height": 32,
       "captionRows": 1,
       "sharedFontSize": "one measured fit for the complete localized row in regular and bold, ceiling 16 px",
       "baseline": "centered union of every member's ink in both weights",
-      "widths": [200, 128, 72, 88, 88, 64, 64, 64],
+      "widths": [
+        200,
+        128,
+        72,
+        88,
+        88,
+        64,
+        64,
+        64
+      ],
       "excluded": "search and close are icon controls"
+    },
+    {
+      "id": "highlight.switches",
+      "block": "creature highlight enabled column",
+      "members": [
+        "ON",
+        "OFF"
+      ],
+      "density": "HIGH",
+      "family": "Alegreya Sans SC",
+      "height": 24,
+      "widths": [
+        50,
+        50
+      ],
+      "sharedFontSize": "fixed 16 px, shared UiCompactLayout regular/bold ink bounds",
+      "baseline": "shared centered ink bounds",
+      "preset": "COMPACT"
+    },
+    {
+      "id": "highlight.colors",
+      "block": "creature highlight color actions",
+      "members": [
+        "Color"
+      ],
+      "density": "HIGH",
+      "family": "Alegreya Sans SC",
+      "height": 24,
+      "widths": [
+        "native measured Color width, minimum 64"
+      ],
+      "sharedFontSize": "fixed 16 px, shared UiCompactLayout regular/bold ink bounds",
+      "baseline": "shared centered ink bounds",
+      "preset": "COMPACT"
+    },
+    {
+      "id": "highlight.bulk",
+      "block": "creature highlight fixed top toolbar",
+      "members": [
+        "ALL ON",
+        "ALL OFF"
+      ],
+      "density": "HIGH",
+      "family": "Alegreya Sans SC",
+      "height": 28,
+      "widths": [
+        110,
+        110
+      ],
+      "sharedFontSize": "one measured localized fit in regular and bold for both actions",
+      "baseline": "shared centered ink bounds"
+    },
+    {
+      "id": "highlight.color-actions",
+      "block": "on-demand creature highlight color popup",
+      "members": [
+        "Apply color",
+        "Cancel"
+      ],
+      "density": "HIGH",
+      "family": "Alegreya Sans SC",
+      "height": 28,
+      "widths": [
+        180,
+        180
+      ],
+      "sharedFontSize": "one measured localized fit in regular and bold for both popup actions",
+      "baseline": "shared centered ink bounds"
+    },
+    {
+      "id": "tiles.switches",
+      "block": "independent surface tile and meteor overlay switches",
+      "members": [
+        "ON",
+        "OFF"
+      ],
+      "widths": [
+        50,
+        50
+      ],
+      "height": 24,
+      "preset": "COMPACT",
+      "density": "HIGH",
+      "family": "Alegreya Sans SC",
+      "sharedFontSize": "fixed 16 px via UiCompactLayout",
+      "baseline": "shared regular/bold ink envelope"
+    },
+    {
+      "id": "tiles.colors",
+      "block": "non-rideable, harvestable, overaged and meteor Color actions",
+      "members": [
+        "Color"
+      ],
+      "widths": [
+        64
+      ],
+      "height": 24,
+      "preset": "COMPACT",
+      "density": "HIGH",
+      "family": "Alegreya Sans SC",
+      "sharedFontSize": "fixed 16 px via UiCompactLayout",
+      "baseline": "shared regular/bold ink envelope"
     }
   ]
 }

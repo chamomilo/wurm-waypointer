@@ -25,7 +25,6 @@ import org.waypoints.next.render.WaypointDistanceLabel;
 import org.waypoints.next.render.WaypointRenderProfiler;
 import org.waypoints.next.render.WaypointRenderRuntimeBridge;
 
-import java.io.File;
 import java.net.URL;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -47,8 +46,6 @@ public final class WaypointCompassMarkerBridge {
             "/org/waypoints/next/compass/compass-hud-base.png";
     private static final String COMPASS_NEEDLE_RESOURCE =
             "/org/waypoints/next/compass/compass-hud-needle.png";
-    private static final File COMPASS_ASSET_DIRECTORY = new File(
-            "mods/wurm-waypointer/assets/compass");
     private static final Matrix NEEDLE_MATRIX = new Matrix();
     private static final ExecutorService ARTWORK_WORKER =
             Executors.newSingleThreadExecutor(new ThreadFactory() {
@@ -185,21 +182,11 @@ public final class WaypointCompassMarkerBridge {
 
     /**
      * Patched com.wurmonline bridge classes are defined by the game loader, which
-     * does not expose resources from the mod JAR. Prefer the distribution's
-     * file-backed copy and retain class-loader fallbacks for development runs.
+     * does not expose resources from the mod JAR. Resolve artwork through the
+     * mod-owned runtime bridge so the install only needs the complete mod JAR.
      */
     private static URL artworkUrl(String path) {
         String resourceName = path.startsWith("/") ? path.substring(1) : path;
-        String fileName = resourceName.substring(resourceName.lastIndexOf('/') + 1);
-        File sidecar = new File(COMPASS_ASSET_DIRECTORY, fileName);
-        if (sidecar.isFile()) {
-            try {
-                return sidecar.toURI().toURL();
-            } catch (Exception ignored) {
-                // Fall through to embedded resource lookup.
-            }
-        }
-
         URL embedded = resourceFrom(
                 WaypointRenderRuntimeBridge.class.getClassLoader(), resourceName);
         if (embedded == null) {

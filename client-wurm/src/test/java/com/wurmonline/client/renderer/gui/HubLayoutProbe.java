@@ -20,8 +20,17 @@ public final class HubLayoutProbe {
     private static final ServerIdentity server=ServerIdentity.of(new ServerEndpoint("127.0.0.1",3724,27016),"Fixture","Fixture",ServerIdentity.Resolution.RESOLVED);
     private static int saves,clearPreviews,managedRefreshes,animalRefreshes;
     private static long trackingRevision;
+    private static Map<CreatureHighlightRule,Integer> detected=Collections.emptyMap();
+    static void detectedCount(CreatureHighlightRule rule,int count) {
+        Map<CreatureHighlightRule,Integer> next=new EnumMap<CreatureHighlightRule,Integer>(CreatureHighlightRule.class);
+        next.putAll(detected);next.put(rule,count);detected=Collections.unmodifiableMap(next);
+    }
     public static void main(String[] args)throws Exception{
         Files.createDirectories(Paths.get(args[1]));Instant now=Instant.now();TrackingCatalog tracking=new TrackingCatalog();tracking.bind(server,"Alice",now);
+        org.waypoints.next.tiles.TileHighlightSettings.prepareStartup(settings);
+        detectedCount(CreatureHighlightRule.PLAYERS,2);detectedCount(CreatureHighlightRule.ANIMALS,18);
+        detectedCount(CreatureHighlightRule.AGGRESSIVE_ANIMALS,5);detectedCount(CreatureHighlightRule.MONSTERS,4);
+        detectedCount(CreatureHighlightRule.UNIQUE,1);detectedCount(CreatureHighlightRule.CHAMPION,2);detectedCount(CreatureHighlightRule.DISEASED,1);
         WaypointRecord mare=tracking.live(ManagedKind.ANIMAL,"42","Mare Alpha","Manage horse",new WaypointCoordinate(110,90,2d,WaypointLayer.SURFACE),now);tracking.enabled(mare.getId(),true,now);tracking.vanished(ManagedKind.ANIMAL,"42",now);
         tracking.candidate(ManagedKind.ANIMAL,"43","Horse Beta","Manage horse",now);
         tracking.live(ManagedKind.VEHICLE,"44","Cart Gamma","Manage small cart",new WaypointCoordinate(200,100,2d,WaypointLayer.SURFACE),now);
@@ -42,7 +51,7 @@ public final class HubLayoutProbe {
                     return defaultValue(m2);
                 });
                 case "surroundings":return proxy(SurroundingsController.class,(p2,m2,a2)->{if(m2.getName().equals("snapshot"))return surroundings.snapshot((SurroundingsQuery)a2[0],400,400);if(m2.getName().equals("setWaypoint")){surroundings.setWaypoint((SurroundingKey)a2[0],(Boolean)a2[1]);return null;}if(m2.getName().equals("revision"))return surroundings.revision();return defaultValue(m2);});
-                case "settings":return proxy(SettingsController.class,(p2,m2,a2)->{if(m2.getName().equals("values")){Properties copy=new Properties();copy.putAll(settings);return copy;}if(m2.getName().equals("status"))return "";if(m2.getName().equals("save")){settings.putAll((Properties)a2[0]);saves++;}return null;});
+                case "settings":return proxy(SettingsController.class,(p2,m2,a2)->{if(m2.getName().equals("values")){Properties copy=new Properties();copy.putAll(settings);return copy;}if(m2.getName().equals("detectedCreatures"))return detected;if(m2.getName().equals("detectedMeteors"))return 2;if(m2.getName().equals("status"))return "";if(m2.getName().equals("save")){settings.putAll((Properties)a2[0]);saves++;}return null;});
                 case "clearLivePreview":clearPreviews++;return null;
                 case "reportFailure":throw new AssertionError(String.valueOf(a[0]),(Throwable)a[1]);
                 default:return defaultValue(m);
@@ -52,9 +61,29 @@ public final class HubLayoutProbe {
             Messages.select("en");WaypointerLayoutProbe.preparePreview(args[0],args[2],12);verifyTrackedScroll(controller);
             System.out.println("TRACKED_TABLE_SCROLL_OK: SDK scroll, background order and visible UUID retention");return;
         }
+        if(Boolean.getBoolean("waypointer.probe.highlightOnly")) {
+            for(String language:Messages.CODES) {
+                Messages.select(language);WaypointerLayoutProbe.preparePreview(args[0],args[2],12);
+                WaypointerHubWindow hub=new WaypointerHubWindow(controller);hub.setSize(1,480);hub.setPosition(10,10);hub.select(WaypointerSection.CREATURES_HIGHLIGHT);hub.gameTick();
+                CreatureHighlightPanel panel=(CreatureHighlightPanel)panels(hub).get(WaypointerSection.CREATURES_HIGHLIGHT);verifyScrollWidths(panel);
+                CreatureHighlightPanelProbe.verify(hub,panel,args[1],language);
+                CreatureHighlightColorWindow previousPopup=CreatureHighlightPanelProbe.openDraft(hub,panel);
+                String draft=(String)field(panel,"draftColor");Object selected=field(panel,"selected");
+                check(((WaypointColorPicker)field(previousPopup,"picker")).hexText().equals(draft),"Original popup matches its draft");
+                Messages.select(language.equals("ru")?"en":"ru");hub.gameTick();
+                CreatureHighlightPanel translated=(CreatureHighlightPanel)panels(hub).get(WaypointerSection.CREATURES_HIGHLIGHT);
+                check(draft.equals(field(translated,"draftColor"))&&selected==field(translated,"selected"),"Highlight draft and selected rule survive language switch");
+                CreatureHighlightColorWindow translatedPopup=(CreatureHighlightColorWindow)field(translated,"colorWindow");
+                check(translatedPopup!=null&&WurmComponent.hud.getComponents().contains(translatedPopup)&&!WurmComponent.hud.getComponents().contains(previousPopup),"Language rebuild replaces an open popup without leaking the old window");
+                String translatedHex=((WaypointColorPicker)field(translatedPopup,"picker")).hexText();
+                check(translatedHex.equals(draft),"Relocalized popup retains its HSV draft: expected="+draft+", actual="+translatedHex);
+                hub.prepareDetach();check(!WurmComponent.hud.getComponents().contains(translatedPopup),"Manager detach removes the colour popup");
+            }
+            Messages.select("en");NativeUiRenderFixture.verified();System.out.println("HIGHLIGHT_UI_OK: four languages, every visible toggle/checkbox, popup HSV input, apply/cancel/close, fixed alpha, native clipping, draft retention, detach cleanup");return;
+        }
         for(String language:Messages.CODES){Messages.select(language);settings.setProperty("language",language);WaypointerLayoutProbe.preparePreview(args[0],args[2],12);
             WaypointerHubWindow hub=new WaypointerHubWindow(controller);hub.setSize(1120,480);hub.setPosition(10,10);hub.gameTick();
-            @SuppressWarnings("unchecked") Map<WButton,WaypointerSection> selectors=(Map<WButton,WaypointerSection>)field(hub,"selectors");check(selectors.size()==7,"Seven selectors");
+            @SuppressWarnings("unchecked") Map<WButton,WaypointerSection> selectors=(Map<WButton,WaypointerSection>)field(hub,"selectors");check(selectors.size()==8,"Eight selectors; Settings is only in the updater registry");
             WaypointerLayoutProbe.savePreview(hub,Paths.get(args[1],"initial.png").toString());
             WaypointerLayoutProbe.verifyStableOpacity(hub);
             for(Map.Entry<WButton,WaypointerSection> selector:selectors.entrySet()){
@@ -104,6 +133,8 @@ public final class HubLayoutProbe {
                 }
                 for(WButton tab:selectors.keySet())verifyPaintedCaption(tab,tab.getLabel(),tab.text,0,1);
                 if(panel instanceof TrackedTargetsPanel)verifyTrackedTargets((TrackedTargetsPanel)panel);
+                if(panel instanceof CreatureHighlightPanel)CreatureHighlightPanelProbe.verify(hub,(CreatureHighlightPanel)panel,args[1],language);
+                if(panel instanceof TileHighlightPanel)TileHighlightPanelProbe.verify(hub,(TileHighlightPanel)panel,args[1],language);
                 if(panel instanceof SurroundingsWindow){
                     WButton monitor=(WButton)field(panel,"monitoringButton");
                     verifyMonitorCaption(monitor);
@@ -129,7 +160,7 @@ public final class HubLayoutProbe {
             }
             check(canRemove,"Explicitly added targets can be removed from ALL WAYPOINTS");
             WurmDropDown type=(WurmDropDown)field(manager,"typeFilter");type.setValue(1);
-            hub.select(WaypointerSection.SETTINGS);hub.select(WaypointerSection.ALL_WAYPOINTS);check(panels(hub).get(WaypointerSection.ALL_WAYPOINTS)==manager,"Switch retains panel");check(type.getValue()==1,"Structured filters survive section switch");
+            hub.select(WaypointerSection.TILES_HIGHLIGHT);hub.select(WaypointerSection.ALL_WAYPOINTS);check(panels(hub).get(WaypointerSection.ALL_WAYPOINTS)==manager,"Switch retains panel");check(type.getValue()==1,"Structured filters survive section switch");
             for(WaypointerSection from:WaypointerSection.values()){
                 hub.select(from);hub.gameTick();
                 for(Map.Entry<WButton,WaypointerSection> selector:selectors.entrySet()){
@@ -142,9 +173,6 @@ public final class HubLayoutProbe {
                     verifyInputRouting(hub,button,panels(hub).get(selector.getValue()));
                 }
             }
-            hub.select(WaypointerSection.SETTINGS);WaypointerSettingsPanel panel=(WaypointerSettingsPanel)panels(hub).get(WaypointerSection.SETTINGS);
-            for(SettingSpec spec:((Map<SettingSpec,FlexComponent>)field(panel,"editors")).keySet())check(!spec.key.equals("language"),"Only the updater offers language selection");
-            panel.buttonClicked((WButton)field(panel,"save"));check(saves>0,"Settings save action");
             check(hub instanceof ChamomiloUiV1Window,"Standard window");
             verifyAuxiliaryUi(hub,language,args[1]);
             FilterListProbe.verify(hub,args[1],language);
@@ -154,8 +182,9 @@ public final class HubLayoutProbe {
             hub.toggleMaximized();check(hub.width==WurmComponent.hud.getWidth()-20,"Standard maximize uses the current HUD");
             hub.toggleMaximized();check(hub.width==normalWidth&&hub.height==normalHeight,"Standard maximize restores dimensions");
         }
+        TileHighlightPanelProbe.verifyLanguage(controller);
         for(int size:new int[]{10,18}){WaypointerLayoutProbe.preparePreview(args[0],args[2],size);Messages.select("ru");WaypointerHubWindow hub=new WaypointerHubWindow(controller);hub.setSize(1,480);hub.setPosition(10,10);for(WaypointerSection view:WaypointerSection.values()){hub.select(view);hub.gameTick();verifyScrollWidths(panels(hub).get(view));WaypointerLayoutProbe.savePreview(hub,Paths.get(args[1],"waypointer-ru-font-"+size+"-"+view+".png").toString());}}
-        WaypointerLayoutProbe.preparePreview(args[0],args[2],12);Messages.select("en");verifyTrackedScroll(controller);WaypointManagerPanelProbe.verify(args[1]);check(clearPreviews>0,"Editor previews cleaned on leave");NativeUiRenderFixture.verified();Messages.select("en");System.out.println("WAYPOINTER_UI_OK: native SDK UV crops, HUD blend/depth state, seven panels, four languages, clicks/input routing, typography groups, fonts 10/12/18");
+        WaypointerLayoutProbe.preparePreview(args[0],args[2],12);Messages.select("en");verifyTrackedScroll(controller);WaypointManagerPanelProbe.verify(args[1]);check(clearPreviews>0,"Editor previews cleaned on leave");NativeUiRenderFixture.verified();Messages.select("en");System.out.println("WAYPOINTER_UI_OK: native SDK UV crops, HUD blend/depth state, eight panels; general Settings only in updater, four languages, clicks/input routing, typography groups, fonts 10/12/18");
     }
     private static void verifyTrackedTargets(TrackedTargetsPanel panel)throws Exception {
         WButton refresh=(WButton)field(panel,"refreshButton");
@@ -278,7 +307,7 @@ public final class HubLayoutProbe {
         verifySurroundingsGroups(nearby);
         WaypointerLayoutProbe.savePreview(filter,Paths.get(output,"condition-filter-"+language+".png").toString());
         WaypointerLayoutProbe.verifyStableOpacity(filter);
-        hub.select(WaypointerSection.SETTINGS);check(field(nearby,"filterWindow")==null,"Switching view disposes the filter window");
+        hub.select(WaypointerSection.TILES_HIGHLIGHT);check(field(nearby,"filterWindow")==null,"Switching view disposes the filter window");
         org.waypoints.next.map.MiniMapState miniState=new org.waypoints.next.map.MiniMapState();
         MiniMapWindow mini=new MiniMapWindow(miniState);mini.setPosition(10,10);
         WaypointerLayoutProbe.savePreview(mini,Paths.get(output,"mini-map-"+language+".png").toString());

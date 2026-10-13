@@ -108,10 +108,14 @@ public final class WurmWaypointerRuntime {
             new ArchaeologyRuntime(LOGGER);
     private static final SurroundingsRuntime SURROUNDINGS =
             new SurroundingsRuntime(LOGGER);
+    private static final CreatureHighlightRuntime HIGHLIGHTS = new CreatureHighlightRuntime();
+    private static final TileHighlightRuntime TILE_HIGHLIGHTS = new TileHighlightRuntime();
+    private static final MeteoriteHighlightRuntime METEORS = new MeteoriteHighlightRuntime();
     private static final TrackedTargetsRuntime TRACKED = new TrackedTargetsRuntime(LOGGER);
     private static volatile java.util.Properties pendingSettings;
+    private static java.util.Properties appliedHubSettings;
     private static final HubSettings HUB_SETTINGS = new HubSettings(
-            java.nio.file.Paths.get("mods", "wurm-waypointer.config"), p -> pendingSettings = p);
+            java.nio.file.Paths.get("mods", "wurm-waypointer.config"), p -> pendingSettings = p,HIGHLIGHTS::detectedCounts,METEORS::count);
     private static final ConcurrentLinkedQueue<UUID> EXTERNAL_NAVIGATION_REQUESTS =
             new ConcurrentLinkedQueue<UUID>();
     private static final List<DynamicWaypointProvider> DYNAMIC_WAYPOINTS =
@@ -149,6 +153,8 @@ public final class WurmWaypointerRuntime {
     private static volatile PickableUnit[] scannerOutlineTargets =
             NO_SCANNER_OUTLINES;
     private static volatile long scannerOutlineRevision = Long.MIN_VALUE;
+    private static volatile long highlightOutlineRevision = Long.MIN_VALUE;
+    private static volatile long meteorOutlineRevision = Long.MIN_VALUE;
     private static volatile int scannerOutlinePlayerTileX = Integer.MIN_VALUE;
     private static volatile int scannerOutlinePlayerTileY = Integer.MIN_VALUE;
     private static volatile int scannerOutlinePlayerLayer = Integer.MIN_VALUE;
@@ -451,6 +457,9 @@ public final class WurmWaypointerRuntime {
         configure(beamValue);
         waypointConfiguration = waypointValue == null
                 ? WaypointClientConfiguration.defaults() : waypointValue;
+        HIGHLIGHTS.configure(HUB_SETTINGS.values());
+        TILE_HIGHLIGHTS.configure(HUB_SETTINGS.values());
+        METEORS.configure(HUB_SETTINGS.values());
         STATIC_WAYPOINTS.configureAndLoad(waypointConfiguration);
         DEEDS.configure(waypointConfiguration);
         STATIC_NAVIGATION.configure(waypointConfiguration);
@@ -519,15 +528,24 @@ public final class WurmWaypointerRuntime {
                 pendingSettings = null;
                 // Current preferences and language already changed on the HUD thread.
                 // An older completed disk write must not restore its language snapshot.
-                TRACKED.configure(changedSettings);
-                configure(configuration, WaypointClientConfiguration.from(changedSettings));
-                String profile = changedSettings.getProperty("scannerProfile", "off");
-                if ("off".equals(profile)) SURROUNDINGS.deactivateScanner();
-                else SURROUNDINGS.activateScanner(profile);
+                java.util.Properties latestSettings=HUB_SETTINGS.values();
+                HIGHLIGHTS.configure(latestSettings);
+                TILE_HIGHLIGHTS.configure(latestSettings);
+                METEORS.configure(latestSettings);
+                // A highlight switch must not reset a scanner started from a command.
+                if(HubSettings.generalChanged(appliedHubSettings,latestSettings)) {
+                    TRACKED.configure(latestSettings);
+                    configure(configuration, WaypointClientConfiguration.from(latestSettings));
+                    String profile = latestSettings.getProperty("scannerProfile", "off");
+                    if ("off".equals(profile)) SURROUNDINGS.deactivateScanner();
+                    else SURROUNDINGS.activateScanner(profile);
+                }
+                appliedHubSettings=latestSettings;
             }
             if (hud != currentHud) hudReady(currentHud);
             World world = currentHud.getWorld();
             if (world == null || awaitingServerInformation || confirmedWorld != world) return;
+            TILE_HIGHLIGHTS.tick(world,System.currentTimeMillis());
             if (identity == null && !confirmedWorldName.isEmpty()) {
                 identity = SERVER.resolve(confirmedWorldName);
                 LOGGER.info("Server identity resolved: " + describe(identity));
@@ -566,6 +584,8 @@ public final class WurmWaypointerRuntime {
             TRACKED.navigationOwner(priorAnimalOwner==null?null:priorAnimalOwner.getKey().getWaypointId());
             TRACKED.tick(currentHud, identity, SURROUNDINGS, java.time.Instant.now());
             SURROUNDINGS.tick(System.currentTimeMillis());
+            autoMarkCreatures(currentHud);
+            autoMarkMeteors(currentHud);
             refreshScannerOutlineTargets(world);
             STATIC_NAVIGATION.tick(world, currentHud, identity,
                     world.getUsername(), combineDynamicWaypoints(
@@ -1050,8 +1070,48 @@ public final class WurmWaypointerRuntime {
     }
 
     /** Immutable cached array consumed by the injected world-render pass. */
+    private static void autoMarkCreatures(HeadsUpDisplay currentHud) {
+        if(identity==null || currentHud==null)return;
+        org.waypoints.next.surroundings.CreatureHighlightSettings settings=HIGHLIGHTS.settings();
+        if(!settings.autoMark(org.waypoints.next.surroundings.CreatureHighlightRule.UNIQUE)
+                && !settings.autoMark(org.waypoints.next.surroundings.CreatureHighlightRule.CHAMPION)
+                && !settings.autoMark(org.waypoints.next.surroundings.CreatureHighlightRule.DISEASED))return;
+        java.util.Collection<SurroundingKey> existing=null;
+        boolean changed=false;
+        for(SurroundingEntry entry:SURROUNDINGS.entries()) {
+            org.waypoints.next.surroundings.CreatureHighlightRule rule=HIGHLIGHTS.autoMark(entry);
+            if(rule==null)continue;
+            if(existing==null)existing=allSurroundingsWaypointKeys();
+            if(!existing.contains(entry.getKey())) {
+                org.waypoints.next.surroundings.ScannerColor color=HIGHLIGHTS.settings().color(rule);
+                MarkerStyle style=new MarkerStyle(MarkerStyle.WorldStyle.TARGET_CROSSHAIR,
+                        color.getRed(),color.getGreen(),color.getBlue(),1f,9f,2f,true,true);
+                STATIC_WAYPOINTS.upsertExternalObjectWaypoint(entry,"creatures-highlight","auto-mark",
+                        style,0,currentHud,identity,java.time.Instant.now());
+                changed=true;
+            }
+            HIGHLIGHTS.marked(entry.getKey());
+        }
+        if(changed)SURROUNDINGS.reconcileWaypoints(allSurroundingsWaypointKeys());
+    }
+
     public static PickableUnit[] currentScannerOutlineTargets() {
         return scannerOutlineTargets;
+    }
+    private static void autoMarkMeteors(HeadsUpDisplay currentHud) {
+        if(identity==null||currentHud==null)return;
+        boolean changed=false;java.util.Collection<SurroundingKey> existing=null;
+        int rgb=METEORS.settings().meteorRgb();
+        for(SurroundingEntry entry:METEORS.pendingMarks()) {
+            if(existing==null)existing=allSurroundingsWaypointKeys();
+            if(!existing.contains(entry.getKey())) {
+                MarkerStyle style=new MarkerStyle(MarkerStyle.WorldStyle.TARGET_CROSSHAIR,((rgb>>16)&255)/255f,((rgb>>8)&255)/255f,(rgb&255)/255f,1,9,2,true,true);
+                STATIC_WAYPOINTS.upsertExternalObjectWaypoint(entry,"tiles-highlight","meteorite",style,0,currentHud,identity,java.time.Instant.now());changed=true;
+            }
+            METEORS.marked(entry.getKey());
+        }
+        if(changed)SURROUNDINGS.reconcileWaypoints(allSurroundingsWaypointKeys());
+        while(METEORS.pollChime())ARCHAEOLOGY_CHIMES.enqueueMeteor();
     }
 
     private static void refreshScannerOutlineTargets(World world) {
@@ -1060,20 +1120,27 @@ public final class WurmWaypointerRuntime {
             return;
         }
         long revision = SURROUNDINGS.revision();
+        long highlightRevision = HIGHLIGHTS.revision();
+        long meteorRevision=METEORS.revision();
         int tileX = (int) Math.floor(world.getPlayerPosX() / 4.0d);
         int tileY = (int) Math.floor(world.getPlayerPosY() / 4.0d);
         int layer = world.getPlayerLayer();
         if (revision == scannerOutlineRevision
+                && highlightRevision == highlightOutlineRevision
+                && meteorRevision == meteorOutlineRevision
                 && tileX == scannerOutlinePlayerTileX
                 && tileY == scannerOutlinePlayerTileY
                 && layer == scannerOutlinePlayerLayer) return;
         List<SurroundingsRuntime.ScannerOutlineSubject> subjects =
                 SURROUNDINGS.scannerOutlineSubjects(world.getPlayerPosX(),
                         world.getPlayerPosY(), layer);
-        List<PickableUnit> targets = new ArrayList<PickableUnit>(subjects.size());
+        List<PickableUnit> targets = HIGHLIGHTS.outlines();
+        targets.addAll(METEORS.outlines());
+        Set<Long> highlightedIds = new java.util.HashSet<Long>();
+        for(PickableUnit target:targets)highlightedIds.add(target.getId());
         for (SurroundingsRuntime.ScannerOutlineSubject subject : subjects) {
             Object renderable = subject.getRenderable();
-            if (renderable instanceof PickableUnit) {
+            if (renderable instanceof PickableUnit && !highlightedIds.contains(((PickableUnit)renderable).getId())) {
                 targets.add(new ScannerOutlinePickable(
                         (PickableUnit) renderable, subject.getColor()));
             }
@@ -1081,6 +1148,8 @@ public final class WurmWaypointerRuntime {
         scannerOutlineTargets = targets.isEmpty() ? NO_SCANNER_OUTLINES
                 : targets.toArray(new PickableUnit[targets.size()]);
         scannerOutlineRevision = revision;
+        highlightOutlineRevision = highlightRevision;
+        meteorOutlineRevision=meteorRevision;
         scannerOutlinePlayerTileX = tileX;
         scannerOutlinePlayerTileY = tileY;
         scannerOutlinePlayerLayer = layer;
@@ -1089,6 +1158,8 @@ public final class WurmWaypointerRuntime {
     private static void invalidateScannerOutlineTargets() {
         scannerOutlineTargets = NO_SCANNER_OUTLINES;
         scannerOutlineRevision = Long.MIN_VALUE;
+        highlightOutlineRevision = Long.MIN_VALUE;
+        meteorOutlineRevision=Long.MIN_VALUE;
         scannerOutlinePlayerTileX = Integer.MIN_VALUE;
         scannerOutlinePlayerTileY = Integer.MIN_VALUE;
         scannerOutlinePlayerLayer = Integer.MIN_VALUE;
@@ -1197,6 +1268,7 @@ public final class WurmWaypointerRuntime {
 
     public static void effectRendererCleared(Object renderer) {
         try {
+            TILE_HIGHLIGHTS.clear();
             WurmBeamProbeController current = beam;
             if (current != null) current.rendererCleared(renderer);
             STATIC_NAVIGATION.rendererCleared(renderer);
@@ -1471,7 +1543,9 @@ public final class WurmWaypointerRuntime {
     /** Called after a creature or ground item enters or changes in the client. */
     public static void surroundingsRenderableUpserted(Object renderable) {
         try {
+            HIGHLIGHTS.upsert(renderable);
             SurroundingEntry entry = SURROUNDINGS.upsertRenderable(renderable);
+            METEORS.observe(entry,renderable);
             TRACKED.observe(renderable, null, null, null, entry, java.time.Instant.now());
             STATIC_WAYPOINTS.refreshExternalObjectWaypoints(
                     entry, java.time.Instant.now());
@@ -1485,8 +1559,10 @@ public final class WurmWaypointerRuntime {
     public static void surroundingsCreatureMoved(Object renderable, float worldX,
                                                   float worldY, float height) {
         try {
+            HIGHLIGHTS.upsert(renderable);
             SurroundingEntry entry = SURROUNDINGS.creatureMoved(
                     renderable, worldX, worldY, height);
+            METEORS.observe(entry,renderable);
             TRACKED.observe(renderable, (double) worldX, (double) worldY, (double) height, entry, java.time.Instant.now());
             STATIC_WAYPOINTS.refreshExternalObjectWaypoints(
                     entry, java.time.Instant.now());
@@ -1500,8 +1576,10 @@ public final class WurmWaypointerRuntime {
     public static void surroundingsRenderableRemoved(Object renderable,
                                                       boolean removedFromWorld) {
         try {
+            HIGHLIGHTS.remove(renderable);
             SurroundingKey removed = SURROUNDINGS.removeRenderable(
                     renderable, removedFromWorld);
+            METEORS.remove(removed);
             TRACKED.removed(renderable, removed, java.time.Instant.now());
             // In the pinned client true is used by authoritative server removals
             // (picked up, buried, destroyed, dead-animation completion, etc.).
@@ -1517,6 +1595,7 @@ public final class WurmWaypointerRuntime {
     public static void surroundingsCreatureReplacedByCorpse(long creatureId,
                                                              long corpseId) {
         try {
+            HIGHLIGHTS.died(creatureId);
             SurroundingKey removed = new SurroundingKey(
                     SurroundingKind.ANIMAL, creatureId);
             SURROUNDINGS.removeAuthoritatively(removed);
@@ -1538,7 +1617,7 @@ public final class WurmWaypointerRuntime {
 
     /** Called when Wurm clears the active cell renderer. */
     public static void surroundingsRenderablesCleared() {
-        try { TRACKED.clearLive(); SURROUNDINGS.clearRenderables(); }
+        try { HIGHLIGHTS.clearLoaded(); METEORS.clearLoaded(); TILE_HIGHLIGHTS.clear(); invalidateScannerOutlineTargets(); TRACKED.clearLive(); SURROUNDINGS.clearRenderables(); }
         catch (Throwable failure) {
             LOGGER.log(Level.FINE, "Surroundings clear hook failed open", failure);
         }
@@ -1797,6 +1876,9 @@ public final class WurmWaypointerRuntime {
     }
 
     private static void endDynamicSessions() {
+        HIGHLIGHTS.endSession();
+        METEORS.endSession();
+        TILE_HIGHLIGHTS.clear();
         for (DynamicWaypointProvider provider : DYNAMIC_WAYPOINTS) {
             provider.connectionEnded();
         }
@@ -1819,6 +1901,11 @@ public final class WurmWaypointerRuntime {
     }
     public static void configureHub(java.util.Properties properties) {
         HUB_SETTINGS.configure(properties);
+        org.chamomilo.wurm.update.SharedModSettings.register("wurm-waypointer",new WaypointerModSettings(HUB_SETTINGS));
+        appliedHubSettings=null;
+        HIGHLIGHTS.configure(HUB_SETTINGS.values());
+        TILE_HIGHLIGHTS.configure(HUB_SETTINGS.values());
+        METEORS.configure(HUB_SETTINGS.values());
         TRACKED.configure(properties);
         pendingSettings=properties;
     }

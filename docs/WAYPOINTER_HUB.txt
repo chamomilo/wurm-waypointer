@@ -1,6 +1,43 @@
 Waypointer hub and tracking
 
-The main window owns selection, frame and native window lifecycle. Each section is a reusable content panel; switching sections preserves its current filters. Edit previews are cleared when leaving the waypoint editor. All global configuration preferences live in SETTINGS; record styles and list filters stay beside the records they affect.
+The main window owns selection, frame and native window lifecycle. Each section is a reusable content panel; switching sections preserves its current filters. Edit previews are cleared when leaving the waypoint editor. General configuration preferences live in the shared updater Mods Registry; creature outline preferences live in CREATURES HIGHLIGHT. Record styles and list filters stay beside the records they affect.
+
+Creatures Highlight
+
+Twelve traits are in the left column; Players, Non-aggressive animals, Aggressive animals, Monsters, Unique, Small, Mini and Tiny are in the right. All twenty rows fit without scrolling using the shared Compact controls. Each column has fixed, closely spaced ON/OFF, name/count and colour controls, with a 56 px gap between the columns. ALL ON / ALL OFF stay at the top. Explanatory text is omitted from this panel.
+
+Each row starts with an independent ON/OFF button (green ON), then the creature/category name, colour swatch, Color button and optional Auto-mark checkbox. Select Color to open a separate popup, drag the shared HSV picker and press Apply color to save and close it. Cancel or the window close button discards the draft. The main panel has no permanent picker. Switches and checkboxes save immediately. The established ESP palette and enabled switches are configuration defaults; saved custom values are retained on load. An open popup and its draft survive shared language switching; selecting a different rule loads that rule's saved colour. Leaving the section or closing the manager removes the popup. Preferences persist in wurm-waypointer.config under creatureHighlight.<rule>.enabled and .color (hex #RRGGBB).
+
+Categories: Players, Non-aggressive animals, Aggressive animals, Monsters and Unique. Non-aggressive animals include sheep, cows, buffalo/bison, chickens, horses, pigs and other ordinary livestock. Aggressive animals include wolves, spiders, lions, bears, crocodiles, scorpions and other wild predators. Monsters cover fantasy/humanoid creature families such as trolls, goblins, demons, hell creatures and dragons. Groups follow the received species/model rather than current attitude: a tamed wolf retains the aggressive-animal colour, while an angry cow retains its non-aggressive family unless an enabled modifier overrides it. Unique uses the existing vanilla unique-family classifier. Conditions: Champion, Diseased, Fierce, Angry, Raging, Slow, Alert, Greenish, Lurking, Sly, Hardened, Scared, Small, Mini and Tiny. Enabled condition colours override Unique, then the animal/monster category. Disabled specific rules fall back to enabled broader rules. The native model outline also works without an active scanner profile; the chosen highlight colour takes priority when both match.
+
+Every name includes its current detected count, for example Monsters (12). Counts include loaded living creatures on both layers independently of ON/OFF and outline priority. Each creature contributes to its species category and any matching Unique/condition rows, so those counts can overlap. Appearance, unload, death, rename/model/condition changes and disconnect refresh the immutable count snapshot. Movement does not create duplicates. Counts change existing labels without rebuilding rows, discarding a colour popup draft. Shared checkbox glyphs are centered inside their 24 px Compact buttons and retain the standard press displacement.
+
+ALL ON and ALL OFF in the fixed top toolbar switch all twenty outline rules in one saved operation, including Small/Mini/Tiny. They remain above both fixed columns and retain colour preferences, Auto-mark flags, detected counts and any open colour draft. Both bulk actions share one measured caption group in the current language.
+
+Unique, Champion and Diseased have independent Auto-mark checkboxes, saved as .autoMark. Auto-mark operates even when the corresponding outline is OFF. A match in the loaded area creates one target in ALL WAYPOINTS with that rule's colour; enabling the checkbox detects creatures already loaded. Enabled Champion or Diseased Auto-mark takes priority over Unique for the target colour. Existing manual marks are retained. Movement and temporary cell re-adds never create duplicates. Confirmed death removes the target and outline; losing visibility preserves the target's last received coordinate. Deleting an automatic target suppresses its recreation for that connection. Disabling Auto-mark stops new creation and leaves existing targets available for manual removal. Auto-mark does not change the active navigator and defaults to OFF.
+
+Highlighting uses loaded native renderables on both surface and cave layers. The native ESP fill/outline/depth-restore pass draws their contours through terrain; the player's current layer does not exclude a received creature. Unload removes the outline; disconnect and server transfer clear the session. Unknown or unreceived creatures are not discovered by this feature.
+
+ESP defaults (RGB / hex)
+
+Players: 115,255,0 / #73FF00
+Non-aggressive animals: 0,140,255 / #008CFF
+Aggressive animals and Monsters: 210,0,255 / #D200FF
+Unique: 255,150,0 / #FF9600
+Champion: 255,255,255 / #FFFFFF
+Diseased: 153,102,0 / #996600
+Fierce: 128,0,0 / #800000
+Angry: 255,0,50 / #FF0032
+Raging: 204,0,0 / #CC0000
+Slow: 0,0,102 / #000066
+Alert: 153,0,255 / #9900FF
+Greenish: 0,153,51 / #009933
+Lurking: 102,0,102 / #660066
+Sly: 51,51,153 / #333399
+Hardened: 255,51,0 / #FF3300
+Scared: 255,213,79 / #FFD54F (warm yellow; distinct from tower-guard blue)
+
+The five category rules and twelve original condition rules start ON. ESP has no separate Small/Mini/Tiny condition colours; those extra overrides start OFF and use the base animal blue if enabled.
 
 Editor focus activates only the attached owning hub. Native HeadsUpDisplay.setActiveWindow registers its argument as a top-level component, so a child content panel must never be passed directly. Closing removes every owned HUD component, including cached panels promoted by older focus code and dropdowns registered in both native popup and component lists. Filter windows are disposed through their original HUD. Preview cleanup errors cannot prevent removal; unrelated windows and navigation remain active. The native lifecycle regression covers route/close, compass reopening, editor typing, chat-focus restoration, legacy orphan removal, auxiliary filters, failed preview cleanup and HUD replacement.
 
@@ -72,4 +109,36 @@ The top ALL WAYPOINTS toolbar groups Add and Refresh. On and active NAV use stab
 
 In all three surroundings sections, Unmark, Clear filtered and Clear all marks remove waypoint membership, including legacy static marks. Nearby marks follow the received object ID rather than a copied position. Movement and catalogue refreshes cannot re-add removed memberships. Counts include only the displayed object kind.
 
-Filter choice popups show all choices without internal scrolling, splitting into columns on shorter screens. Each choice has one 28 px row, separate 28 px check-square hit targets and 6 px horizontal gaps. Choice captions, clear selection and Done share surroundings.filter-choices metrics; square controls use the kit's CHECK/MAXIMIZE glyphs and fixed alpha. Selection applies immediately through either the square or caption. Standard dropdowns likewise show the complete option grid, retaining native outside-click dismissal and fixed-alpha SDK field rendering. Native checks select the last option in every checkbox filter and manager/settings dropdown, including 80 choices and a 480 px viewport. Interactive headers and repeated Mark/Unmark actions have separate explicit groups, reserving all state variants; header and body boundaries use the same final widths through the SDK resize API. CONTAINERS AROUND and OBJECTS AND ITEMS AROUND omit the complete Short name filter row and its draft state.
+Filter choice popups show all choices without internal scrolling, splitting into columns on shorter screens. Each choice has one 28 px row, separate 28 px check-square hit targets and 6 px horizontal gaps. Choice captions, clear selection and Done share surroundings.filter-choices metrics; square controls use the kit's CHECK/MAXIMIZE glyphs and fixed alpha. Selection applies immediately through either the square or caption. Standard dropdowns likewise show the complete option grid, retaining native outside-click dismissal and fixed-alpha SDK field rendering. Native checks select the last option in every checkbox filter and manager dropdown, including 80 choices and a 480 px viewport. Interactive headers and repeated Mark/Unmark actions have separate explicit groups, reserving all state variants; header and body boundaries use the same final widths through the SDK resize API. CONTAINERS AROUND and OBJECTS AND ITEMS AROUND omit the complete Short name filter row and its draft state.
+
+Tiles Highlight
+
+Independent green ON/OFF switches, reset to OFF at each client launch regardless of their previous enabled state. Selected colours are retained; activation during play must be manual:
+- Non-rideable tiles: red #FF0000 initially; Color opens the HSV popup. Apply saves; Cancel/close discard the draft. Uses standard land-mount terrain limits (more than 40 dirt height difference across the corners or more than 0.7 m water depth), surface cave openings and lava. This is a terrain indication; server permissions, fences, houses, bridges and unusual mounts can change actual passage.
+- Flower tiles: automatically use the received native GrassData flower type: yellow, orange-red, purple, white, blue, greenish-yellow or white-dotted. Empty or unknown flower codes and unrelated tree/field data are ignored.
+- Harvestable areas: green #60E060 initially, with its own Color popup. Field stages 5/6 are ripe; normal native trees/bushes require their received harvestable fruit flag and an age from Mature through Very old, including sprouting variants. Young, Overaged and Shrivelled trees are not harvestable. Legacy species bits never substitute for the fruit flag. The highlight disappears when a received harvest or growth update no longer matches.
+- Overaged trees: cyan #00FFFF initially, with its own Color popup. Includes both native Overaged and Shrivelled ages, excludes younger trees and bushes, and works independently of harvestability.
+
+Every matching rule keeps a separate nested border on the same tile: non-rideable, flowers, harvestable, then old trees, from outside in. Frames have 0.18 m spacing and 0.08 m stroke; absent rules leave no gaps. One light interior fill avoids mixing several full-tile colours.
+
+Tile highlight radius is configured only in the updater Settings. It accepts 1..16 tiles along each axis, initially 7: a 15 x 15 square (225 tiles), including diagonal corners, extending 28 m in each direction. Only received surface tiles inside that square are sampled. All corners must be available; stale wrapped coordinates are rejected. Hover help explains the radius and exact non-rideable and harvest thresholds. A valid radius edit applies immediately while preserving active switches and colours. Meteorite object detection remains independent of this terrain radius.
+
+Each overlay follows corner heights and sits 0.5 m above terrain (or the water surface for wet tiles). A light fill retains depth testing; broad border ribbons remain visible through grass without writing depth. Cave view suppresses surface overlays. One fixed-capacity native buffer is used for the current radius; ordinary sampling never resizes it. Equal tile snapshots retain uploaded geometry, and a smaller snapshot clears formerly used vertices. Only live geometry is uploaded. The render-origin transform follows the player. No terrain is requested from the server.
+
+Wurm builds its effect queue in a background job. That worker reads an immutable uploaded tile snapshot and only enqueues primitives. Buffer uploads, material/program initialization and vertex writes run at Backend.beginFrame on the GL thread before world preparation. Closing or replacing an overlay retires its storage until two completed frames have passed; the worker never frees buffers. Empty/flat areas suppress draws while retaining the allocation, preventing movement from repeatedly deleting and recreating buffers. Radius/session/renderer/world changes explicitly retire the old overlay.
+
+Scared palette migration
+
+Scared now defaults to #FFD54F. On the first start, only the previous standard #006699 is changed to yellow. A saved palette marker prevents subsequent changes; custom colours and a later deliberate blue choice are retained.
+
+Meteors
+
+Tiles Highlight includes a Meteors row for landed meteorite objects in the received client stream. Model/name metadata identifies meteorite resources; creatures and ordinary lumps, ore, scrap and shards are excluded. ON/OFF controls the native model outline. Color uses its own popup and also sets the colour of future Auto-mark targets. Auto-mark and Chime are separate checkboxes and work with the outline OFF. The detected count reflects loaded objects.
+
+Meteors is the startup exception: its outline, Auto-mark and Chime default ON. Explicit saved meteor preferences are retained; the terrain startup reset does not affect these three flags.
+
+Auto-mark creates one persisted target per object identity, respects existing manual targets and never starts NAV. Repeated updates, technical remove/re-add and unload/reappearance do not create more targets or sounds. A short native handbell plays once when a new matching object is detected with Chime enabled. Turning a preference on also processes already loaded objects. Outside the loaded area targets keep their last position; authoritative disappearance removes the target. Disconnect starts a fresh sound/mark session while persisted targets prevent duplicate marks.
+
+General Settings
+
+Waypointer has no Settings tab. All general preferences, creature colours and Auto-mark flags, and tile/meteorite preferences are configured through Settings in the shared updater Mods Registry. Valid edits are immediately saved; startup-only changes retain the 1.9.0 restart warning and standard Wurm quit confirmation.

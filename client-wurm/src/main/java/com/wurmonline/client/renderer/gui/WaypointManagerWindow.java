@@ -1564,7 +1564,7 @@ final class WaypointManagerWindow extends WaypointerContentPanel
 
     private void refreshAllStyleControls() {
         MarkerStyle style = currentMarkerStyle();
-        if (colorPicker != null) colorPicker.setColor(
+        if (colorPicker != null) colorPicker.setSelectedColor(
                 style.getRed(), style.getGreen(), style.getBlue());
         rebuildStyleSliders();
         publishLivePreview();
@@ -1575,7 +1575,7 @@ final class WaypointManagerWindow extends WaypointerContentPanel
         MarkerStyle style = styleEditor.getStyle();
         if (!colorPicker.matchesColor(style.getRed(), style.getGreen(),
                 style.getBlue())) {
-            colorPicker.setColor(style.getRed(), style.getGreen(),
+            colorPicker.setSelectedColor(style.getRed(), style.getGreen(),
                     style.getBlue());
         }
     }

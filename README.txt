@@ -1,100 +1,152 @@
-Wurm Waypointer
+WURM WAYPOINTER 1.10.4
+Waypoints, maps, navigation, tracking and highlights for Wurm Unlimited.
 
+Download and illustrated guide:
+https://github.com/chamomilo/wurm-waypointer
+Latest release:
+https://github.com/chamomilo/wurm-waypointer/releases/latest
 
-
-Wurm Waypointer 1.7.6 is a client navigation and map mod for Wurm Unlimited, created especially for Sklotopolis. Create a destination, start NAV and follow the glowing navigation pulse.
-
-Download the latest release (https://github.com/chamomilo/wurm-waypointer/releases/latest)
-
-Features
-
-- Waypoints and navigation: permanent or temporary destinations, custom colours/icons/sizes, arrival notifications, chat sharing and GPS imports. Choose Pulse, Solid or Moving navigation signals.
-- Sklotopolis maps: browse Liberty, Novus, Caza, Infinity Round 5 and Old Infinity with pan/zoom and their own published deeds and roads. CENTER returns to your character.
-- Surface and cave mini-map: received terrain, waypoints, roads, navigation and optional height contours. Unknown terrain stays unknown.
-- Surroundings and monitoring: browse nearby mobs, containers, objects and items; filter, mark, navigate and monitor results.
-- Managed animals and vehicles: track permitted animals, carts, wagons and ships. Animal Track starts an automatic native direction search outside view, then follows its live position once received. Vehicle navigation needs a known position.
-- Loot Maps and archaeology: follow the white rabbit using Loot Map readings, or track archaeology searches and receive a completion chime.
-- Scanner profiles: live animal, unique and treasure searches with optional model outlines and appearance notifications.
-- Chamomilo interface and updates: bundled UI, one mod registry, manual ZIP downloads and shared English, Brazilian Portuguese, German and Russian language selection.
-
-New in 1.7.6
-
-- Complete canonical updater 1.2.13 and Chamomilo UI 0.4.10, verified by version, SHA-256 and exact archive contents.
-- Separate publication images in the project; TXT documentation in the installable ZIP, with no Markdown or README images.
-- Research captures, temporary logs and unused full-size design sources removed from the project.
-
-Also includes the changes prepared since 1.6.17: the compact seven-section hub, separate animal and vehicle catalogues, automatic animal searches, tracked-creature death cleanup, immediate shared language switching, and continent browsing with independent deed and road layers. See CHANGELOG.txt (CHANGELOG.txt).
-
-Installation
+INSTALLATION / UPDATE
 
 A working Wurm Unlimited client modloader is required.
 
-1. Download wurm-waypointer-1.7.6.zip from Releases (https://github.com/chamomilo/wurm-waypointer/releases/latest).
-2. Close the game and back up your configuration.
-3. Extract the ZIP into WurmLauncher, merging the included mods folder.
-4. Keep only the current Waypointer JAR in mods/wurm-waypointer; check that mods/wurm-waypointer.properties points to it.
-5. Start the game normally.
+1. Close the game. If updating, back up mods/wurm-waypointer.config and
+   wurm-waypointer-data.
+2. Extract this ZIP into WurmLauncher, merging its mods folder.
+   Preserve your existing .config when upgrading. The included configuration
+   supplies defaults for a new installation; the mod adds missing new options.
+3. Keep only wurm-waypointer-1.10.4.jar in mods/wurm-waypointer.
+   Use the new mods/wurm-waypointer.properties, which points to that JAR.
+4. Start the game and open Waypointer using its compass control.
 
-Installed JAR: WurmLauncher/mods/wurm-waypointer/wurm-waypointer-1.7.6.jar.
+This ZIP contains exactly:
+mods/wurm-waypointer.properties
+mods/wurm-waypointer.config
+mods/wurm-waypointer/README.txt
+mods/wurm-waypointer/wurm-waypointer-1.10.4.jar
 
-Waypoints and marks are saved separately in WurmLauncher/wurm-waypointer-data. Preserve this folder when upgrading. Installation is manual; the updater opens downloads without installing or replacing game files.
+All runtime artwork, the shared updater and the interface SDK are embedded in
+the JAR. Waypoints and cached map data live in wurm-waypointer-data; preserve
+that folder when upgrading.
 
-Getting started
+SETTINGS AND LANGUAGE
 
-- Open Waypointer through its compass control. The hub contains ALL WAYPOINTS, MOBS AROUND, CONTAINERS AROUND, OBJECTS AND ITEMS AROUND, VEHICLES, MY ANIMALS and SETTINGS.
-- Press M for the full map. ALL MAPS ON SERVER opens the continent gallery; CENTER returns home. DEEDS, ROADS, MARKS and NAV LINE control overlays. Browsed continents have independent deeds/roads; live terrain and waypoint creation belong to the connected world.
-- MINI MAP enables a separate character-centred view. Scroll to zoom; its footer has GROUND/CAVE, FULL MAP and the height-contour interval. Use 1–99 metres or 0 to disable contours.
-- Add a waypoint in the hub or by left-clicking a map; right-click a map for a custom mark. NAV starts navigation and /wp nav off stops it.
-- Refresh MY ANIMALS or VEHICLES to request native catalogues, then Track or Untrack. Animal searches need native Manage/Find permissions and use approximate direction responses. Living targets leaving view keep their labelled last known position; confirmed death removes the waypoint and stops search/navigation.
-- + filter includes any comma-separated matching fragment; - filter excludes any matching fragment. Matching ignores case; exclusions take precedence. Example: horse, wolf.
-- Select language in Main menu → Mod updates. It applies immediately to participating mods and saves in .chamomilo/updater.properties under the user's home.
+Open Main menu > Mod updates > Waypointer > Settings in the shared Mods Registry.
+General Settings are available only in the shared updater Mods Registry.
+It contains navigation, storage, creature rules, tile colours, highlight radius
+and meteorite options. Every parameter has hover help. Valid edits save
+automatically and apply immediately where supported. Startup-only edits offer
+the game's normal quit confirmation.
 
-Useful commands:
-/wp nav style pulse|solid|moving|status
+Select English, Brazilian Portuguese, German or Russian in the updater.
+Language changes apply immediately to participating mods.
+Embedded updater: 1.5.0. Interface SDK: Chamomilo UI 0.4.11.
+Updates open the release download; installation remains manual.
+
+WAYPOINTER HUB
+
+Eight tabs: Waypoints, Mobs, Containers, Objects / items, Vehicles, My animals,
+Creatures Highlight and Tiles Highlight.
+
+Add, edit, filter, share, import and export waypoints. ON enables a target;
+NAV starts navigation. /wp nav off stops it. Nearby lists use received entities.
+Refresh My animals or Vehicles to obtain native catalogues, then Track/Untrack.
+Animal direction searches need the game's Manage/Find permissions. Last known
+positions remain available after a living target leaves view.
+
+Text filters accept comma-separated fragments, ignoring case. The + filter
+includes matches and the - filter excludes them; exclusions take precedence.
+
+CREATURES HIGHLIGHT
+
+Traits are on the left; categories and Small/Mini/Tiny are on the right.
+Players, non-aggressive farm animals, aggressive wild animals and monsters have
+separate rules. Names show currently detected counts. ON is green. ALL ON and
+ALL OFF change outline switches. Color opens a popup picker; Apply saves, while
+Cancel or closing discards the draft. Initial colours follow the familiar ESP
+palette; Scared is warm yellow to distinguish it from blue tower guards.
+
+Unique, Champion and Diseased can Auto-mark one tracked target per detected
+creature. Auto-mark works independently of the outline switch and never starts
+navigation automatically. Modifier colours override Unique, then categories.
+
+TILES HIGHLIGHT
+
+Independent terrain rules:
+- Non-rideable tiles: steep terrain, deep water, lava and cave openings; red.
+- Flower tiles: native flower colours.
+- Harvestable areas: ripe field crops and harvestable mature trees/bushes.
+- Overaged trees: Overaged and Shrivelled trees, independently of harvestability.
+
+All four terrain switches start OFF after every client launch. Enable them
+manually when needed. Colours and radius are retained. Matching enabled rules
+keep separate coloured borders on the same tile, slightly above the ground.
+
+Terrain highlight radius defaults to 7 tiles along both axes, including diagonal
+corners: a 15 x 15 square. Change it in updater Settings, from 1 to 16. Changes
+apply immediately. Only received surface terrain is used.
+
+Non-rideable thresholds: corner height difference greater than 40 dirt (4 m),
+water deeper than 0.7 m above the lowest corner, cave openings or lava. Exactly
+40 dirt and 0.7 m are allowed. Buildings, fences and permissions are not checked.
+Harvestable crops are native ripe stages 5/6. Normal trees/bushes need a received
+fruit flag and an age from Mature through Very old, including sprouting.
+Young, Overaged and Shrivelled trees do not match Harvestable. Hover help
+explains these thresholds in Settings.
+
+Meteors detects landed meteorites in the loaded area. Outlines, Auto-mark and
+Chime default ON for a new installation; explicit saved preferences are kept.
+Targets and sounds are deduplicated per detected meteorite. Terrain radius does
+not limit meteorite object detection. Auto-mark does not start navigation.
+
+MAPS AND SEARCHES
+
+Press M for the full map. Pan/zoom; CENTER returns to the player. DEEDS, ROADS,
+MARKS and NAV LINE control layers. Left-click adds a waypoint; right-click adds
+a custom mark. On recognized Sklotopolis servers, ALL MAPS ON SERVER browses
+Liberty, Novus, Caza, Infinity Round 5 and Old Infinity.
+
+MINI MAP opens a character-centred surface/cave view. Scroll to zoom. Its footer
+switches GROUND/CAVE, opens the full map and controls height contours:
+1-99 metres, or 0 to disable. Unknown terrain stays unknown.
+
+Loot Maps follow the white rabbit from native readings. Archaeology tracks
+searches and can play a completion chime. Scanner profiles search animals,
+uniques and treasure with optional notifications and model outlines.
+
+USEFUL COMMANDS
+
 /wp nav off
+/wp nav style pulse|solid|moving|status
 /wp scan animals|uniques|treasure
 /wp scan off|status|window
+/wp scan notify on|off|status
+/wp scan outline on|off|status
 /wp scan exclude catseye, corpse, pet
 /wp scan unexclude corpse
 /wp scan excludes
 /wp scan clear-excludes
-/wp scan notify on|off|status
-/wp scan outline on|off|status
 /wp deeds
 /wp deeds refresh
 /wp deeds status
 /wp perf
 
-Settings are in the hub and mods/wurm-waypointer.config. See hub and tracking instructions (docs/WAYPOINTER_HUB.txt).
+FEEDBACK
 
-Other servers
+https://github.com/chamomilo/wurm-waypointer/issues
+Include the version, time/timezone, enabled highlights, radius and client logs
+when reporting rendering problems. Bounded diagnostics are stored in
+wurm-waypointer-data/waypointer-diagnostics-*.log. Live game GPU behaviour needs
+manual verification after installation.
 
-Sklotopolis uses explicit server/world mappings. Other servers can configure JSON or CSV deed feeds through deedProviderMappings, with semicolon-separated entries:
-endpoint[|exact world]|<JSON or CSV>|source[|mapWidth|mapHeight]
+LICENSE
 
-HTTPS and local file:///... imports are supported. Unknown servers show No provider. The deed picker is available through /wp deeds; malformed refreshes preserve validated caches. Terrain details and live positions depend on data actually received by the client.
+GNU GPL version 3 only. License and third-party notices are embedded in the JAR:
+META-INF/waypointer/LICENSE
+META-INF/waypointer/THIRD_PARTY_NOTICES.txt
+Source and corresponding license:
+https://github.com/chamomilo/wurm-waypointer/tree/v1.10.4
 
-Building from source
-
-Use a Java 8 JDK. Copy local.properties.example to local.properties and set wurmClientLibDir to a directory containing client-patched.jar, common.jar, javassist.jar and modlauncher.jar. Proprietary libraries are not included.
-
-If the JDK lacks JavaFX, set wurmJavaFxJar to an existing runtime/lib/ext/jfxrt.jar for native interface verification. It is read only and not packaged.
-
-The canonical updater checkout defaults to C:/projects/updater; override with CHAMOMILO_UPDATER_REFERENCE or -PchamomiloUpdaterReference=/path/to/updater. It supplies the pinned UI SDK. The UI verifier defaults to C:/projects/interface items; override with -PchamomiloUiKitReference=/path/to/interface-items.
-gradlew.bat clean build dist
-
-On other platforms use ./gradlew clean build dist. Output: distribution/build/distributions/wurm-waypointer-1.7.6.zip.
-
-Release checks cover module boundaries, runtime classes, translations, native layout/input, exact updater/UI embedding and allowed ZIP files. README.txt is generated from this README during packaging. Publication images remain outside the mod JAR and installation ZIP.
-
-Diagnostics and feedback
-
-/wp perf reports counters. Bounded logs are in wurm-waypointer-data/waypointer-diagnostics-*.log. Include the exact time/timezone, mini-map mode, contour interval and diagnostic/client logs in freeze reports; see render diagnostics (docs/RENDER_DIAGNOSTICS.txt). Live in-game GPU behaviour requires manual verification.
-
-Report problems on GitHub (https://github.com/chamomilo/wurm-waypointer/issues). Mod integrations are documented in EXTERNAL_MOD_API.txt (EXTERNAL_MOD_API.txt).
-
-
-
-Thanks to Wolfbane and FlpSilva for beta testing, and Killerspike for suggestions and detailed bug reports.
-
-Licensed under GPL-3.0-only. See LICENSE (LICENSE) and THIRD_PARTY_NOTICES.txt (THIRD_PARTY_NOTICES.txt).
+Alegreya Sans / Alegreya Sans SC fonts retain their SIL Open Font License in
+org/chamomilo/wurm/ui/v1/fonts/ inside the JAR. Client/modloader libraries are
+supplied by the user's installation and are not bundled.

@@ -13,6 +13,7 @@ abstract class WaypointerContentPanel extends WurmBorderPanel {
     void entered(){}
     void leaving(){}
     int minimumContentWidth(){return 900;}
+    int minimumContentHeight(){return 0;}
     // Native components normally delegate focus queries to their parent. The
     // hub delegates down to this panel, so a panel must terminate that lookup.
     @Override boolean hasInputField(){return false;}

@@ -13,6 +13,7 @@ import java.io.InputStream;
 import java.lang.reflect.Method;
 
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
 
 /** Compiles every Javassist insertion against the pinned bytecode without launching Wurm. */
 public class HookBytecodeCompatibilityTest {
@@ -83,6 +84,12 @@ public class HookBytecodeCompatibilityTest {
         invokeInstaller("hookMapTextures",pool);
         assertTrue(pool.get("com.wurmonline.client.renderer.backend.Queue").toBytecode().length>0);
         assertTrue(pool.get("com.wurmonline.client.renderer.backend.Backend").toBytecode().length>0);
+        javassist.CtMethod start=pool.get("com.wurmonline.client.renderer.backend.Backend").getDeclaredMethod("beginFrame");
+        javassist.bytecode.CodeIterator code=start.getMethodInfo2().getCodeAttribute().iterator();
+        int first=code.next();assertEquals(javassist.bytecode.Opcode.INVOKESTATIC,code.byteAt(first));
+        javassist.bytecode.ConstPool constants=start.getMethodInfo2().getConstPool();int target=code.u16bitAt(first+1);
+        assertEquals("com.wurmonline.client.renderer.effects.TileHighlightOverlay",constants.getMethodrefClassName(target));
+        assertEquals("flushUploads",constants.getMethodrefName(target));
     }
 
     @Test

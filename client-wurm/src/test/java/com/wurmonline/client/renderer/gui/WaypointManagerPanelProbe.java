@@ -49,7 +49,7 @@ public final class WaypointManagerPanelProbe {
                                 (p2,m2,a2) -> m2.getName().equals("records") ? Collections.emptyList() : m2.getName().equals("status") ? "" : defaultValue(m2));
                         case "reportFailure": throw new AssertionError(String.valueOf(a[0]), (Throwable)a[1]);
                         case "settings": return Proxy.newProxyInstance(SettingsController.class.getClassLoader(), new Class[]{SettingsController.class},
-                                (p2,m2,a2) -> m2.getName().equals("values") ? new Properties() : "");
+                                (p2,m2,a2) -> m2.getName().equals("values") ? new Properties() : m2.getName().equals("detectedCreatures") ? Collections.emptyMap() : m2.getName().equals("detectedMeteors") ? 0 : "");
                         default: return defaultValue(m);
                     }
                 });

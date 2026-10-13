@@ -99,8 +99,6 @@ Waiting for animal direction…	Waiting for animal direction…
 Animal direction is unavailable for this list.	Animal direction is unavailable for this list.
 Animal position is unavailable.	Animal position is unavailable.
 Animal direction received.	Animal direction received.
-On	On
-Off	Off
 All	All
 Current	Current
 Current (	Current (
@@ -211,7 +209,6 @@ Unknown	Unknown
 PULSE	PULSE
 SOLID	SOLID
 MOVING_DASHES	MOVING_DASHES
-off	off
 uniques	uniques
 treasure	treasure
 animals	animals
@@ -405,7 +402,6 @@ Animal waypoint race started: {0}	Animal waypoint race started: {0}
 Animal search stopped: direction is unavailable.	Animal search stopped: direction is unavailable.
 Animal search stopped: no direction response after three checks.	Animal search stopped: no direction response after three checks.
 Animal found: {0}. Navigation now follows its received position.	Animal found: {0}. Navigation now follows its received position.
-
 Mobs	Mobs
 Objects / items	Objects / items
 ALL MAPS ON SERVER	ALL MAPS ON SERVER
@@ -414,3 +410,52 @@ Choose a map to view	Choose a map to view
 Wheel: zoom | drag: pan | CENTER: return to your character	Wheel: zoom | drag: pan | CENTER: return to your character
 Add this animal to ALL WAYPOINTS and automatically start a waypoint race if it is out of sight.	Add this animal to ALL WAYPOINTS and automatically start a waypoint race if it is out of sight.
 Loading full map...	Loading full map...
+Creatures Highlight	Creatures Highlight
+Players	Players
+Monsters	Monsters
+Champion	Champion
+Diseased	Diseased
+Fierce	Fierce
+Angry	Angry
+Raging	Raging
+Slow	Slow
+Alert	Alert
+Greenish	Greenish
+Lurking	Lurking
+Sly	Sly
+Hardened	Hardened
+Scared	Scared
+Small	Small
+Mini	Mini
+Tiny	Tiny
+ON	ON
+OFF	OFF
+Auto-mark	Auto-mark
+Apply color	Apply color
+Color: {0}	Color: {0}
+Drag to choose	Drag to choose
+Loaded creatures. Priority: modifier > Unique > category.	Loaded creatures. Priority: modifier > Unique > category.
+Auto-mark works independently of ON/OFF and keeps one target per creature.	Auto-mark works independently of ON/OFF and keeps one target per creature.
+Create a target when this creature appears in the loaded area.	Create a target when this creature appears in the loaded area.
+CREATURES HIGHLIGHT	CREATURES HIGHLIGHT
+On	On
+Off	Off
+Non-aggressive animals	Non-aggressive animals
+Aggressive animals	Aggressive animals
+ALL ON	ALL ON
+ALL OFF	ALL OFF
+Tiles Highlight	Tiles Highlight
+Tile highlight radius	Tile highlight radius
+Radius in tiles along both axes, 1..16; default 7 gives a 15 x 15 square (225 tiles, 28 m in each direction). Diagonal corners are included. Uses only received surface terrain; changing the radius applies immediately and does not affect meteorite object detection.	Radius in tiles along both axes, 1..16; default 7 gives a 15 x 15 square (225 tiles, 28 m in each direction). Diagonal corners are included. Uses only received surface terrain; changing the radius applies immediately and does not affect meteorite object detection.
+Non-rideable if the highest and lowest corners differ by more than 40 dirt (4 m), or water is more than 0.7 m above the lowest corner. Exactly 40 dirt and 0.7 m remain allowed. Cave openings and lava always match. Terrain indication only; fences, buildings and server permissions are not checked.	Non-rideable if the highest and lowest corners differ by more than 40 dirt (4 m), or water is more than 0.7 m above the lowest corner. Exactly 40 dirt and 0.7 m remain allowed. Cave openings and lava always match. Terrain indication only; fences, buildings and server permissions are not checked.
+Ripe crop stages 5 and 6 only. Normal trees and bushes require the received fruit flag and ages Mature through Very old (including sprouting). Young, Overaged and Shrivelled trees do not match. Updates after received harvest or growth changes; independent of the old-tree switch.	Ripe crop stages 5 and 6 only. Normal trees and bushes require the received fruit flag and ages Mature through Very old (including sprouting). Young, Overaged and Shrivelled trees do not match. Updates after received harvest or growth changes; independent of the old-tree switch.
+TILES HIGHLIGHT	TILES HIGHLIGHT
+Non-rideable tiles	Non-rideable tiles
+Flower tiles	Flower tiles
+Harvestable areas	Harvestable areas
+Overaged trees	Overaged trees
+Include Overaged and Shrivelled trees.	Include Overaged and Shrivelled trees.
+Meteors	Meteors
+Chime	Chime
+Create one target per detected meteorite.	Create one target per detected meteorite.
+Play a chime when a new meteorite is detected.	Play a chime when a new meteorite is detected.

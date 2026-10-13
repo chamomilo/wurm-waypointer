@@ -1,4 +1,76 @@
+1.10.4 - 2026-10-13
+
+- Embed the freshly verified complete canonical updater 1.5.0 with UI SDK 0.4.11. All general settings remain in the updater Mods Registry, including creature rules, tile radius, terrain highlights and meteorite options.
+- Reduce the installation ZIP to the mod JAR, loader descriptor, default configuration and README.txt. Load compass artwork from the JAR; embed license and attribution notices there too.
+- Rewrite the user guide with current interface images on GitHub and a separate plain-text installation guide in the ZIP. Remove local drafting artifacts from the project folder.
+- Include the terrain rendering fixes from 1.10.3 and all creature/tile highlight features and settings from 1.8.0 through 1.10.2.
+
 Changelog
+
+1.10.3 - 2026-10-13
+
+- Fix terrain rendering lifecycle across Wurm's asynchronous effect queue jobs. Coalesce received tile snapshots and upload buffers on the GL thread at Backend.beginFrame, before world preparation/jobs. Queue-building workers only read an immutable uploaded snapshot and never write or free vertex buffers.
+- Retire buffers and transform storage at GL frame completion after queued primitives finish. Turning highlights off, changing radius or replacing the world cannot free memory while a background job still references it.
+- Keep the terrain overlay allocated across temporarily empty/non-rideable-free areas. Movement no longer repeatedly destroys/recreates native buffers and materials.
+- Upload only live vertices and the transparent primer, clear formerly used tail vertices on shrink, and retain unchanged geometry. Preserve radius 7, Settings range 1..16, colours and meteor preferences.
+- Verify frame-boundary upload/deletion, pending snapshot isolation, update coalescing, partial upload bounds and movement between matching/flat/unloaded areas with native lifecycle bytecode and a thread-checking fixture.
+
+1.10.2 - 2026-10-13
+
+- Bound terrain highlights to a configurable square around the player: default radius 7 (15 x 15 tiles), range 1..16. Add Tile highlight radius exclusively to updater Settings; apply valid edits live without turning off manually enabled highlights or resetting navigation.
+- Add localized hover explanations for radius, non-rideable slope/water thresholds and harvest stages. Reject invalid radii without overwriting the current value; meteorite object detection retains its loaded-area scope.
+- Replace in-place native VertexBuffer resizing with one fixed-capacity buffer per terrain overlay. The pinned client's off-GL resize path can keep a retired vertex-array name; avoiding that path prevents stale bindings during changing tile counts. Clear the full unused tail, bound all draw ranges and cache equal tile snapshots.
+- Verify repeated updates, growing/shrinking snapshots, cache retention, draw bounds, unloaded/cave/reflection cleanup, native stale-VAO behaviour and exact radius boundaries.
+
+1.10.1 - 2026-10-13
+
+- Fix tile-rule overlap: flowers and non-rideable terrain keep their own colours when both match the same tile. Render separate nested frames for all matching rules with one raised interior fill.
+- Add Harvestable areas for native ripe field stages 5/6 and trees or bushes with a received harvestable fruit flag. Refresh after harvest and terrain updates without requesting additional server data.
+- Add independent Overaged trees, including both Overaged and Shrivelled ages. Exclude younger trees and bushes from this age rule.
+- Give each new rule a green ON/OFF switch and independent popup colour picker. Initially OFF, with green #60E060 for harvestable areas and cyan #00FFFF for old trees; persist and expose both through the shared updater registry in all four hub languages.
+- Reset all terrain tile switches to OFF on client startup, keeping their colours and allowing manual activation during play. Meteor outlines, Auto-mark and Chime default ON; preserve explicit saved meteor choices.
+- Retain canonical updater 1.5.0 and UI 0.4.11, rebuilt and checked as complete modules in the JAR and manual installable ZIP.
+
+1.10.0 - 2026-10-13
+
+- Arrange twelve creature traits in the left column and categories plus Small/Mini/Tiny in the right. Remove explanatory text, retain counts, popup colour editing, Unique/Champion/Diseased Auto-mark and fixed ALL ON / ALL OFF. Use shared 24 px Compact controls and fit all rows without scrolling.
+- Add Tiles Highlight: independently toggle non-rideable surface tiles (red, editable in a popup) and flower tiles (seven native flower colours). Use received terrain only within 64 tiles, reject unknown/wrapped coordinates and lift terrain-conforming overlays by 0.5 m; edge ribbons remain visible through grass.
+- Detect standard land-mount terrain limits: greater than 40 dirt slope or 0.7 m water depth, cave openings and lava. Non-rideable colour takes priority when a flower tile also matches. Cache geometry, translate it with the render origin and clear it on layer/world/session changes.
+- Change Scared to warm yellow #FFD54F to distinguish it from tower guards. Migrate only the previous standard blue once and retain custom colours and later explicit choices.
+- Add landed meteorites to Tiles Highlight with independent coloured native outlines, Auto-mark and Chime, plus a live count. Deduplicate targets and sounds by loaded object identity across movement, technical re-adds and reappearance; retain last known targets and remove them on authoritative disappearance.
+- Remove the Settings tab and its panel from Waypointer; expose all general preferences only through the updater registry.
+- Retain all 1.9.0 registry settings, immediate saves and startup-only restart flow; expose tile switches and colour in the same registry. Embed verified complete canonical updater 1.5.0 and UI 0.4.11.
+
+1.9.0 - 2026-10-13
+
+- Expose every user preference and every Creatures Highlight rule through Settings in the shared Mods Registry, with hover help and immediate application where supported.
+- Save valid registry edits immediately and prevent older queued hub saves from overwriting newer values.
+- Warn after a saved startup-only change and offer the standard Wurm quit confirmation once pending edits are saved.
+
+1.8.2 - 2026-10-12
+
+- Center the inner square and check glyph in Auto-mark and the shared checkbox buttons, retaining the native press displacement.
+- Show the current detected count after every Creatures Highlight name. Count loaded living creatures across both layers independently of ON/OFF; category, Unique and condition counts can overlap. Refresh on appearance, unload, death and classification changes without rebuilding the rows or disturbing popup drafts and scroll.
+- Add ALL ON and ALL OFF in the fixed top toolbar for all twenty outline rules in one saved operation. Preserve selected colours and independent Auto-mark flags, and update every row immediately. Translate and fit the complete action group in all four languages.
+- Remove the ESP defaults action; retain the established palette and enabled states as configuration defaults, preserving saved preferences.
+- Embed canonical updater 1.4.2 and UI SDK 0.4.11 with complete JAR/ZIP verification and the reference's early shared-updater bootstrap.
+
+1.8.1 - 2026-10-12
+
+- Remove the same-layer restriction from Creatures Highlight: received surface and cave creatures both reach the native ESP outline pass, including surface targets while the player is underground.
+- Match the established WurmEspRevisited palette and enabled defaults. Players use lime, non-aggressive animals blue, aggressive animals/monsters purple, Unique orange and Champion white; preserve the original colours for all twelve ESP conditions. Extra Small/Mini/Tiny rules remain OFF with the base animal blue. Auto-mark remains OFF by default.
+- Move ON/OFF to the first column, followed by the creature/category name, colour controls and Auto-mark. Add ESP defaults to restore the preset in an existing saved configuration, with translated captions and one shared footer typography group.
+- Open the HSV picker only in a Color popup. Apply color saves and closes it; Cancel or the standard close button discards the draft. Preserve an open draft during shared language changes and remove the popup on section changes or manager close.
+- Separate picker selection from native GUI tint propagation so attachment and layout retain saved colours and unsaved drafts.
+- Embed canonical updater 1.3.3 and UI SDK 0.4.11 and verify complete JAR/ZIP contents. Resolve the UI verification reference from the compiled updater's pinned version and SHA-256.
+
+1.8.0 - 2026-10-12
+
+- Add a dedicated CREATURES HIGHLIGHT hub panel: player, non-aggressive animal, aggressive animal, monster, Unique and modifier model outlines, with independent green ON/OFF switches and HSV colour selection. Separate livestock from wild predators; keep fantasy/humanoid monsters separate. All rules default to OFF.
+- Add independent Unique/Champion Auto-mark checkboxes. Create one target per loaded matching creature with the configured colour; follow position updates, preserve the last received position outside view, and remove targets on confirmed death. Avoid duplicates after movement, technical re-adds and reappearance; respect existing manual marks and do not start NAV automatically.
+- Prioritize enabled modifier colours over Unique and category colours. Retain one native outline per creature when scanner profiles also match. Include loaded players, surface/cave separation, unload, rename/model changes and disconnect cleanup.
+- Save highlight preferences alongside existing configuration, preserving comments and other settings. Translate new controls into all four supported languages; preserve pending colour edits across shared language switching.
+- Embed canonical updater 1.3.1 and UI SDK 0.4.10 with exact JAR/ZIP verification.
 
 1.7.6 - 2026-10-11
 

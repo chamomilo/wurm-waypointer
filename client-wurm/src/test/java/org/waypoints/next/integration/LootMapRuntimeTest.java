@@ -396,8 +396,9 @@ public class LootMapRuntimeTest {
     private static void awaitDifferentRecord(LootMapRuntime runtime, UUID first)
             throws Exception {
         for (int i = 0; i < 300; i++) {
-            if (!runtime.records().isEmpty()
-                    && !first.equals(runtime.records().get(0).getId())) return;
+            java.util.List<WaypointRecord> records = runtime.records();
+            if (!records.isEmpty()
+                    && !first.equals(records.get(0).getId())) return;
             Thread.sleep(10L);
         }
         fail("Loot Map worker did not split the changed map session");
@@ -406,8 +407,9 @@ public class LootMapRuntimeTest {
     private static void awaitRecordName(LootMapRuntime runtime, String expected)
             throws Exception {
         for (int i = 0; i < 200; i++) {
-            if (!runtime.records().isEmpty()
-                    && expected.equals(runtime.records().get(0).getName())) return;
+            java.util.List<WaypointRecord> records = runtime.records();
+            if (!records.isEmpty()
+                    && expected.equals(records.get(0).getName())) return;
             Thread.sleep(10L);
         }
         fail("Loot Map worker did not publish phase " + expected);
@@ -426,8 +428,9 @@ public class LootMapRuntimeTest {
     private static void awaitReadingCount(LootMapRuntime runtime,
                                           String expected) throws Exception {
         for (int i = 0; i < 200; i++) {
-            if (!runtime.records().isEmpty()
-                    && expected.equals(runtime.records().get(0).getExtensions()
+            java.util.List<WaypointRecord> records = runtime.records();
+            if (!records.isEmpty()
+                    && expected.equals(records.get(0).getExtensions()
                     .get("lootmap.readingCount").get(0))) return;
             Thread.sleep(10L);
         }

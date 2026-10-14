@@ -49,12 +49,3 @@ ObjectMarkRequest.Builder.snapshot(...). If the object is currently selected
 in the standard HUD, Waypointer will also try to obtain its coordinates
 automatically. Waypointer removes the marker when the object disappears; when
 the active marker is removed, NAV stops automatically.
-
-Prompt for another task
-
-> Integrate this client mod with Waypointer only through the public
-> org.waypoints.api.WaypointerApi, following the rules in this file. Perform
-> the optional isInstalled() handshake first, do not introduce a hard runtime
-> dependency, use unique ownerId and markerKey values, and report object
-> removal or replacement through subjectVanished. The integration must fail
-> open.

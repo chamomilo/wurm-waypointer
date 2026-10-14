@@ -1,7 +1,20 @@
-# Settings
+# Waypointer settings
 
-Settings are available from the Settings button in the shared Mods Registry. Each parameter has hover help. Valid edits are saved automatically and applied during play where supported; startup-only changes are identified in the help. The shared language selector controls the settings window.
+Open **Main menu → Mod updates**, then choose **Settings** on the Waypointer card in the shared **Mods Registry**. Use the registry's language selector for English, Brazilian Portuguese, German or Russian.
 
-Tile highlight radius accepts 1..16 tiles, initially 7 (15 x 15 around the player). It applies during play and does not reset manually activated highlights. Its hover help describes the area, native terrain availability and the separate loaded-object scope for meteorites. Non-rideable and Harvestable hover help specifies the actual terrain and age thresholds.
+| Area | Preferences |
+| --- | --- |
+| Navigation | Route appearance, pulse distance, highway refresh and cart terrain limits. |
+| Maps and deeds | Published maps, visible layers, deed providers and refresh intervals. |
+| Tracking and scanners | Position retention, scanner profile, notifications and outline limits. |
+| Creature highlights | Independent outline rules, colours and Auto-mark choices. |
+| Tile highlights | Terrain switches, colours, radius and meteorite actions. |
+| Storage and diagnostics | Data/cache locations and optional route logging. |
 
-A saved change that requires a client restart immediately shows a warning. Continue configuring keeps the game running; Exit game first saves valid pending edits and opens Wurm's normal quit confirmation. An exit offer remains in the Settings footer while restart changes are pending.
+Every parameter has hover help. Valid edits save automatically and apply during play where supported. Startup-only changes show a restart notice. **Continue configuring** keeps Wurm running; **Exit game** saves valid pending edits and opens Wurm's normal quit confirmation. An exit offer remains in the footer while restart changes are pending.
+
+The tile radius accepts **1–16**, initially **7**: a **15 × 15 square** around the player. A radius change applies immediately without resetting manually activated highlights. Meteorite detection uses received objects and is independent of this radius. Hover help for Non-rideable and Harvestable explains the terrain, crop-stage and tree-age thresholds.
+
+The four terrain highlight switches start **OFF after each client launch**. Colours and radius persist. Meteorite outlines, Auto-mark and Chime respect saved choices.
+
+The default configuration supplied in the installation ZIP is for new installations. Keep your existing `mods/wurm-waypointer.config` when updating. Changing a storage path does not move existing files; retain the old data until you have transferred it to the new location with Wurm closed.

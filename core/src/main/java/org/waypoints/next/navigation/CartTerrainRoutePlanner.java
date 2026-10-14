@@ -9,7 +9,7 @@ import java.util.PriorityQueue;
 
 /** Bounded eight-connected A* for the currently observable cart terrain. */
 public final class CartTerrainRoutePlanner {
-    public static final String ALGORITHM_VERSION = "bounded-cart-a-star-v2";
+    public static final String ALGORITHM_VERSION = "bounded-cart-a-star-v3";
     private static final float DIAGONAL = (float) Math.sqrt(2.0d);
     private static final int[] DX = {1, 1, 0, -1, -1, -1, 0, 1};
     private static final int[] DY = {0, 1, 1, 1, 0, -1, -1, -1};
@@ -119,6 +119,27 @@ public final class CartTerrainRoutePlanner {
 
     public Plan plan(int startX, int startY, int targetX, int targetY,
                      Terrain terrain) {
+        return plan(startX, startY, targetX, targetY, terrain, null);
+    }
+
+    /**
+     * Finds a surface entry by terrain travel time plus the remaining highway
+     * journey. A geometric entry can require a large terrain detour even when
+     * a later part of the same highway is directly accessible.
+     * Uses the usual entry search bounds and node budget; callers can fall back
+     * to a chained approach if no join is received inside those bounds.
+     */
+    public Plan planToHighway(int startX, int startY,
+                              List<GroundRouteTrace.Point> highway,
+                              Terrain terrain) {
+        if (highway == null || highway.isEmpty()) return empty(startX, startY);
+        GroundRouteTrace.Point entry = highway.get(0);
+        return plan(startX, startY, entry.getTileX(), entry.getTileY(),
+                terrain, highway);
+    }
+
+    private Plan plan(int startX, int startY, int targetX, int targetY,
+                      Terrain terrain, List<GroundRouteTrace.Point> highway) {
         if (terrain == null) throw new IllegalArgumentException("terrain is required");
         if (!insideMap(startX, startY) || !insideMap(targetX, targetY)) {
             return empty(targetX, targetY);
@@ -146,6 +167,38 @@ public final class CartTerrainRoutePlanner {
         int height = maximumY - minimumY + 1;
         int size = width * height;
 
+        float[] continuation = null;
+        int estimateX = goalX, estimateY = goalY;
+        if (highway != null) {
+            continuation = new float[size];
+            Arrays.fill(continuation, Float.POSITIVE_INFINITY);
+            float commonRemainder = Float.NaN;
+            float remaining = 0.0f;
+            for (int i = highway.size() - 1; i >= 0; i--) {
+                GroundRouteTrace.Point point = highway.get(i);
+                if (i + 1 < highway.size()) {
+                    GroundRouteTrace.Point next = highway.get(i + 1);
+                    remaining += (float) Math.hypot(next.getTileX() - point.getTileX(),
+                            next.getTileY() - point.getTileY()) / 3.0f;
+                }
+                int x = point.getTileX(), y = point.getTileY();
+                if (point.getHighwayKind() == HighwayTileIndex.Kind.ROAD
+                        && point.getHeightSource() != GroundRouteTrace.HeightSource.CAVE
+                        && x >= minimumX && x <= maximumX
+                        && y >= minimumY && y <= maximumY) {
+                    if (Float.isNaN(commonRemainder)) {
+                        commonRemainder = remaining;
+                        estimateX = x;
+                        estimateY = y;
+                    }
+                    int candidate = index(x, y, minimumX, minimumY, width);
+                    continuation[candidate] = Math.min(continuation[candidate],
+                            remaining - commonRemainder);
+                }
+            }
+            if (Float.isNaN(commonRemainder)) return empty(goalX, goalY);
+        }
+
         float[] gScore = new float[size];
         Arrays.fill(gScore, Float.POSITIVE_INFINITY);
         int[] parent = new int[size];
@@ -168,33 +221,46 @@ public final class CartTerrainRoutePlanner {
                 terrain, stats) == null) return empty(goalX, goalY);
         gScore[start] = 0.0f;
         open.add(new OpenNode(start, 0.0f,
-                heuristic(startX, startY, goalX, goalY)));
+                estimate(startX, startY, estimateX, estimateY, highway != null)));
         int best = start;
         float bestHeuristic = heuristic(startX, startY, goalX, goalY);
+        float bestTotal = Float.POSITIVE_INFINITY;
         boolean reached = false;
 
         while (!open.isEmpty() && stats.expanded < maximumExpandedNodes) {
             OpenNode currentEntry = open.poll();
             int current = currentEntry.index;
             if (closed[current] || currentEntry.g != gScore[current]) continue;
+            if (reached && currentEntry.f >= bestTotal) break;
             closed[current] = true;
             stats.expanded++;
             int currentX = minimumX + current % width;
             int currentY = minimumY + current / width;
             float currentHeuristic = heuristic(currentX, currentY, goalX, goalY);
-            if (currentHeuristic < bestHeuristic
+            if (highway == null && (currentHeuristic < bestHeuristic
                     || (currentHeuristic == bestHeuristic
-                    && gScore[current] < gScore[best])) {
+                    && gScore[current] < gScore[best]))) {
                 best = current;
                 bestHeuristic = currentHeuristic;
             }
-            if (current == goal) {
+            if (highway == null && current == goal) {
                 best = current;
                 reached = true;
                 break;
             }
 
             GroundRouteTrace.Point currentSample = samples[current];
+            if (continuation != null && !Float.isInfinite(continuation[current])
+                    && currentSample.getHighwayKind() == HighwayTileIndex.Kind.ROAD
+                    && currentSample.isPublishedHighway()
+                    && currentSample.getHeightSource() != GroundRouteTrace.HeightSource.CAVE) {
+                float total = gScore[current] + continuation[current];
+                if (total < bestTotal) {
+                    bestTotal = total;
+                    best = current;
+                    reached = true;
+                }
+            }
             for (int direction = 0; direction < DX.length; direction++) {
                 int nextX = currentX + DX[direction];
                 int nextY = currentY + DY[direction];
@@ -218,8 +284,14 @@ public final class CartTerrainRoutePlanner {
                 gScore[next] = tentative;
                 parent[next] = current;
                 open.add(new OpenNode(next, tentative, tentative
-                        + heuristic(nextX, nextY, goalX, goalY)));
+                        + estimate(nextX, nextY, estimateX, estimateY, highway != null)));
             }
+        }
+
+        if (highway != null) {
+            if (!reached) return empty(goalX, goalY);
+            goalX = minimumX + best % width;
+            goalY = minimumY + best / width;
         }
 
         List<GroundRouteTrace.Point> reversed =
@@ -238,7 +310,8 @@ public final class CartTerrainRoutePlanner {
             reversed = new ArrayList<GroundRouteTrace.Point>(
                     reversed.subList(0, maximumRoutePoints));
         }
-        boolean finalTarget = reached && goalX == targetX && goalY == targetY
+        boolean finalTarget = reached && (highway != null
+                || (goalX == targetX && goalY == targetY))
                 && !truncated;
         return new Plan(reversed, goalX, goalY, reached, finalTarget, truncated,
                 stats.expanded, stats.slope, stats.water, stats.unknown,
@@ -394,6 +467,14 @@ public final class CartTerrainRoutePlanner {
         int diagonal = Math.min(dx, dy);
         int cardinal = Math.max(dx, dy) - diagonal;
         return (diagonal * DIAGONAL + cardinal) / 3.0f;
+    }
+
+    private static float estimate(int x, int y, int goalX, int goalY,
+                                   boolean highwayApproach) {
+        // The remaining highway can contain long published segments, so use
+        // Euclidean distance as a lower bound for a multi-entry search.
+        return highwayApproach ? (float) Math.hypot(goalX - x, goalY - y) / 3.0f
+                : heuristic(x, y, goalX, goalY);
     }
 
     private static int clamp(int value, int minimum, int maximum) {

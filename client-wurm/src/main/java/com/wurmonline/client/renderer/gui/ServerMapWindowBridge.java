@@ -114,6 +114,8 @@ public final class ServerMapWindowBridge {
     private static final Matrix LINE_MATRIX = new Matrix();
     private static final Map<WorldMap, State> STATES =
             new WeakHashMap<WorldMap, State>();
+    private static final Map<MapViewport, OverlayBatches> OVERLAY_BATCHES =
+            new WeakHashMap<MapViewport, OverlayBatches>();
     private static final Set<String> REPORTED_FAILURES = new HashSet<String>();
     private static final ExecutorService TEXTURE_WORKER =
             Executors.newSingleThreadExecutor(new ThreadFactory() {
@@ -708,12 +710,23 @@ public final class ServerMapWindowBridge {
 
     public static synchronized void resetAll() {
         STATES.clear();
+        for (OverlayBatches batches : OVERLAY_BATCHES.values()) batches.dispose();
+        OVERLAY_BATCHES.clear();
         WurmWaypointerRuntime.stopMapBrowsing();
         for(LocalSurfaceTexture value:LOCAL_TEXTURES.values())value.texture.dispose();
         LOCAL_TEXTURES.clear();lastLocalSnapshot=null;
         // The published image and its terrain index are independent of the HUD/world session.
         // Keep one revision across reconnects; prepare() replaces it when its identity changes.
         REPORTED_FAILURES.clear();
+    }
+
+    private static OverlayBatches overlayBatches(MapViewport viewport) {
+        OverlayBatches batches = OVERLAY_BATCHES.get(viewport);
+        if (batches == null) {
+            batches = new OverlayBatches();
+            OVERLAY_BATCHES.put(viewport, batches);
+        }
+        return batches;
     }
 
     private static ServerMapProfile customProfile(ServerMapSnapshot snapshot) {
@@ -1169,7 +1182,8 @@ public final class ServerMapWindowBridge {
         if (deeds == null || deeds.isEmpty()) return;
         boolean overview = viewport.getPixelsPerTile()
                 < OVERVIEW_PIXELS_PER_TILE;
-        int labels = 0;
+        MapOverlayBatch batch = overlayBatches(viewport).deeds;
+        batch.begin(left, top, CONTENT_WIDTH, CONTENT_HEIGHT);
         for (Deed deed : deeds) {
             MapPoint point = viewport.mapToScreen(
                     deed.getX() + 0.5d, deed.getY() + 0.5d);
@@ -1185,7 +1199,7 @@ public final class ServerMapWindowBridge {
                 MapPoint deedB = viewport.mapToScreen(
                         deed.getMaximumX() + 1.0d,
                         deed.getMaximumY() + 1.0d);
-                outline(map, queue, left, top, deedA, deedB,
+                batch.outline(deedA, deedB,
                         hovered ? 1.0f
                                 : deed.isSpawnPoint() ? 1.0f : 0.25f,
                         hovered ? 0.91f
@@ -1196,12 +1210,12 @@ public final class ServerMapWindowBridge {
                     float markerRed = deed.isSpawnPoint() ? 1.0f : 0.92f;
                     float markerGreen = deed.isSpawnPoint() ? 0.76f : 1.0f;
                     float markerBlue = deed.isSpawnPoint() ? 0.12f : 0.60f;
-                    map.fillRect(queue,
+                    batch.rect(
                             hovered ? 1.0f : 0.08f,
                             hovered ? 0.91f : 0.05f,
                             hovered ? 0.48f : 0.02f,
                             1.0f, x - 3, y - 3, 7, 7);
-                    map.fillRect(queue, markerRed, markerGreen, markerBlue,
+                    batch.rect(markerRed, markerGreen, markerBlue,
                             1.0f, x - 1, y - 1, 3, 3);
                 }
                 continue;
@@ -1211,13 +1225,13 @@ public final class ServerMapWindowBridge {
             MapPoint perimeterB = viewport.mapToScreen(
                     deed.getPerimeterMaximumX() + 1.0d,
                     deed.getPerimeterMaximumY() + 1.0d);
-            outline(map, queue, left, top, perimeterA, perimeterB,
+            batch.outline(perimeterA, perimeterB,
                     0.25f, 0.78f, 1.0f, 0.55f, 1);
             MapPoint deedA = viewport.mapToScreen(
                     deed.getMinimumX(), deed.getMinimumY());
             MapPoint deedB = viewport.mapToScreen(
                     deed.getMaximumX() + 1.0d, deed.getMaximumY() + 1.0d);
-            outline(map, queue, left, top, deedA, deedB,
+            batch.outline(deedA, deedB,
                     deed.isSpawnPoint() ? 1.0f : 0.25f,
                     deed.isSpawnPoint() ? 0.8f : 1.0f,
                     0.25f, 0.9f, 2);
@@ -1227,21 +1241,29 @@ public final class ServerMapWindowBridge {
                 float markerBlue = deed.isSpawnPoint() ? 0.12f : 0.60f;
                 boolean hovered = sameDeed(deed, state.hoveredDeed);
                 if (hovered) {
-                    map.fillRect(queue, 1.0f, 0.91f, 0.48f, 1.0f,
+                    batch.rect(1.0f, 0.91f, 0.48f, 1.0f,
                             x - 7, y - 7, 15, 15);
-                    map.fillRect(queue, 0.13f, 0.075f, 0.025f, 1.0f,
+                    batch.rect(0.13f, 0.075f, 0.025f, 1.0f,
                             x - 5, y - 5, 11, 11);
                 }
-                map.fillRect(queue, 0.08f, 0.05f, 0.02f, 0.92f,
+                batch.rect(0.08f, 0.05f, 0.02f, 0.92f,
                         x - 4, y - 4, 9, 9);
-                map.fillRect(queue, markerRed, markerGreen, markerBlue, 1.0f,
+                batch.rect(markerRed, markerGreen, markerBlue, 1.0f,
                         x - 2, y - 2, 5, 5);
-                if (hovered || (viewport.getPixelsPerTile() >= 0.42d
-                        && labels++ < 140)) {
-                    text(queue, deed.getName(), x + 6, y - 4,
-                            1.0f, 0.94f, 0.70f, 1.0f, left, top);
-                }
             }
+        }
+        batch.draw(queue);
+        // Labels stay above the complete geometry layer and retain the existing visibility budget.
+        if (overview) return;
+        int labels = 0;
+        for (Deed deed : deeds) {
+            MapPoint point = viewport.mapToScreen(deed.getX() + 0.5d, deed.getY() + 0.5d);
+            int x = left + (int) Math.round(point.getX()), y = top + (int) Math.round(point.getY());
+            if (x < left - 8 || y < top - 8 || x > left + CONTENT_WIDTH + 8
+                    || y > top + CONTENT_HEIGHT + 8) continue;
+            if (sameDeed(deed, state.hoveredDeed)
+                    || (viewport.getPixelsPerTile() >= 0.42d && labels++ < 140))
+                text(queue, deed.getName(), x + 6, y - 4, 1.0f, 0.94f, 0.70f, 1.0f, left, top);
         }
     }
 
@@ -1250,22 +1272,22 @@ public final class ServerMapWindowBridge {
                                          int left, int top, int size,
                                          List<Deed> deeds) {
         if (deeds == null || deeds.isEmpty()) return;
-        int labels = 0;
+        MapOverlayBatch batch = overlayBatches(viewport).deeds;
+        batch.begin(left, top, size, size);
         for (Deed deed : deeds) {
             MapPoint perimeterA = viewport.mapToScreen(
                     deed.getPerimeterMinimumX(), deed.getPerimeterMinimumY());
             MapPoint perimeterB = viewport.mapToScreen(
                     deed.getPerimeterMaximumX() + 1.0d,
                     deed.getPerimeterMaximumY() + 1.0d);
-            outline(map, queue, left, top, size, size,
-                    perimeterA, perimeterB,
+            batch.outline(perimeterA, perimeterB,
                     0.25f, 0.78f, 1.0f, 0.55f, 1);
             MapPoint deedA = viewport.mapToScreen(
                     deed.getMinimumX(), deed.getMinimumY());
             MapPoint deedB = viewport.mapToScreen(
                     deed.getMaximumX() + 1.0d,
                     deed.getMaximumY() + 1.0d);
-            outline(map, queue, left, top, size, size, deedA, deedB,
+            batch.outline(deedA, deedB,
                     deed.isSpawnPoint() ? 1.0f : 0.25f,
                     deed.isSpawnPoint() ? 0.8f : 1.0f,
                     0.25f, 0.92f, 2);
@@ -1280,10 +1302,18 @@ public final class ServerMapWindowBridge {
             float markerRed = deed.isSpawnPoint() ? 1.0f : 0.92f;
             float markerGreen = deed.isSpawnPoint() ? 0.76f : 1.0f;
             float markerBlue = deed.isSpawnPoint() ? 0.12f : 0.60f;
-            map.fillRect(queue, 0.08f, 0.05f, 0.02f, 0.92f,
+            batch.rect(0.08f, 0.05f, 0.02f, 0.92f,
                     anchorX - 4, anchorY - 4, 9, 9);
-            map.fillRect(queue, markerRed, markerGreen, markerBlue, 1.0f,
+            batch.rect(markerRed, markerGreen, markerBlue, 1.0f,
                     anchorX - 2, anchorY - 2, 5, 5);
+        }
+        batch.draw(queue);
+        int labels = 0;
+        for (Deed deed : deeds) {
+            MapPoint anchor = viewport.mapToScreen(deed.getX() + 0.5d, deed.getY() + 0.5d);
+            int anchorX = left + (int) Math.round(anchor.getX()), anchorY = top + (int) Math.round(anchor.getY());
+            if (anchorX < left - 8 || anchorY < top - 8
+                    || anchorX > left + size + 8 || anchorY > top + size + 8) continue;
             if (labels++ < 80) {
                 text(queue, deed.getName(), anchorX + 6, anchorY - 4,
                         1.0f, 0.94f, 0.70f, 1.0f,
@@ -1297,6 +1327,8 @@ public final class ServerMapWindowBridge {
                                      int clipWidth, int clipHeight,
                                      HighwayTileIndex index) {
         if (index == null || index.isEmpty()) return;
+        MapOverlayBatch batch = overlayBatches(viewport).highways;
+        batch.begin(left, top, clipWidth, clipHeight);
         List<HighwayTileIndex.Segment> segments = index.getSegments();
         int maximum = viewport.getPixelsPerTile() < OVERVIEW_PIXELS_PER_TILE
                 ? MAXIMUM_OVERVIEW_HIGHWAY_SEGMENTS : Integer.MAX_VALUE;
@@ -1331,9 +1363,10 @@ public final class ServerMapWindowBridge {
             } else if (segment.getKind() == HighwayTileIndex.Kind.TUNNEL) {
                 red = 1.0f; green = 0.3f; blue = 0.86f; width = 3.0f;
             }
-            line(queue, clipped[0], clipped[1], clipped[2], clipped[3],
+            batch.line(clipped[0], clipped[1], clipped[2], clipped[3],
                     width, red, green, blue, 0.92f);
         }
+        batch.draw(queue);
     }
 
     private static void drawNavigationLine(Queue queue,
@@ -2058,48 +2091,6 @@ public final class ServerMapWindowBridge {
         state.hoveredWaypointEditable = false;
     }
 
-    private static void outline(WorldMap map, Queue queue, int left, int top,
-                                MapPoint a, MapPoint b, float red, float green,
-                                float blue, float alpha, int thickness) {
-        outline(map, queue, left, top, CONTENT_WIDTH, CONTENT_HEIGHT,
-                a, b, red, green, blue, alpha, thickness);
-    }
-
-    private static void outline(WurmComponent map, Queue queue,
-                                int left, int top,
-                                int clipWidth, int clipHeight,
-                                MapPoint a, MapPoint b, float red, float green,
-                                float blue, float alpha, int thickness) {
-        int x1 = left + (int) Math.floor(Math.min(a.getX(), b.getX()));
-        int y1 = top + (int) Math.floor(Math.min(a.getY(), b.getY()));
-        int x2 = left + (int) Math.ceil(Math.max(a.getX(), b.getX()));
-        int y2 = top + (int) Math.ceil(Math.max(a.getY(), b.getY()));
-        fillClipped(map, queue, red, green, blue, alpha, x1, y1,
-                x2 - x1, thickness, left, top, clipWidth, clipHeight);
-        fillClipped(map, queue, red, green, blue, alpha,
-                x1, y2 - thickness, x2 - x1, thickness,
-                left, top, clipWidth, clipHeight);
-        fillClipped(map, queue, red, green, blue, alpha, x1, y1,
-                thickness, y2 - y1, left, top, clipWidth, clipHeight);
-        fillClipped(map, queue, red, green, blue, alpha,
-                x2 - thickness, y1, thickness, y2 - y1,
-                left, top, clipWidth, clipHeight);
-    }
-
-    private static void fillClipped(WurmComponent map, Queue queue,
-                                    float red, float green, float blue, float alpha,
-                                    int x, int y, int width, int height,
-                                    int left, int top,
-                                    int clipWidth, int clipHeight) {
-        int clipX = Math.max(left, x);
-        int clipY = Math.max(top, y);
-        int clipRight = Math.min(left + clipWidth, x + width);
-        int clipBottom = Math.min(top + clipHeight, y + height);
-        if (clipRight <= clipX || clipBottom <= clipY) return;
-        map.fillRect(queue, red, green, blue, alpha, clipX, clipY,
-                clipRight - clipX, clipBottom - clipY);
-    }
-
     private static void line(Queue queue, float x1, float y1, float x2, float y2,
                              float thickness, float red, float green,
                              float blue, float alpha) {
@@ -2339,6 +2330,12 @@ public final class ServerMapWindowBridge {
             this.url = url;
             this.label = label;
         }
+    }
+
+    private static final class OverlayBatches {
+        final MapOverlayBatch highways = new MapOverlayBatch();
+        final MapOverlayBatch deeds = new MapOverlayBatch();
+        void dispose() { highways.dispose(); deeds.dispose(); }
     }
 
     private static final class State {

@@ -29,7 +29,7 @@ import java.util.logging.Logger;
 
 public final class WurmWaypointerMod implements WurmClientMod, Configurable, PreInitable, Initable,
         ModListener, SharedLanguageCoordinator.Participant {
-    public static final String VERSION = "1.10.6";
+    public static final String VERSION = "1.10.9";
 
     @Override public String[] supportedLanguageCodes() {
         return org.waypoints.next.i18n.Messages.CODES.clone();
@@ -235,7 +235,7 @@ public final class WurmWaypointerMod implements WurmClientMod, Configurable, Pre
         queue.getDeclaredMethod("renderModern").insertBefore(before);
         CtClass backend=pool.get("com.wurmonline.client.renderer.backend.Backend");
         backend.getDeclaredMethod("beginFrame").insertBefore("com.wurmonline.client.renderer.effects.TileHighlightOverlay.flushUploads();");
-        backend.getDeclaredMethod("endFrame").insertAfter(bridge + "finishFrame(); com.wurmonline.client.renderer.effects.TileHighlightOverlay.finishFrame();");
+        backend.getDeclaredMethod("endFrame").insertAfter(bridge + "finishFrame(); com.wurmonline.client.renderer.effects.TileHighlightOverlay.finishFrame(); com.wurmonline.client.renderer.gui.MapOverlayBatch.finishFrame();");
     }
 
     /** Optional timings cannot prevent installation of texture retirement/upload hooks. */

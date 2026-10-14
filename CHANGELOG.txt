@@ -1,3 +1,22 @@
+1.10.9 - 2026-10-15
+
+- Publish the map HUD batching and terrain-aware Highway entry fixes from 1.10.7 and 1.10.8.
+- Clean-build with the complete canonical updater 1.5.0 and UI SDK 0.4.11. All Waypointer preferences remain available through Settings in the shared Mods Registry.
+- Replace the illustrated user guide and the plain-text installation guide. Keep local profiling captures outside the source tree.
+- Keep the installable archive limited to the mod JAR, loader descriptor, default configuration and README.txt; retain artwork, fonts, updater and license notices inside the JAR.
+
+1.10.8 - 2026-10-15
+
+- Keep the large map frame and controls visible at full zoom-out. Batch road segments and deed geometry instead of exhausting Wurm's 8192-primitive HUD pool before the window chrome is queued.
+- Preserve road colors, deed borders, markers, hover highlights and clipping on the main map and minimap. Reuse unchanged geometry and retire replaced native buffers after queued frames finish.
+- Verify a dense overview with 3000 roads, 2000 deeds and 8000 other HUD primitives against the pinned client's real queue, along with buffer reuse and retirement.
+
+1.10.7 - 2026-10-15
+
+- Choose surface Highway entries by observed terrain travel time plus the remaining Highway journey. An approach can join a later reachable section instead of visiting a distant geometric entry and returning along a rectangular detour.
+- Cover the Kamino Bay road coordinate shift with a regression using the published road geometry. Preserve terrain, slope, water, layer and portal checks, bounded search limits and chained fallback for distant or unloaded approaches.
+- Retain the complete verified canonical updater 1.5.0 and UI SDK 0.4.11 in the manual installation ZIP.
+
 1.10.6 - 2026-10-14
 
 - Rebuild with the latest complete canonical updater 1.5.0 and Chamomilo UI 0.4.11, including all Waypointer preferences in the shared Mods Registry settings window.

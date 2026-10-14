@@ -1417,15 +1417,26 @@ public final class GroundNavigationRouteEffect extends Effect
                                         TravelLayer travelLayer,
                                         int routeTargetX, int routeTargetY,
                                         boolean routeTargetIsFinal) {
-        PlannedRoute entry = terrainRoute(startX, startY,
+        List<GroundRouteTrace.Point> highwayPoints =
+                sampleHighway(highway.getHighwaySteps(), highways,
+                        travelLayer);
+        PlannedRoute entry = null;
+        if (travelLayer == TravelLayer.SURFACE) {
+            CartTerrainRoutePlanner.Plan approach = connectorPlanner.planToHighway(
+                    startX, startY, highwayPoints, terrain(highways, travelLayer));
+            if (approach.isReachedFinalTarget()) {
+                entry = new PlannedRoute(approach.getPoints(), true, "highway_entry",
+                        approach.getExpandedNodes(), approach.getRejectedSlopeEdges(),
+                        approach.getRejectedWaterEdges(), approach.getRejectedUnknownEdges(),
+                        approach.getRejectedCornerEdges());
+            }
+        }
+        if (entry == null) entry = terrainRoute(startX, startY,
                 highway.getEntryX(), highway.getEntryY(), connectorPlanner,
                 "highway_entry", highways, travelLayer);
         PlannedRoute exit = terrainRoute(highway.getExitX(),
                 highway.getExitY(), routeTargetX, routeTargetY,
                 connectorPlanner, "highway_exit", highways, travelLayer);
-        List<GroundRouteTrace.Point> highwayPoints =
-                sampleHighway(highway.getHighwaySteps(), highways,
-                        travelLayer);
         List<GroundRouteTrace.Point> combined = NavigationRouteAssembly.joinHighway(
                 entry.points, highwayPoints, exit.points);
         if (combined.isEmpty()) {

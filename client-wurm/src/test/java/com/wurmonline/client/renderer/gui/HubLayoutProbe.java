@@ -217,7 +217,7 @@ public final class HubLayoutProbe {
             }
         }
         TableHeaderProbe.verify(headers);
-        for(Object row:rows.components)check(row instanceof WurmArrayPanel&&((WurmArrayPanel<?>)row).height==28,"Targets use one compact table row without cards");
+        for(Object row:((WaypointerVirtualTable)rows).dataRows())check(row instanceof WurmArrayPanel&&((WurmArrayPanel<?>)row).height==28,"Targets use one compact table row without cards");
         WurmScrollPanel scroll=(WurmScrollPanel)field(panel,"scroll");
         check(headers.parent==scroll.parent&&headers.y+headers.height<=scroll.y,"Headers are fixed above the scroll area");
         List<Object> columns=new ArrayList<Object>(((Map<WButton,?>)field(panel,"sortActions")).values());
@@ -394,9 +394,9 @@ public final class HubLayoutProbe {
         WButton back=(WButton)field(monitor,"surroundingsButton");
         check(viewport.height%28==0&&scroll.yo%28==0,"Monitoring viewport and scrolling fit complete rows");
         check(back.y-viewport.y-viewport.height>=8,"Monitoring reserves space before the footer");
-        for(FlexComponent row:((WurmArrayPanel<?>)scroll.content).components) {
+        for(FlexComponent row:((WaypointerVirtualTable)scroll.content).dataRows()) {
             if(row.y<viewport.y+viewport.height&&row.y+row.height>viewport.y)
-                check(row.y>=viewport.y&&row.y+row.height<=viewport.y+viewport.height,"Monitoring never shows part of a row");
+                check(row.y>=viewport.y&&row.y+row.height<=viewport.y+viewport.height,"Monitoring never shows part of a row: row="+row.y+"+"+row.height+", viewport="+viewport.y+"+"+viewport.height+", offset="+scroll.yo);
         }
     }
     private static void verifyMonitorMark(SurroundingsMonitoringWindow monitor,String preview)throws Exception {
@@ -493,6 +493,7 @@ public final class HubLayoutProbe {
         check(header.components.size()==labels.length,"Section columns exclude unavailable Traits");
         for(int i=0;i<labels.length;i++)check(((WButton)header.components.get(i)).getLabel().equals(Messages.text(labels[i])),"Active header: "+labels[i]);
         for(int row=0;row<table.components.size();row++){
+            if (!(table.components.get(row) instanceof WurmArrayPanel)) continue;
             WurmArrayPanel<?> values=(WurmArrayPanel<?>)table.components.get(row);
             verifyTableAction(((WaypointerTableActionCell)values.components.get(0)).button);
             for(int column=0;column<labels.length;column++){

@@ -39,6 +39,7 @@ final class SurroundingsScrollPanel extends WurmScrollPanel {
     void restoreOffset(int requested) { applyOffset(Math.max(0, requested)); }
     void useWholeRowOffsets() { wholeRowOffsets = true;applyOffset(yo); }
     private WurmComponent viewport() { return (WurmComponent) (Object) offs; }
+    int viewportHeight() { return Math.max(0, viewport().height); }
 
     @Override protected void mouseWheeled(int mx, int my, int delta) { scrollWheel(delta); }
     @Override void leftPressed(int mx, int my, int count) {
@@ -73,6 +74,7 @@ final class SurroundingsScrollPanel extends WurmScrollPanel {
         isAtBottom = yo >= hidden;
         translateSubtree(content, viewport.x - content.x, viewport.y - yo - content.y);
         synchronizeBar();
+        if (content instanceof WaypointerVirtualTable) ((WaypointerVirtualTable) content).refreshViewport();
     }
     // Native widgets keep absolute screen coordinates. Translate descendants
     // directly: setLocation would clamp negative scroll positions to the screen.

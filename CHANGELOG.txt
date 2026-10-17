@@ -1,3 +1,18 @@
+1.10.11 - 2026-10-18
+
+- Publish the large-list performance fixes from 1.10.10 across the hub, Monitoring, deed search and compass target chooser.
+- Clean-build with the complete canonical updater 1.5.0 and its pinned Chamomilo UI 0.4.11. General Waypointer settings remain available in the shared Mods Registry.
+- Rewrite the illustrated GitHub guide and README.txt for manual installation. Keep the ZIP limited to the JAR, loader descriptor, default configuration and README.txt.
+- Remove stale local build outputs and preview captures from the project folder.
+
+1.10.10 - 2026-10-18
+
+- Keep large Objects / items, Containers and Mobs lists responsive. Attach and render only the rows near the visible viewport instead of creating native controls for every loaded object. Preserve the full result count, scrollbar range, filters, sorting and bulk marking.
+- Apply the same viewport-based row creation to Waypoints, My animals, Vehicles, Monitoring, deed search and overlapping compass waypoint choices. Retain native SDK scrolling, live row updates, UUID anchors and complete search/sort/bulk data.
+- Compare refresh revisions in the controller's revision domain, avoiding a full rebuild every second when the catalogue is unchanged.
+- Preserve partial-row scroll offsets across live refreshes; clamp after filtering or removals. Verify native button hit testing and object IDs at the beginning, middle and end of a 2500-item catalogue, with all four interface languages.
+- Retain the verified complete canonical shared updater and UI SDK in the manual installation ZIP.
+
 1.10.9 - 2026-10-15
 
 - Publish the map HUD batching and terrain-aware Highway entry fixes from 1.10.7 and 1.10.8.

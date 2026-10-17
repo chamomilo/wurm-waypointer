@@ -18,7 +18,7 @@ final class TrackedTargetsPanel extends WaypointerContentPanel implements Button
     private final Set<WButton> fixedActions=new HashSet<WButton>();
     private final List<Runnable> statusUpdates=new ArrayList<Runnable>();
     private final WurmInputField search,minus;
-    private final WurmArrayPanel<FlexComponent> rows;
+    private final WaypointerVirtualTable rows;
     private final WurmScrollPanel scroll;
     private final WurmLabel status;
     private final WButton refreshButton;
@@ -63,13 +63,13 @@ final class TrackedTargetsPanel extends WaypointerContentPanel implements Button
         headers=new WaypointerTableHeader.Row("tracked-targets.headers");
         // Native autoWidth temporarily sets the content height to zero while
         // resizing descendants, which makes Offsetter clamp its scroll offset.
-        rows=new WurmArrayPanel<FlexComponent>("targets.rows",WurmArrayPanel.DIR_VERTICAL);scroll=new ChamomiloUiV1ScrollPanel("targets.scroll",rows,false,true);
+        rows=new WaypointerVirtualTable("targets.rows",28,()->{actions.keySet().retainAll(fixedActions);statusUpdates.clear();},null);
+        scroll=new ChamomiloUiV1ScrollPanel("targets.scroll",rows,false,true);rows.bind(scroll);
         WurmBorderPanel table=new WurmBorderPanel("targets.table");table.setComponent(headers,NORTH);table.setComponent(scroll,CENTER);setComponent(table,CENTER);
         refresh(true);
     }
     private void refresh(boolean sortAgain){
         int offset=scroll.yo;UUID anchor=offset/28<displayOrder.size()?displayOrder.get(offset/28):null;
-        rows.removeAllComponents();actions.keySet().retainAll(fixedActions);statusUpdates.clear();
         headers.removeAllComponents();sortActions.clear();
         String[] titles=new String[columns.length];for(int i=0;i<columns.length;i++)titles[i]=heading(columns[i]);
         int baseline=WaypointerTableHeader.baseline(titles);
@@ -89,10 +89,11 @@ final class TrackedTargetsPanel extends WaypointerContentPanel implements Button
         if(sortAgain&&sortColumn!=null)filtered.sort(comparator(context));
         else if(!sortAgain){Map<UUID,Integer> previous=new HashMap<UUID,Integer>();for(int i=0;i<displayOrder.size();i++)previous.put(displayOrder.get(i),i);filtered.sort(Comparator.comparingInt(r->previous.getOrDefault(r.getId(),Integer.MAX_VALUE)));}
         displayOrder.clear();
-        for(WaypointRecord record:filtered){displayOrder.add(record.getId());rows.addComponent(dataRow(record));}
-        if(rows.components.isEmpty())rows.addComponent(cell(new WaypointerLabel(Messages.text(catalogue.isEmpty()?(animals?"No managed animals to display.":"No managed vehicles or ships to display."):"No targets match these filters.")),800));
-        rows.componentResized();scroll.componentResized();int index=anchor==null?-1:displayOrder.indexOf(anchor);
-        scrollTo(index<0?offset:index*28+offset%28);status.setLabel(Messages.text(controller.status()));revision=controller.revision();
+        for(WaypointRecord record:filtered)displayOrder.add(record.getId());
+        int index=anchor==null?-1:displayOrder.indexOf(anchor);
+        rows.setRows(Math.max(1,filtered.size()),index<0?offset:index*28+offset%28,
+                row->filtered.isEmpty()?cell(new WaypointerLabel(Messages.text(catalogue.isEmpty()?(animals?"No managed animals to display.":"No managed vehicles or ships to display."):"No targets match these filters.")),800):dataRow(filtered.get(row)));
+        status.setLabel(Messages.text(controller.status()));revision=controller.revision();
     }
     private FlexComponent dataRow(WaypointRecord r){
         WurmArrayPanel<FlexComponent> row=new WurmArrayPanel<FlexComponent>("target."+r.getId(),WurmArrayPanel.DIR_HORIZONTAL);

@@ -15,6 +15,7 @@ import org.waypoints.next.ui.SurroundingsScrollState;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -85,7 +86,7 @@ final class SurroundingsWindow extends WaypointerContentPanel
     private WButton clearExcludedNames;
     private final Map<WButton,SurroundingsQuery.SortColumn> sortActions=new LinkedHashMap<WButton,SurroundingsQuery.SortColumn>();
     private WurmLabel countLabel;
-    private WurmArrayPanel<FlexComponent> table;
+    private WaypointerVirtualTable table;
     private WurmArrayPanel<FlexComponent> tableHeader;
     private WurmBorderPanel tablePanel;
     private SurroundingsScrollPanel scrollPanel;
@@ -104,6 +105,7 @@ final class SurroundingsWindow extends WaypointerContentPanel
     private final Map<WButton,List<String>> filterCaptions=new LinkedHashMap<WButton,List<String>>();
     private long displayedRevision = Long.MIN_VALUE;
     private long nextAutoRefreshAt;
+    private List<SurroundingsRow> displayedRows = Collections.emptyList();
 
     SurroundingsWindow(SurroundingsController controller) {
         super("wurm-waypointer.surroundings", true);
@@ -125,6 +127,7 @@ final class SurroundingsWindow extends WaypointerContentPanel
     }
 
     private void rebuildView(String search) {
+        displayedRows = Collections.emptyList();
         excludedNamesInput = null;
         clearExcludedNames = null;
         WurmBorderPanel root = new WurmBorderPanel("waypointer.surroundings.root");
@@ -151,7 +154,8 @@ final class SurroundingsWindow extends WaypointerContentPanel
         top.setComponent(filterPanel, CENTER);
         root.setComponent(top, WurmBorderPanel.NORTH);
 
-        table = new WurmArrayPanel<FlexComponent>("waypointer.surroundings.table",0);
+        table = new WaypointerVirtualTable("waypointer.surroundings.table", ROW_HEIGHT,
+                rowActions::clear, this::fitTableColumns);
         scrollPanel = new SurroundingsScrollPanel(
                 "waypointer.surroundings.scroll", table, ROW_HEIGHT,
                 new SurroundingsScrollPanel.ScrollListener() {
@@ -159,8 +163,10 @@ final class SurroundingsWindow extends WaypointerContentPanel
                                                        long nowMillis) {
                         scrollState.observe(offset, nowMillis);
                         scrollOffsets.put(activeKind, Integer.valueOf(offset));
+                        table.refreshViewport();
                     }
                 });
+        table.bind(scrollPanel, offset->{scrollPanel.contentChanged();scrollPanel.restoreOffset(offset);});
         tablePanel = new WurmBorderPanel("waypointer.surroundings.table-panel");
         tablePanel.setComponent(scrollPanel, WurmBorderPanel.CENTER);
         WurmBorderPanel tableArea = new WurmBorderPanel("surroundings.table-area");
@@ -273,22 +279,20 @@ final class SurroundingsWindow extends WaypointerContentPanel
 
     private void refreshRows(int scrollOffset) {
         try {
+            // The controller also tracks scanner changes; its revision is not
+            // the catalogue-only revision carried by the snapshot. Capture it
+            // before reading so concurrent changes still trigger another refresh.
+            long revision = controller.revision();
             SurroundingsSnapshot snapshot = controller.snapshot(query());
-            displayedRevision = snapshot.getRevision();
-            List<FlexComponent> components = new ArrayList<FlexComponent>(
-                    snapshot.getRows().size());
+            displayedRevision = revision;
+            displayedRows = snapshot.getRows();
             tableHeader = header();
             tablePanel.setComponent(tableHeader, WurmBorderPanel.NORTH);
-            rowActions.clear();
             filteredKeys.clear();
-            for (SurroundingsRow row : snapshot.getRows()) {
+            for (SurroundingsRow row : displayedRows) {
                 filteredKeys.add(row.getEntry().getKey());
-                components.add(dataRow(row));
             }
-            table.removeAllComponents();
-            table.addComponents(components.toArray(
-                    new FlexComponent[components.size()]));
-            fitTableColumns();
+            table.setRows(displayedRows.size(), scrollOffset, index -> dataRow(displayedRows.get(index)));
             restoreScroll(scrollOffset);
             countLabel.setLabel(org.waypoints.next.i18n.Messages.format("{0} of {1}; {2} tracked",
                     snapshot.getFilteredCount(),snapshot.getTotalCount(),snapshot.getMarkedCount()),org.waypoints.next.i18n.Messages.text("Matching rows / loaded objects in this section; marked objects in this section."));
@@ -304,7 +308,9 @@ final class SurroundingsWindow extends WaypointerContentPanel
 
     private void fitTableColumns(){
         WurmArrayPanel<?> header=tableHeader;
-        List<FlexComponent> layoutRows=new ArrayList<FlexComponent>(table.components);
+        List<FlexComponent> layoutRows=new ArrayList<FlexComponent>();
+        for (FlexComponent child : table.components)
+            if (child instanceof WurmArrayPanel) layoutRows.add(child);
         layoutRows.add(0,tableHeader);
         int[] widths=new int[header.components.size()];
         for(int i=0;i<widths.length;i++){
@@ -641,6 +647,7 @@ final class SurroundingsWindow extends WaypointerContentPanel
     }
 
     @Override public void gameTick() {
+        if (table != null) table.refreshViewport();
         super.gameTick();
         long now = System.currentTimeMillis();
         if (scrollPanel != null) {

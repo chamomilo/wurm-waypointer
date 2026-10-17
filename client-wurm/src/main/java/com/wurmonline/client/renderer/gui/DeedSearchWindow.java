@@ -24,7 +24,7 @@ final class DeedSearchWindow extends WaypointerUiWindow
     private WurmLabel countLabel;
     private WButton refreshButton;
     private WButton clearPlus,clearMinus;
-    private WurmArrayPanel<FlexComponent> table;
+    private WaypointerVirtualTable table;
     private int filteredCount;
     private Deed onlyFiltered;
     private DeedDataStatus providerStatus = DeedDataStatus.READY;
@@ -121,11 +121,11 @@ final class DeedSearchWindow extends WaypointerUiWindow
         root.setComponent(filters, WurmBorderPanel.NORTH);
         minimumWidth = Math.max(800,filters.calcWidth()+48);
 
-        table = new WurmArrayPanel<FlexComponent>(
-                "waypointer.deed-search.table", 0, true);
-        root.setComponent(new ChamomiloUiV1ScrollPanel(
-                "waypointer.deed-search.scroll", table, false, true),
-                WurmBorderPanel.CENTER);
+        table = new WaypointerVirtualTable("waypointer.deed-search.table", ROW_HEIGHT, null, null);
+        ChamomiloUiV1ScrollPanel scroll = new ChamomiloUiV1ScrollPanel(
+                "waypointer.deed-search.scroll", table, false, true);
+        table.bind(scroll);
+        root.setComponent(scroll, WurmBorderPanel.CENTER);
         setComponent(root);
         refreshRows();
     }
@@ -134,21 +134,21 @@ final class DeedSearchWindow extends WaypointerUiWindow
 
     private void refreshRows() {
         if (table == null) return;
-        table.removeAllComponents();
         String filter = searchInput == null ? ""
                 : safe(searchInput.getText()).trim();
         int shown = 0;
+        List<Deed> filtered = new ArrayList<Deed>();
+        org.waypoints.next.service.TextFilter textFilter = new org.waypoints.next.service.TextFilter(filter,minusInput.getText());
         onlyFiltered = null;
         for (Deed deed : DeedSearchRanker.rank(deeds, "")) {
             String line = format(deed);
-            if(!new org.waypoints.next.service.TextFilter(filter,minusInput.getText()).matches(line))continue;
-            DeedRow row = new DeedRow(line, deed, this);
-            row.setInitialSize(TABLE_WIDTH, ROW_HEIGHT, false);
-            table.addComponent(row);
+            if(!textFilter.matches(line))continue;
+            filtered.add(deed);
             shown++;
             onlyFiltered = deed;
         }
         filteredCount = shown;
+        table.setRows(filtered.size(),0,index->{Deed deed=filtered.get(index);DeedRow row=new DeedRow(format(deed),deed,this);row.setInitialSize(TABLE_WIDTH,ROW_HEIGHT,false);return row;});
         if (shown != 1) onlyFiltered = null;
         countLabel.setLabel(providerLabel(shown));
     }

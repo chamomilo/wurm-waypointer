@@ -267,6 +267,7 @@ task verifyArtifact(dependsOn: [jar, ':verifyArchitectureBoundaries', ':client-w
                 'com/wurmonline/client/renderer/gui/SurroundingsWindow.class',
                 'com/wurmonline/client/renderer/gui/SurroundingsMonitoringWindow.class',
                 'com/wurmonline/client/renderer/gui/SurroundingsScrollPanel.class',
+                'com/wurmonline/client/renderer/gui/WaypointerVirtualTable.class',
                 'com/wurmonline/client/renderer/gui/SurroundingsWindowBridge.class',
                 'com/wurmonline/client/renderer/gui/CompassSurroundingsPopupBridge.class',
                 'com/wurmonline/client/renderer/gui/WaypointColorPicker.class',
@@ -415,4 +416,4 @@ task verifyUiKit(type: Exec, dependsOn: jar) {
                 '-ReferenceJar', referenceKit.absolutePath
     }
 }
-dist.dependsOn verifyUiKit
+dist.dependsOn verifyUiKit, ':client-wurm:verifyLargeSurroundings'

@@ -75,7 +75,7 @@ public final class MapOverlayBatchTest {
             }
             HighwayTileIndex index = HighwayTileIndex.parse(roads.append(']').toString(), 4096, 4096);
             Class<?> stateType = Class.forName(ServerMapWindowBridge.class.getName() + "$State");
-            Constructor<?> constructor = stateType.getDeclaredConstructors()[0]; constructor.setAccessible(true);
+            Constructor<?> constructor = stateType.getDeclaredConstructor(String.class, MapViewport.class, MapOverlayVisibility.class); constructor.setAccessible(true);
             Object state = constructor.newInstance("sklotopolis-novus", viewport, new MapOverlayVisibility(true, true, true));
             Method highways = ServerMapWindowBridge.class.getDeclaredMethod("drawHighways", Queue.class, MapViewport.class,
                     int.class, int.class, int.class, int.class, HighwayTileIndex.class);

@@ -367,7 +367,13 @@ public final class WurmWaypointerRuntime {
                 @Override public long revision() {
                     SURROUNDINGS.reconcileWaypoints(
                             allSurroundingsWaypointKeys());
-                    return SURROUNDINGS.revision();
+                    long revision = SURROUNDINGS.revision();
+                    World world = hud == null ? null : hud.getWorld();
+                    if (world == null) return revision;
+                    // Distances and distance sorting change when the player
+                    // moves even if every received object stays stationary.
+                    revision = revision * 31L + Double.doubleToLongBits(world.getPlayerPosX());
+                    return revision * 31L + Double.doubleToLongBits(world.getPlayerPosY());
                 }
                 @Override public void reportFailure(String operation, Throwable failure) {
                     LOGGER.log(Level.WARNING, "Surroundings " + oneLine(operation)

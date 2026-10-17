@@ -58,6 +58,14 @@ task verifyWaypointerUi(type: JavaExec, dependsOn: ['classes', 'testClasses']) {
             'standard-kit'
 }
 
+task verifyLargeSurroundings(type: JavaExec, dependsOn: ['classes', 'testClasses']) {
+    systemProperty 'waypointer.probe.surroundingsOnly', true
+    classpath = sourceSets.test.runtimeClasspath
+    if (rootProject.ext.wurmJavaFxJar != null) classpath += files(rootProject.ext.wurmJavaFxJar)
+    main = 'org.waypoints.next.ui.WaypointerUiProbe'
+    args 'standard-kit', file("${buildDir}/surroundings-large-preview").absolutePath, 'standard-kit'
+}
+
 ext.chamomiloUpdate = [id: 'wurm-waypointer', name: 'Waypointer',
         repo: 'chamomilo/wurm-waypointer', asset: 'wurm-waypointer-{version}.zip',
         properties: '../mods/wurm-waypointer.properties',

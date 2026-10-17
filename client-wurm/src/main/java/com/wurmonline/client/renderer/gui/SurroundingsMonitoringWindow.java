@@ -40,7 +40,7 @@ final class SurroundingsMonitoringWindow extends WaypointerUiWindow
     private final SurroundingsScrollState scrollState =
             new SurroundingsScrollState(SCROLL_SETTLE_MILLIS);
 
-    private WurmArrayPanel<FlexComponent> table;
+    private WaypointerVirtualTable table;
     private WurmArrayPanel<FlexComponent> tableHeader;
     private WurmBorderPanel tablePanel;
     private SurroundingsScrollPanel scrollPanel;
@@ -79,7 +79,8 @@ final class SurroundingsMonitoringWindow extends WaypointerUiWindow
     private void build() {
         WurmBorderPanel root = new WurmBorderPanel(
                 "waypointer.surroundings-monitoring.root");
-        table = vertical("waypointer.surroundings-monitoring.table");
+        table = new WaypointerVirtualTable("waypointer.surroundings-monitoring.table", ROW_HEIGHT,
+                rowActions::clear, this::fitColumns);
         scrollPanel = new SurroundingsScrollPanel(
                 "waypointer.surroundings-monitoring.scroll",
                 table, ROW_HEIGHT,
@@ -87,8 +88,10 @@ final class SurroundingsMonitoringWindow extends WaypointerUiWindow
                     @Override public void userScrolled(int offset,
                                                        long nowMillis) {
                         scrollState.observe(offset, nowMillis);
+                        table.refreshViewport();
                     }
                 });
+        table.bind(scrollPanel, offset->{scrollPanel.contentChanged();scrollPanel.restoreOffset(offset);});
         scrollPanel.useWholeRowOffsets();
         tablePanel = new WholeRowsPanel();
         tablePanel.setComponent(scrollPanel, WurmBorderPanel.CENTER);
@@ -131,19 +134,14 @@ final class SurroundingsMonitoringWindow extends WaypointerUiWindow
             }
             List<SurroundingsRow> detections =
                     SurroundingsMonitoringView.merge(snapshots);
-            List<FlexComponent> components =
-                    new ArrayList<FlexComponent>(detections.size());
             tableHeader = header();
             tablePanel.setComponent(tableHeader, WurmBorderPanel.NORTH);
             rowActions.clear();
             int marked = 0;
             for (SurroundingsRow detection : detections) {
                 if (detection.isWaypointEnabled()) marked++;
-                components.add(dataRow(detection));
             }
-            table.removeAllComponents();
-            table.addComponents(components.toArray(
-                    new FlexComponent[components.size()]));
+            table.setRows(detections.size(), scrollOffset, index -> dataRow(detections.get(index)));
             countLabel.setLabel(org.waypoints.next.i18n.Messages.format("{0} found; {1} tracked; {2} filters",detections.size(),marked,queries.size()));
             countLabel.setSize(Math.max(206, countLabel.textWidth()+8), ROW_HEIGHT);
             fitColumns();
@@ -227,7 +225,7 @@ final class SurroundingsMonitoringWindow extends WaypointerUiWindow
 
     private void fitColumns() {
         WurmArrayPanel<?> header = tableHeader;
-        List<FlexComponent> layoutRows = new ArrayList<FlexComponent>(table.components);
+        List<FlexComponent> layoutRows = table.dataRows();
         layoutRows.add(0, tableHeader);
         int[] widths = {MARK_WIDTH, NAME_WIDTH, DETAIL_WIDTH};
         for (int i=0; i<widths.length; i++) {

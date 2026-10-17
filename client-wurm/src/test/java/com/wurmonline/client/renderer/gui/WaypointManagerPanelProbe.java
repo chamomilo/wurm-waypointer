@@ -90,11 +90,10 @@ public final class WaypointManagerPanelProbe {
         UUID top = before.get(15), removed = before.get(5);
         String removedSource = catalog.find(removed).getSourceKey();
         String removedKey = removedSource.substring(removedSource.lastIndexOf(':') + 1);
-        WButton delete = null;
-        for (Map.Entry<WButton,?> action : actions.entrySet()) if (removed.equals(field(action.getValue(), "id"))
-                && field(action.getValue(), "kind").toString().equals("REMOVE_TRACKED")) delete = action.getKey();
-        check(delete != null, "Delete action is bound to a UUID, including identical names");
-        manager.buttonClicked(delete);
+        for (Map.Entry<WButton,?> action : actions.entrySet())
+            check(!removed.equals(field(action.getValue(), "id")), "Offscreen rows do not retain native action widgets");
+        controller.delete(removed);
+        tick(manager);
         List<UUID> after = (List<UUID>)field(manager, "filteredIds");
         check(after.size() == 69 && !after.contains(removed), "Deleted row disappears immediately");
         check(after.get(14).equals(top) && scroll.yo == offset - rowPitch, "Deletion before viewport retains visible UUID and intra-row offset");

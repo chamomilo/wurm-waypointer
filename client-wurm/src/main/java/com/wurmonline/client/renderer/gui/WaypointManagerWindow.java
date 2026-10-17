@@ -76,8 +76,9 @@ final class WaypointManagerWindow extends WaypointerContentPanel
     private final List<ResponsiveRow> responsiveRows =
             new ArrayList<ResponsiveRow>();
     private final Map<UUID, LiveRow> liveRows = new HashMap<UUID, LiveRow>();
+    private final Map<UUID, WaypointManagerRow> catalogueRows = new HashMap<UUID, WaypointManagerRow>();
 
-    private WurmArrayPanel<FlexComponent> table;
+    private WaypointerVirtualTable table;
     private WurmArrayPanel<FlexComponent> tableHeader;
     private WurmBorderPanel listTable;
     private WurmBorderPanel listRoot;
@@ -188,10 +189,12 @@ final class WaypointManagerWindow extends WaypointerContentPanel
         top.addComponent(gap(1, CONTROL_GAP));
         root.setComponent(top, WurmBorderPanel.NORTH);
 
-        table = new WurmArrayPanel<FlexComponent>("waypointer.manager.table", 0);
+        table = new WaypointerVirtualTable("waypointer.manager.table", ROW_HEIGHT + CONTROL_GAP,
+                this::clearVisibleRows, ()->{lastResponsiveWidth=-1;applyResponsiveLayout();});
         WurmScrollPanel scroll = new ChamomiloUiV1ScrollPanel(
                 "waypointer.manager.scroll", table, false, true);
         listScroll=scroll;
+        table.bind(scroll);
         listTable = new WurmBorderPanel("waypointer.manager.table-panel");
         listTable.setComponent(scroll, WurmBorderPanel.CENTER);
         root.setComponent(listTable, WurmBorderPanel.CENTER);
@@ -326,7 +329,9 @@ final class WaypointManagerWindow extends WaypointerContentPanel
             WaypointManagerQuery query = query(context);
             WaypointManagerSnapshot snapshot = controller.snapshot(query);
             if (!explicitOrder && canUpdateLiveRows(snapshot)) {
-                for (WaypointManagerRow data : snapshot.getRows()) liveRows.get(data.getId()).update(data);
+                catalogueRows.clear();
+                for (WaypointManagerRow data : snapshot.getRows()) catalogueRows.put(data.getId(),data);
+                for (Map.Entry<UUID,LiveRow> row : liveRows.entrySet()) row.getValue().update(catalogueRows.get(row.getKey()));
                 updateCount(snapshot);
                 catalogueRevision = controller.revision();
                 return;
@@ -340,7 +345,6 @@ final class WaypointManagerWindow extends WaypointerContentPanel
                 for (WaypointManagerRow data : displayRows) if (!order.containsKey(data.getId())) order.put(data.getId(), order.size());
                 displayRows.sort((left, right) -> Integer.compare(order.get(left.getId()), order.get(right.getId())));
             }
-            table.removeAllComponents();
             rowActions.clear();
             sortActions.clear();
             liveDistanceCells.clear();
@@ -348,6 +352,7 @@ final class WaypointManagerWindow extends WaypointerContentPanel
             lastDistanceOriginX = Double.NaN;
             lastDistanceOriginY = Double.NaN;
             filteredIds = new ArrayList<UUID>();
+            catalogueRows.clear();
             tableLayoutRows.clear();
             tableHeader = header();
             WurmBorderPanel heading = new WurmBorderPanel("waypointer.manager.heading");
@@ -357,9 +362,10 @@ final class WaypointManagerWindow extends WaypointerContentPanel
             listTable.setComponent(heading, NORTH);
             for (WaypointManagerRow row : displayRows) {
                 filteredIds.add(row.getId());
-                table.addComponent(dataRow(row));
-                table.addComponent(gap(1, CONTROL_GAP));
+                catalogueRows.put(row.getId(),row);
             }
+            table.setRows(filteredIds.size(), previousOffset,
+                    index -> dataRow(catalogueRows.get(filteredIds.get(index))));
             updateCount(snapshot);
             lastResponsiveWidth = -1;
             applyResponsiveLayout();
@@ -377,12 +383,25 @@ final class WaypointManagerWindow extends WaypointerContentPanel
     }
 
     private boolean canUpdateLiveRows(WaypointManagerSnapshot snapshot) {
-        if (liveRows.size() != snapshot.getRows().size()) return false;
+        if (filteredIds.size() != snapshot.getRows().size()) return false;
+        java.util.Set<UUID> ids = new java.util.HashSet<UUID>(filteredIds);
         for (WaypointManagerRow data : snapshot.getRows()) {
+            if (!ids.contains(data.getId())) return false;
             LiveRow previous = liveRows.get(data.getId());
-            if (previous == null || !previous.sameControls(data)) return false;
+            if (previous != null && !previous.sameControls(data)) return false;
         }
         return true;
+    }
+
+    private void clearVisibleRows() {
+        rowActions.clear();liveDistanceCells.clear();liveRows.clear();
+        tableLayoutRows.removeIf(row -> row.panel != tableHeader);
+        hoverTexts.keySet().removeIf(component -> {
+            for (WurmComponent parent=component;parent!=null;parent=parent.parent)
+                if (parent==table) return true;
+            return false;
+        });
+        lastDistanceOriginX=lastDistanceOriginY=Double.NaN;
     }
 
     /** Retain the top visible UUID and the intra-row pixel offset, including after deletion. */
@@ -1382,7 +1401,7 @@ final class WaypointManagerWindow extends WaypointerContentPanel
                     - CONTROL_GAP * (WaypointManagerTableLayout.COLUMN_COUNT - 1));
             columnWidths[2] += extra; // Names use the remaining viewport space.
             int tableWidth=CONTROL_GAP * (WaypointManagerTableLayout.COLUMN_COUNT - 1);for(int columnWidth:columnWidths)tableWidth+=columnWidth;
-            for (TableLayoutRow row : tableLayoutRows) {
+            for (TableLayoutRow row : new ArrayList<TableLayoutRow>(tableLayoutRows)) {
                 row.apply(tableWidth, columnWidths);
             }
             if (table != null) table.componentResized();

@@ -73,6 +73,8 @@ public final class WaypointerUiProbe {
         pool.get(gui+"WurmScrollPanel$VScrollBar").getDeclaredMethod("renderComponent").setBody("{}");
         pool.get(gui+"WurmScrollPanel$HScrollBar").getDeclaredMethod("renderComponent").setBody("{}");
         Loader loader = new Loader(pool);
-        loader.run(gui + (Boolean.getBoolean("waypointer.probe.managerOnly") ? "WaypointManagerPanelProbe" : "HubLayoutProbe"), args);
+        loader.run(gui + (Boolean.getBoolean("waypointer.probe.surroundingsOnly")
+                ? "SurroundingsLargeCatalogProbe"
+                : Boolean.getBoolean("waypointer.probe.managerOnly") ? "WaypointManagerPanelProbe" : "HubLayoutProbe"), args);
     }
 }

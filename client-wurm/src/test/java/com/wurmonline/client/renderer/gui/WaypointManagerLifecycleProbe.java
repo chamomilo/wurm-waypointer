@@ -31,6 +31,11 @@ final class WaypointManagerLifecycleProbe {
         check(field(hud, "kbFocusComponent").get(hud) == input && field(hud, "isTyping").getBoolean(hud),
                 "Owning hub routes keyboard focus to the editor");
         manager.buttonClicked((WButton) field(manager, "cancelButton").get(manager));
+        List<?> orderedIds=(List<?>)field(manager,"filteredIds").get(manager);
+        int destinationIndex=orderedIds.indexOf(destination);
+        check(destinationIndex>=0,"Destination remains in the complete catalogue");
+        ((ChamomiloUiV1ScrollPanel)field(manager,"listScroll").get(manager)).scrollTo(0,destinationIndex*32);
+        hub.gameTick();
         WButton navigate=null;
         for(Map.Entry<?,?> entry:((Map<?,?>)field(manager,"rowActions").get(manager)).entrySet()) {
             Object action=entry.getValue();
